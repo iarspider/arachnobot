@@ -422,7 +422,7 @@ class Bot(commands.Bot):
             stream = await self.my_get_stream(self.user_id)
             game = self.my_get_game(stream['game_id'])
             delta = self.countdown_to - datetime.datetime.now()
-            announcement = f"<@&{discord_role.id> Паучок запустил стрим \"{stream['title']}\" " \
+            announcement = f"<@&{discord_role.id} Паучок запустил стрим \"{stream['title']}\" " \
                            f"по игре \"{game['name']}\"! У вас есть примерно {delta.seconds // 60} минут чтобы" \
                            " открыть стрим - <https://twitch.tv/iarspider>!"
             await discord_channel.send(announcement)
@@ -724,7 +724,8 @@ class Bot(commands.Bot):
         return res.json()['data'][0]
 
     @staticmethod
-    async def my_get_stream(user_id):
+    async def my_get_stream(user_id) -> dict:
+        res = None
         while True:
             logger.info("Attempting to get stream...")
             try:
