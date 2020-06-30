@@ -7,6 +7,7 @@ import random
 from collections import deque, defaultdict
 from typing import Union, Iterable, Optional
 
+import colorlog
 import discord
 import pygame
 import requests
@@ -19,7 +20,6 @@ from requests.structures import CaseInsensitiveDict
 from twitchio.dataclasses import Context
 from twitchio.ext import commands
 
-
 import streamlabs_api as api
 import twitch_api
 from config import *
@@ -31,10 +31,43 @@ except ImportError as e:
     pywinauto = None
 
 import logging
-import http.client
+import http.client as http_client
 
 httpclient_logger = logging.getLogger("http.client")
 discord_channel: Optional[discord.TextChannel] = None
+discord_role: Optional[discord.Role] = None
+logger: Optional[logging.Logger] = None
+
+
+def setup_logging(logfile, debug, color, http_debug):
+    global logger
+    logger = logging.getLogger("bot")
+    logger.propagate = False
+    handler = logging.StreamHandler()
+    if color:
+        handler.setFormatter(
+            colorlog.ColoredFormatter('%(asctime)s %(log_color)s[%(name)s:%(levelname)s]%(reset)s %(message)s',
+                                      datefmt='%H:%M:%S'))
+    else:
+        handler.setFormatter(logging.Formatter(fmt="%(asctime)s [%(name)s:%(levelname)s] %(message)s",
+                                               datefmt='%H:%M:%S'))
+
+    file_handler = logging.FileHandler(logfile, "w")
+    file_handler.setFormatter(logging.Formatter(fmt="%(asctime)s [%(name)s:%(levelname)s] %(message)s"))
+
+    logger.addHandler(handler)
+    logger.addHandler(file_handler)
+
+    if not debug:
+        logger.setLevel(logging.INFO)
+        logging.getLogger('discord').setLevel(logging.INFO)
+    else:
+        logger.info("Debug logging is ON")
+        logger.setLevel(logging.DEBUG)
+        logging.getLogger('discord').setLevel(logging.DEBUG)
+
+    if http_debug:
+        http_client.HTTPConnection.debuglevel = 1
 
 
 def httpclient_logging_patch(level=logging.DEBUG):
@@ -45,9 +78,9 @@ def httpclient_logging_patch(level=logging.DEBUG):
 
     # mask the print() built-in in the http.client module to use
     # logging instead
-    http.client.print = httpclient_log
+    http_client.print = httpclient_log
     # enable debugging
-    http.client.HTTPConnection.debuglevel = 1
+    http_client.HTTPConnection.debuglevel = 1
 
 
 class Bot(commands.Bot):
@@ -146,6 +179,8 @@ class Bot(commands.Bot):
 
         self.bots = (self.nick, 'nightbot', 'pretzelrocks')
 
+        self.countdown_to = None
+
     @staticmethod
     def play_sound(sound: str):
         soundfile = pathlib.Path(__file__).with_name(sound)
@@ -206,7 +241,7 @@ class Bot(commands.Bot):
         print(f'Ready | {self.nick}')
         self.user_id = self.my_get_users(self.initial_channels[0].lstrip('#'))['id']
         sess = twitch_api.get_session(twitch_client_id, twitch_client_secret, twitch_redirect_url)
-        self.pubsub_nonce = await self.pubsub_subscribe(sess.access_token,
+        self.pubsub_nonce = await self.pubsub_subscribe(sess.token["access_token"],
                                                         'channel-points-channel-v1.{0}'.format(self.user_id))
 
     async def event_message(self, message):
@@ -314,7 +349,7 @@ class Bot(commands.Bot):
 
         res: obsws_requests.GetStreamingStatus = self.ws.call(obsws_requests.GetStreamingStatus())
         if res.getStreaming():
-            print('[WARN] Already streaming!')
+            logger.error('Already streaming!')
             return
 
         asyncio.ensure_future(ctx.send('К стриму готов!'))
@@ -323,6 +358,30 @@ class Bot(commands.Bot):
 
     @commands.command(name='countdown', aliases=['preroll', 'cd', 'pr', 'св', 'зк'])
     async def countdown(self, ctx: Context):
+        def write_countdown_html():
+            args = ctx.message.content.split()[1:]
+            parts = tuple(int(x) for x in args[0].split(':'))
+            if len(parts) == 2:
+                m, s = parts
+                # noinspection PyShadowingNames
+                delta = datetime.timedelta(minutes=m, seconds=s)
+                dt = datetime.datetime.now() + delta
+            elif len(parts) == 3:
+                h, m, s = parts
+                dt = datetime.datetime.now().replace(hour=h, minute=m, second=s)
+            else:
+                print("[ERROR] Invalid call to countdown: {0}".format(args[0]))
+                return
+
+            self.countdown_to = dt
+
+            with codecs.open(self.htmlfile.replace('html', 'template'), encoding='UTF-8') as f:
+                lines = f.read()
+
+            lines = lines.replace('@@date@@', dt.isoformat())
+            with codecs.open(self.htmlfile, 'w', encoding='UTF-8') as f:
+                f.write(lines)
+
         if not self.check_sender(ctx, 'iarspider'):
             return
 
@@ -331,27 +390,10 @@ class Bot(commands.Bot):
 
         res: obsws_requests.GetStreamingStatus = self.ws.call(obsws_requests.GetStreamingStatus())
         if res.getStreaming():
+            logger.error('Already streaming!')
             return
 
-        args = ctx.message.content.split()[1:]
-        parts = tuple(int(x) for x in args[0].split(':'))
-        if len(parts) == 2:
-            m, s = parts
-            delta = datetime.timedelta(minutes=m, seconds=s)
-            dt = datetime.datetime.now() + delta
-        elif len(parts) == 3:
-            h, m, s = parts
-            dt = datetime.datetime.now().replace(hour=h, minute=m, second=s)
-        else:
-            print("[ERROR] Invalid call to countdown: {0}".format(args[0]))
-            return
-
-        with codecs.open(self.htmlfile.replace('html', 'template'), encoding='UTF-8') as f:
-            lines = f.read()
-
-        lines = lines.replace('@@date@@', dt.isoformat())
-        with codecs.open(self.htmlfile, 'w', encoding='UTF-8') as f:
-            f.write(lines)
+        write_countdown_html()
 
         self.ws.call(obsws_requests.DisableStudioMode())
 
@@ -373,26 +415,18 @@ class Bot(commands.Bot):
         if self.player is not None:
             self.player.type_keys('+%P', set_foreground=False)  # Pause
 
-        asyncio.ensure_future(ctx.send('Начат обратный отсчёт до {0}!'.format(dt.strftime('%X'))))
+        asyncio.ensure_future(ctx.send('Начат обратный отсчёт до {0}!'.format(self.countdown_to.strftime('%X'))))
+        asyncio.ensure_future(self.my_run_commercial(self.user_id))
 
         if discord_bot is not None and discord_channel is not None:
-            while True:
-                print("INFO: Attempting to get stream...")
-                try:
-                    stream = self.my_get_stream(self.user_id)
-                except IndexError:
-                    print("FAIL: No information yet")
-                    pass
-                else:
-                    print("PASS: Success!")
-                    game = self.my_get_game(stream['game_id'])
-                    announcement = f"<@&709415313665425419> Паучок запустил стрим \"{stream['title']}\" " \
-                                   f"по игре \"{game['name']}\"!" \
-                                   " Смотреть тут - <https://twitch.tv/iarspider>!"
-                    await discord_channel.send(announcement)
-                    print("INFO: Discord notification sent!")
-                    break
-                await asyncio.sleep(60)
+            stream = await self.my_get_stream(self.user_id)
+            game = self.my_get_game(stream['game_id'])
+            delta = self.countdown_to - datetime.datetime.now()
+            announcement = f"<@&{discord_role.id> Паучок запустил стрим \"{stream['title']}\" " \
+                           f"по игре \"{game['name']}\"! У вас есть примерно {delta.seconds // 60} минут чтобы" \
+                           " открыть стрим - <https://twitch.tv/iarspider>!"
+            await discord_channel.send(announcement)
+            logger.info("Discord notification sent!")
 
     # noinspection PyUnusedLocal
     @commands.command(name='end', aliases=['fin', 'конец', 'credits'])
@@ -401,7 +435,7 @@ class Bot(commands.Bot):
         try:
             api.roll_credits(self.streamlabs_oauth)
         except requests.HTTPError as exc:
-            print("[ERROR] Can't roll credits! " + str(exc))
+            logger.error("Can't roll credits! " + str(exc))
             pass
 
     @commands.command(name='vr')
@@ -516,11 +550,11 @@ class Bot(commands.Bot):
         if len(args) != 1:
             await ctx.send("Использование: !attack <кого>")
         defender = args[0].strip('@')
-        
+
         if self.is_mod(attacker):
             await ctx.send("Модерам не нужны кубики, чтобы кого-то забанить :)")
             return
-            
+
         if self.is_mod(defender):
             await ctx.send(f"А вот модеров не трожь, @{attacker}!")
             await asyncio.sleep(15)
@@ -655,6 +689,7 @@ class Bot(commands.Bot):
 
         # self.get_chatters()
         asyncio.ensure_future(ctx.send('Начать перепись населения!'))
+        asyncio.ensure_future(self.my_run_commercial(self.user_id, 60))
 
     @commands.command(name='start')
     async def start_(self, ctx: Context):
@@ -689,14 +724,23 @@ class Bot(commands.Bot):
         return res.json()['data'][0]
 
     @staticmethod
-    def my_get_stream(user_id):
-        res = requests.get('https://api.twitch.tv/helix/streams', params={'user_id': user_id},
-                           headers={'Accept': 'application/vnd.twitchtv.v5+json',
-                                    'Authorization': f'Bearer {twitch_chat_password}',
-                                    'Client-ID': twitch_client_id_alt})
+    async def my_get_stream(user_id):
+        while True:
+            logger.info("Attempting to get stream...")
+            try:
+                res = requests.get('https://api.twitch.tv/helix/streams', params={'user_id': user_id},
+                                   headers={'Accept': 'application/vnd.twitchtv.v5+json',
+                                            'Authorization': f'Bearer {twitch_chat_password}',
+                                            'Client-ID': twitch_client_id_alt})
+                res.raise_for_status()
+            except IndexError:
+                logger.info("Stream not detected yet")
+                pass
+            else:
+                logger.info("Got stream")
+                return res.json()['data'][0]
 
-        res.raise_for_status()
-        return res.json()['data'][0]
+            await asyncio.sleep(60)
 
     @staticmethod
     def my_get_game(game_id):
@@ -706,6 +750,17 @@ class Bot(commands.Bot):
                                     'Client-ID': twitch_client_id_alt})
 
         return res.json()['data'][0]
+
+    async def my_run_commercial(self, user_id, length=90):
+        await self.my_get_stream(self.user_id)
+        sess = twitch_api.get_session(twitch_client_id, twitch_client_secret, twitch_redirect_url)
+        res = sess.post('https://api.twitch.tv/helix/channels/commercial',
+                        data={'broadcaster_id': user_id, 'length': length},
+                        headers={'Client-ID': twitch_client_id})
+        try:
+            res.raise_for_status()
+        except requests.HTTPError:
+            logger.error("Failed to run commercial:", res.json())
 
     @commands.command(name='resume')
     async def resume(self, ctx: Context):
@@ -731,7 +786,7 @@ class Bot(commands.Bot):
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
 
         try:
-            res = self.my_get_stream(self.user_id)
+            res = await self.my_get_stream(self.user_id)
             viewers = res['viewer_count']
             asyncio.ensure_future(
                 ctx.send(
@@ -871,7 +926,7 @@ class Bot(commands.Bot):
             return
 
         await self.activate_voicemod()
-    
+
     @commands.command(name='help', aliases=('помощь', 'справка'))
     async def help(self, ctx: Context):
         asyncio.ensure_future(ctx.send(f"Никто тебе не поможет, {ctx.author.name}!"))
@@ -937,12 +992,8 @@ class Bot(commands.Bot):
 if __name__ == '__main__':
     import logging
 
-    # import http.client as http_client
-    # http_client.HTTPConnection.debuglevel = 1
+    setup_logging("bot.log", color=True, debug=False, http_debug=False)
 
-    logging.basicConfig(level=logging.INFO)
-
-    logger = logging.getLogger('discord')
     # logger.setLevel(logging.DEBUG)
     # Run bot
     _loop = asyncio.get_event_loop()
@@ -953,9 +1004,10 @@ if __name__ == '__main__':
     invalid.remove('w')
     twitchio.dataclasses.Messageable.__invalid__ = tuple(invalid)
 
+
     @discord_bot.event
     async def on_ready():
-        global discord_channel
+        global discord_channel, discord_role
         # print("Discord | on_ready")
         guild = discord.utils.find(lambda g: g.name == discord_guild_name, discord_bot.guilds)
 
@@ -966,7 +1018,12 @@ if __name__ == '__main__':
         if discord_channel is None:
             raise RuntimeError(f"Failed to join Discord channel {discord_channel_name}!")
 
-        print(f"Ready | {discord_bot.user} @ {guild.name}")
+        logger.info(f"Ready | {discord_bot.user} @ {guild.name}")
+
+        discord_role = discord.utils.find(lambda r: r.name == discord_role_name, guild.roles)
+        if discord_role is None:
+            raise RuntimeError(f"No role {discord_role_name} in guild {discord_guild_name}!")
+            
 
     asyncio.ensure_future(discord_bot.start(discord_bot_token), loop=_loop)
     twitch_bot.run()

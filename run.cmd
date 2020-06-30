@@ -1,2 +1,2 @@
 @echo off
-pipenv run bot.py
+pipenv run python bot.py

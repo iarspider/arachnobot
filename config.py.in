@@ -1,0 +1,29 @@
+twitch_client_id = "" # client id of your application - used for about everything
+twitch_client_id_alt = "q6batx0epp608isickayubi39itsckt" # client id of twitch chat password generator
+twitch_client_secret = ""
+twitch_redirect_url = ""
+twitch_chat_password = "" # obtained with twitch chat password generator
+
+streamlabs_client_id = ""
+streamlabs_client_secret = ""
+streamlabs_redirect_uri = ""
+
+discord_bot_token = ""
+discord_guild_name = ""
+discord_channel_name = ""
+discord_role_name = ""
+
+obsws_address = "127.0.0.1"
+obsws_password = "spider"
+obsws_port = "4444"
+
+twitch_ladies = (
+    "aiyonamurakami", "chillmeow", "karzti", "tarakanchik14", "laimaaaa", "womens_games", "trurl_constructor", "sum174",
+    "looputaps", "prayda_alpha", "babytigeronthesunflower", "iieerraa", "metamorfa", "gingerbreadcat", "marna149",
+    "moar__", "enotova09", "tetya_sova", "ainu__lossea", "hastia78", "juliett_countess", "siona_phoenix",
+    "blackflashru", "batarashka", "ahhacat100", "phoenix__tv", "zverja", "miraelen", "flower_child_cs", "elly_gadget",
+    "rickeysha", "eolyteam", "elfnatelf", "natelfa", "katrinka125", "blackamber_", "lavrikovajulia", "sovvva",
+    "silverina", "elinary", "da_kina", "albina2502", "dknats", "miricko", "madzisa", "Satila_", "mama_zuzu",
+    "juliet_countess", "ljova2010", "kurai6", "dainega32", "ozverinka", "wyverna12", "mathematicienne_christina",
+    "46xoma", "chashir_meu", "mallleria", "killhelll", "marinadobraya", "chestnutsan", "lesyalisyonok", "mirunyaska",
+    "elwinxx2", "miranight", "alexandra1987", "zmeyagorinovna", "dark_lady_alice", "nastyazaechik")

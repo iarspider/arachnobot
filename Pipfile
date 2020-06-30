@@ -17,6 +17,10 @@ obs-websocket-py = "*"
 py-dateutil = "*"
 pygame = "*"
 discord-py = "*"
+socketio = "*"
+python-dotenv = "*"
+python-socketio = "*"
+colorlog = "*"
 
 [requires]
 python_version = "3.8"
