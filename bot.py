@@ -422,7 +422,7 @@ class Bot(commands.Bot):
             stream = await self.my_get_stream(self.user_id)
             game = self.my_get_game(stream['game_id'])
             delta = self.countdown_to - datetime.datetime.now()
-            announcement = f"<@&{discord_role.id} Паучок запустил стрим \"{stream['title']}\" " \
+            announcement = f"<@&{discord_role.id}> Паучок запустил стрим \"{stream['title']}\" " \
                            f"по игре \"{game['name']}\"! У вас есть примерно {delta.seconds // 60} минут чтобы" \
                            " открыть стрим - <https://twitch.tv/iarspider>!"
             await discord_channel.send(announcement)
@@ -726,6 +726,7 @@ class Bot(commands.Bot):
     @staticmethod
     async def my_get_stream(user_id) -> dict:
         res = None
+        stream = None
         while True:
             logger.info("Attempting to get stream...")
             try:
@@ -734,12 +735,13 @@ class Bot(commands.Bot):
                                             'Authorization': f'Bearer {twitch_chat_password}',
                                             'Client-ID': twitch_client_id_alt})
                 res.raise_for_status()
+                stream = res.json()['data'][0]
             except IndexError:
                 logger.info("Stream not detected yet")
                 pass
             else:
                 logger.info("Got stream")
-                return res.json()['data'][0]
+                return stream
 
             await asyncio.sleep(60)
 

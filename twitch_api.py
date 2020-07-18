@@ -33,7 +33,7 @@ def validate(oauth: OAuth2Session, can_refresh=True):
     try:
         r = requests.get('https://id.twitch.tv/oauth2/validate',
                          headers={'Authorization': f'OAuth {oauth.token["access_token"]}'})
-        print(r.text)
+        # print(r.text)
         r.raise_for_status()
     except requests.HTTPError as e:
         if can_refresh:
@@ -69,7 +69,7 @@ def my_get_users(oauth, user_name):
     try:
         res.raise_for_status()
     except requests.HTTPError:
-        print(res.text)
+        # print(res.text)
         exit(1)
     return res.json()['data'][0]
 
