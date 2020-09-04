@@ -13,6 +13,7 @@ import pygame
 import requests
 import simplejson
 import twitchio
+from pytils import numeral
 from obswebsocket import obsws
 from obswebsocket import requests as obsws_requests
 from requests.structures import CaseInsensitiveDict
@@ -87,6 +88,12 @@ class Bot(commands.Bot):
     async def event_pubsub(self, data):
         pass
 
+    @staticmethod
+    async def create_timer(timeout, stuff):
+        while True:
+            await asyncio.sleep(timeout)
+            await stuff()
+
     # noinspection PyPep8Naming
     @staticmethod
     def setup_mixer():
@@ -150,7 +157,7 @@ class Bot(commands.Bot):
         except (FileNotFoundError, TypeError, ValueError):
             pass
 
-        self.rippers = ('iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv')
+        self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv']
         self.write_rip()
 
         self.last_post = CaseInsensitiveDict()
@@ -422,8 +429,10 @@ class Bot(commands.Bot):
             stream = await self.my_get_stream(self.user_id)
             game = self.my_get_game(stream['game_id'])
             delta = self.countdown_to - datetime.datetime.now()
+            delta_m = delta.seconds // 60
+            delta_text = numeral.get_plural(delta_m, ('минута', 'минуты', 'минут'))
             announcement = f"<@&{discord_role.id}> Паучок запустил стрим \"{stream['title']}\" " \
-                           f"по игре \"{game['name']}\"! У вас есть примерно {delta.seconds // 60} минут чтобы" \
+                           f"по игре \"{game['name']}\"! У вас есть примерно {delta_m} {delta_text} чтобы" \
                            " открыть стрим - <https://twitch.tv/iarspider>!"
             await discord_channel.send(announcement)
             logger.info("Discord notification sent!")
@@ -790,17 +799,17 @@ class Bot(commands.Bot):
 
         try:
             res = await self.my_get_stream(self.user_id)
-            viewers = res['viewer_count']
+            viewers = numeral.get_plural(res['viewer_count'], ('зритель', 'зрителя', 'зрителей'))
             asyncio.ensure_future(
                 ctx.send(
-                    'Перепись населения завершена успешно! Население стрима составляет {0} зрителей'.format(viewers)))
+                    'Перепись населения завершена успешно! Население стрима составляет {0}'.format(viewers)))
         except (KeyError, TypeError) as exc:
             asyncio.ensure_future(ctx.send('Перепись населения не удалась :('))
             print(str(exc))
 
     def write_plusch(self):
         with codecs.open("plusch.txt", "w", "utf8") as f:
-            f.write("Кого-то поплющило {0} раз...".format(self.plusches))
+            f.write("Кого-то поплющило {0}...".format(numeral.get_plural(self.plusches, ('раз', 'раза', 'раз'))))
 
     @commands.command(name='plusch', aliases=['плющ'])
     async def plusch(self, ctx: Context):
@@ -821,13 +830,14 @@ class Bot(commands.Bot):
 
     def write_rip(self):
         with codecs.open('rip_display.txt', 'w', 'utf8') as f:
-            f.write(u'☠: сегодня {0}, всего: {1}'.format(*self.deaths))
+            f.write(u'☠: {0} ({1})'.format(*self.deaths))
+            # f.write(u'☠: {1}'.format(*self.deaths))
 
         with open('rip.txt', 'w') as f:
             f.write(str(self.deaths[1]))
 
     async def do_rip(self, ctx: Context, reason: Optional[str] = None):
-        if not (self.is_mod(ctx.author.name) or self.is_vip(ctx.author.name)):
+        if not (self.is_mod(ctx.author.name) or self.is_vip(ctx.author.name) or ctx.author.name.lower() == "wmuga"):
             asyncio.ensure_future(ctx.send("Эту кнопку не трожь!"))
             return
 
@@ -848,6 +858,34 @@ class Bot(commands.Bot):
             %% rip
         """
         await self.do_rip(ctx)
+
+    @commands.command(name='unrip')
+    async def unrip(self, ctx: Context):
+        """
+        Отмена смерти
+        """
+        if not self.check_sender(ctx, 'iarspider'):
+            return
+
+        self.deaths[0] -= 1
+        self.deaths[1] -= 1
+
+        self.write_rip()
+
+        asyncio.ensure_future(ctx.send("MercyWing1 PinkMercy MercyWing2".format(*self.deaths)))
+
+    @commands.command(name='enrip')
+    async def enrip(self, ctx:Context):
+        """
+        Временно (до перезапуска бота) добавляет пользователя в rip-список
+        """
+        if not self.check_sender(ctx, 'iarspider'):
+            return
+
+        args = ctx.message.content.split()[1:]
+        if len(args) != 1:
+            asyncio.ensure_future(ctx.send("Неправильный запрос"))
+        self.rippers.append(args[0])
 
     # @commands.command(name='ripz')
     # async def ripz(self, ctx: Context):
@@ -991,6 +1029,15 @@ class Bot(commands.Bot):
         for m in reversed(res):
             await ctx.send(m)
 
+    async def mc_rip(self):
+        try:
+            with open(r"e:\MultiMC\instances\InSphere Deeper 0.8.3\.minecraft\LP World v3_deathcounter.txt") as f:
+                self.deaths[0] =  int(f.read())
+                self.deaths[1] = self.deaths[0]
+                self.write_rip()
+        except OSError:
+            return
+
 
 if __name__ == '__main__':
     import logging
@@ -1026,7 +1073,7 @@ if __name__ == '__main__':
         discord_role = discord.utils.find(lambda r: r.name == discord_role_name, guild.roles)
         if discord_role is None:
             raise RuntimeError(f"No role {discord_role_name} in guild {discord_guild_name}!")
-            
+
 
     asyncio.ensure_future(discord_bot.start(discord_bot_token), loop=_loop)
     twitch_bot.run()

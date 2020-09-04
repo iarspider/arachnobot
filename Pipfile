@@ -21,6 +21,8 @@ socketio = "*"
 python-dotenv = "*"
 python-socketio = "*"
 colorlog = "*"
+pytils = "*"
+watchdog = "*"
 
 [requires]
 python_version = "3.8"
