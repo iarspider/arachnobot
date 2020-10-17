@@ -17,12 +17,12 @@ obs-websocket-py = "*"
 py-dateutil = "*"
 pygame = "*"
 discord-py = "*"
-socketio = "*"
 python-dotenv = "*"
 python-socketio = "*"
 colorlog = "*"
 pytils = "*"
 watchdog = "*"
+uvicorn = "*"
 
 [requires]
 python_version = "3.8"
