@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Chat</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.7/semantic.min.css" integrity="sha512-g/MzOGVPy3OQ4ej1U+qe4D/xhLwUn5l5xL0Fa7gdC258ZWVJQGwsbIR47SWMpRxSPjD0tfu/xkilTy+Lhrl3xg==" crossorigin="anonymous" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.7/semantic.min.js" integrity="sha512-1Nyd5H4Aad+OyvVfUOkO/jWPCrEvYIsQENdnVXt1+Jjc4NoJw28nyRdrpOCyFH4uvR3JmH/5WmfX1MJk2ZlhgQ==" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js" integrity="sha512-AcZyhRP/tbAEsXCCGlziPun5iFvcSUpEz2jKkx0blkYKbxU81F+iq8FURwPn1sYFeksJ+sDDrI5XujsqSobWdQ==" crossorigin="anonymous"></script>
+        <style type="text/css">.ui.label {font-size: 24px;} body {font-size: 24px;}</style>
+    </head>
+    <body style='background-color: #18181B'>
+        <script>
+            // document.addEventListener("DOMContentLoaded", function(){ $('#select').dropdown(); });
+            // var iarws = new WebSocket("wss://fr.iarazumov.com/ws");
+            const iarws = io("wss://fr.iarazumov.com/", {
+                             transports: ['websocket'],
+                             path: '/ws'});
+//            const iarws = io("wss://fr.iarazumov.com/", {
+//                             path: '/ws'});
+
+            // var drop_data = new Array();
+            on_add = function(v) {
+                var id = 'viewer_' + hashCode(v.name);
+                if (document.getElementById(id) === null) {
+                    var node = create_label(v);
+                    var root = document.getElementById('viewerz');
+                    document.getElementById('viewerz').append(node);
+                }
+            }
+
+            on_remove = function(v) {
+                var id = 'viewer_' + hashCode(v.name);
+                var node = document.getElementById(id);
+                if (node !== null) {
+                    node.remove();
+                    node = null;
+                }
+            }
+            
+            on_event = function(v) {
+                console.log(v);
+            }
+
+            create_label = function(v) {
+                var fragment = document.getElementById('template').content.cloneNode(true);
+                var div = fragment.querySelector('div');
+                var icon = fragment.querySelector('i');
+                icon.className = v.status + ' icon';
+                if (v.femme) {
+                    icon2 = document.createElement('i');
+                    icon2.className = 'venus icon';
+                    icon.parentNode.insertBefore(icon2, icon.nextSibling);
+                }
+
+                div.id = 'viewer_' + hashCode(v.name);
+                div.style.color = v.color;
+                for (var i = 0; i < div.childNodes.length; i++) {
+                    var curNode = div.childNodes[i];
+                    if (curNode.nodeName === "#text" && curNode.nodeValue.trim() === "23") {
+                        curNode.nodeValue = v.name;
+                        break;
+                    }
+                }
+
+                return fragment;
+            }
+
+            get_random = function(list) {
+                return list[Math.floor((Math.random() * list.length))];
+            }
+
+            const div_viewers = document.getElementById("viewerz");
+            const hashCode = s => s.split('').reduce((a, b) => (((a << 5) - a) + b.charCodeAt(0)) | 0, 0);
+
+            let viewers = [];
+            
+            /*          
+            iarws.onmessage = function (event) {
+                var content = JSON.parse(event.data);
+
+                if (content.action === "add") {
+                    on_add(content.value);
+                }
+                if (content.action === "remove") {
+                    on_delete(content.value);
+                }
+            };
+            */
+            iarws.on('add', on_add);
+            iarws.on('remove', on_remove);
+            iarws.on('event', on_event);
+//            iarws.on('reconnect_attempt', () => {
+//                iarws.io.opts.transports = ['polling', 'websocket'];
+//            });
+            
+        </script>
+
+        <template id="template">
+            <div class="ui black label" style="color: #8F8F8F">
+                <i class="mail icon"></i> 23
+            </div>
+        </template>
+
+        <div class="ui middle aligned two column centered grid">
+            <div class="row">
+                <div class="four wide column">
+                    <!-- iframe frameborder="0" scrolling="off" src="https://www.twitch.tv/embed/iarspider/chat?parent=fr.iarazumov.com&darkpopout" height="900" width="100%">
+                    </iframe -->
+                </div>
+                <div class="eight wide column">
+                    <div class="row" id="viewerz">
+                    </div>
+                    <div class="row" style="height: 75%; overflow: auto">
+                        <ul id="log"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
