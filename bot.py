@@ -1182,6 +1182,7 @@ if __name__ == '__main__':
     # async def sl_client_message(data):
     #     logger.info(f'SL message: {data}')
 
+
     @sl_client.on('event')
     async def sl_client_event(data):
         logger.info(f'SL event: {data}')
@@ -1215,12 +1216,11 @@ if __name__ == '__main__':
                     to_[k_] = 'UNKNOWN'
 
         message = {'action': 'event', 'value': {'type': data['type']}}
-        for k in pick_keys:
-            if isinstance(data['message'], list):
-                for msg in data['message']:
-                    copy_keys(msg, message['value'], pick_keys)
-            else:
-                copy_keys(data['message'], message['value'], pick_keys)
+        if isinstance(data['message'], list):
+            for msg in data['message']:
+                copy_keys(msg, message['value'], pick_keys)
+        else:
+            copy_keys(data['message'], message['value'], pick_keys)
 
         await twitch_bot.queue.put(message)
 
