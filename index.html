@@ -7,9 +7,21 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.7/semantic.min.css" integrity="sha512-g/MzOGVPy3OQ4ej1U+qe4D/xhLwUn5l5xL0Fa7gdC258ZWVJQGwsbIR47SWMpRxSPjD0tfu/xkilTy+Lhrl3xg==" crossorigin="anonymous" />
         <script src="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.7/semantic.min.js" integrity="sha512-1Nyd5H4Aad+OyvVfUOkO/jWPCrEvYIsQENdnVXt1+Jjc4NoJw28nyRdrpOCyFH4uvR3JmH/5WmfX1MJk2ZlhgQ==" crossorigin="anonymous"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js" integrity="sha512-AcZyhRP/tbAEsXCCGlziPun5iFvcSUpEz2jKkx0blkYKbxU81F+iq8FURwPn1sYFeksJ+sDDrI5XujsqSobWdQ==" crossorigin="anonymous"></script>
-        <style type="text/css">.ui.label {font-size: 24px;} body {font-size: 24px;}</style>
+        <style type="text/css">
+            .ui.label {font-size: 24px;} 
+            body {
+                font-size: 24px;
+                background-color: #18181B
+            }
+            .ui.list .item .content {
+                color: gray;
+            }
+            .ui.list .item i.icon {
+                color: gray;
+            }
+        </style>
     </head>
-    <body style='background-color: #18181B'>
+    <body>
         <script>
             // document.addEventListener("DOMContentLoaded", function(){ $('#select').dropdown(); });
             // var iarws = new WebSocket("wss://fr.iarazumov.com/ws");
@@ -38,19 +50,21 @@
             }
             
             on_event = function(v) {
+                console.log('event!');
+                console.log(v);
                 res = {};
                 switch (v.type) {
                     case 'donation':
-                        res = {icon: 'dollar sign', text: `Донат от ${v.from} на сумму ${v.formattedAmount}: ${v.message}`};
+                        res = {icon: 'dollar sign', text: `Донат от ${v.from} на сумму ${v.formatted_amount}: ${v.message}`};
                         break;
                     case 'follow':
-                        res = {icon: 'eye', text: `Фоллоу: ${v.node}`};
+                        res = {icon: 'eye', text: `Фоллоу: ${v.name}`};
                         break;
                     case 'subscription':
-                        res = {icon: 'lightbulb', text: `Подписка:$ {v.name}, срок ${v.months}, уровень ${v.sub_plan}: ${v.message}`};
+                        res = {icon: 'lightbulb', text: `Подписка: ${v.name}, срок ${v.months}, уровень ${v.sub_plan}: ${v.message}`};
                         break;
                     case 'resub':
-                        res = {icon: 'lightbulb', text: `Продление: ${v.name}, срок ${v.months} (${v.streak_months}), уровень ${v.sub_plan}: ${v.message}`};
+                        res = {icon: 'lightbulb', text: `Продление: ${v.name}, срок ${v.streak_months} (всего ${v.months}), уровень ${v.sub_plan}: ${v.message}`};
                         break;
                     case 'host':
                         res = {icon: 'home', text: `Хост от ${v.name}, зрителей ${v.viewers}`};
@@ -75,7 +89,7 @@
                         return;
                 }
                 
-                node = crete_event(res);
+                node = create_event(res);
                 document.getElementById('log').append(node);
             }
             
@@ -187,14 +201,14 @@
         <div class="ui middle aligned two column centered grid">
             <div class="row">
                 <div class="four wide column">
-                    <!-- iframe frameborder="0" scrolling="off" src="https://www.twitch.tv/embed/iarspider/chat?parent=fr.iarazumov.com&darkpopout" height="900" width="100%">
-                    </iframe -->
+                    <iframe frameborder="0" scrolling="off" src="https://www.twitch.tv/embed/iarspider/chat?parent=fr.iarazumov.com&darkpopout" height="900" width="100%">
+                    </iframe>
                 </div>
                 <div class="eight wide column">
                     <div class="row" id="viewerz">
                     </div>
                     <div class="row" style="height: 75%; overflow: auto">
-                        <div class="ui list" id="log">
+                        <div class="ui list" id="log" style="text-color: white">
                         </div>
                     </div>
                 </div>

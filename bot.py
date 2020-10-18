@@ -1184,10 +1184,10 @@ if __name__ == '__main__':
 
     @sl_client.on('event')
     async def sl_client_event(data):
-        # logger.info(f'SL event: {data}')
+        logger.info(f'SL event: {data}')
         pick_keys = []
         if data['type'] == 'donation':
-            pick_keys.extend(('from', 'message', 'formattedAmount'))
+            pick_keys.extend(('from', 'message', 'formatted_amount'))
         elif data['type'] == 'follow':
             pick_keys.extend(('name',))
         elif data['type'] == 'subscription':
@@ -1200,16 +1200,27 @@ if __name__ == '__main__':
             pick_keys.extend(('name', 'amount', 'message'))
         elif data['type'] == 'raid':
             pick_keys.extend(('name', 'raiders'))
+        elif data['type'] == 'alertPlaying':
+            return
         else:
             logger.warning(f'Unknown SL event type: {data["type"]}')
             return
 
-        message = {'action': 'event', 'value': {'action': data['type']}}
+        def copy_keys(from_, to_, keys_):
+            for k_ in keys_:
+                if k_ in from_:
+                    to_[k_] = from_[k_]
+                else:
+                    logger.warning(f'Event {data["type"]} missing key {k_}')
+                    to_[k_] = 'UNKNOWN'
+
+        message = {'action': 'event', 'value': {'type': data['type']}}
         for k in pick_keys:
-            if k in data['message']:
-                message['value'][k] = data['message'][k]
+            if isinstance(data['message'], list):
+                for msg in data['message']:
+                    copy_keys(msg, message['value'], pick_keys)
             else:
-                logger.warning(f'Event {message["action"]} missing key {k}')
+                copy_keys(data['message'], message['value'], pick_keys)
 
         await twitch_bot.queue.put(message)
 
