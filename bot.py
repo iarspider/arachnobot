@@ -288,7 +288,7 @@ class Bot(commands.Bot):
         elif user.badges.get('moderator', 0):
             status = 'hammer'
         elif user.badges.get('vip', 0):
-            status = 'reward'
+            status = 'award'
         else:
             status = 'eye'
 
@@ -1331,3 +1331,13 @@ if __name__ == '__main__':
     # data = {'type': 'raid', 'message': [
     #     {'name': 'IARSpider', 'isTest': True, 'raiders': 927, '_id': '98d84f5070c7457d5ef2b57c11b42883',
     #      'priority': 10}], 'for': 'twitch_account', 'event_id': 'evt_35b84e788985457d2688fc5e824aa065'}
+    # data = {'type': 'subscription', 'message': [
+    #     {'priority': 10, '_id': '5f8c454af356b', 'from': 'barabusik022', 'from_display_name': 'Barabusik022',
+    #      'emotes': None, 'months': 1, 'streak_months': None, 'message': '', 'payload': [], 'name': 'barabusik022',
+    #      'display_name': 'Barabusik022', 'subPlan': '1000', 'sub_plan': '1000', 'subscriber_twitch_id': 137911875,
+    #    'gifter': 'nickopolidiss', 'gifter_display_name': 'Nickopolidiss', 'count': 1, 'repeat': True, 'isTest': False,
+    #      'createdAt': '2020-10-18 13:38:18', 'platform': 'twitch_account', 'planName': '', 'type': 'subscription',
+    #      'hash': 'subscription:barabusik022:', 'read': False, 'amount': None, 'membershipLevel': None,
+    #      'membershipLevelName': None, 'massSubGiftChildAlerts': [], 'isSubgiftExpanded': True,
+    #      'benefit_end_month': None, 'historical': True, 'forceShow': False, 'success': False, 'forceRepeat': False}],
+    #         'for': 'twitch_account', 'event_id': 'evt_42b3a8e30aa06d763f430d08c794de27'}

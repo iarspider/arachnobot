@@ -3,8 +3,9 @@
     <head>
         <meta charset="utf-8" />
         <title>Chat</title>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css" integrity="sha512-+4zCK9k+qNFUR5X+cKL9EIR+ZOhtIloNl9GIKS57V1MyNsYpYcUrUeQc9vNfzsWfV28IaLL3i96P9sdNyeRssA==" crossorigin="anonymous" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.7/semantic.min.css" integrity="sha512-g/MzOGVPy3OQ4ej1U+qe4D/xhLwUn5l5xL0Fa7gdC258ZWVJQGwsbIR47SWMpRxSPjD0tfu/xkilTy+Lhrl3xg==" crossorigin="anonymous" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.7/semantic.min.js" integrity="sha512-1Nyd5H4Aad+OyvVfUOkO/jWPCrEvYIsQENdnVXt1+Jjc4NoJw28nyRdrpOCyFH4uvR3JmH/5WmfX1MJk2ZlhgQ==" crossorigin="anonymous"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js" integrity="sha512-AcZyhRP/tbAEsXCCGlziPun5iFvcSUpEz2jKkx0blkYKbxU81F+iq8FURwPn1sYFeksJ+sDDrI5XujsqSobWdQ==" crossorigin="anonymous"></script>
         <style type="text/css">
@@ -205,7 +206,7 @@
                     </iframe>
                 </div>
                 <div class="eight wide column">
-                    <div class="row" id="viewerz">
+                    <div class="row" style="height: 25%; overflow: auto" id="viewerz">
                     </div>
                     <div class="row" style="height: 75%; overflow: auto">
                         <div class="ui list" id="log" style="text-color: white">
