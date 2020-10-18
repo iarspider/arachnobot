@@ -24,7 +24,6 @@
                 var id = 'viewer_' + hashCode(v.name);
                 if (document.getElementById(id) === null) {
                     var node = create_label(v);
-                    var root = document.getElementById('viewerz');
                     document.getElementById('viewerz').append(node);
                 }
             }
@@ -39,7 +38,51 @@
             }
             
             on_event = function(v) {
-                console.log(v);
+                res = {};
+                switch (v.type) {
+                    case 'donation':
+                        res = {icon: 'dollar sign', text: `Донат от {v.from} на сумму {v.formattedAmount}: {v.message}`};
+                        break;
+                    case 'follow':
+                        res = {icon: 'eye', text: `Фоллоу: {v.node}`};
+                        break;
+                    case 'subscription':
+                        res = {icon: 'lightbulb', text: `Подписка: {v.name}, срок {v.months}, уровень {v.sub_plan}: {v.message}`};
+                        break;
+                    case 'resub':
+                        res = {icon: 'lightbulb', text: `Продление: {v.name}, срок {v.months} ({v.streak_months}), уровень {v.sub_plan}: {v.message}`};
+                        break;
+                    case 'host':
+                        res = {icon: 'home', text: `Хост от {v.name}, зрителей {v.viewers}`};
+                        break;
+                    case 'bits':
+                        res = {icon: 'dollar sign', text: `Битсы от {v.name} в количестве {v.amount}: {v.message}`};
+                        break;
+                    case 'raid':
+                        res = {icon: 'bullhorn', text: `Рейд от {v.name} зрителей {v.raiders}`};
+                        break;
+                }
+                
+                node = crete_event(res);
+                document.getElementById('log').append(node);
+            }
+            
+            create_event = function(v) { // v.icon, v.text
+                var fragment = document.getElementById('event').content.cloneNode(true);
+                var div = fragment.querySelector('div');
+                var icon = fragment.querySelector('i');
+                icon.className = v.icon + ' icon';
+                var div2 = div.querySelector('div')
+
+                for (var i = 0; i < div2.childNodes.length; i++) {
+                    var curNode = div2.childNodes[i];
+                    if (curNode.nodeName === "#text" && curNode.nodeValue.trim() === "23") {
+                        curNode.nodeValue = v.text;
+                        break;
+                    }
+                }
+
+                return fragment;
             }
 
             create_label = function(v) {
@@ -66,10 +109,28 @@
                 return fragment;
             }
 
+            create_event = function(v) { // v.icon, v.text
+                var fragment = document.getElementById('event').content.cloneNode(true);
+                var div = fragment.querySelector('div');
+                var icon = fragment.querySelector('i');
+                icon.className = v.icon + ' icon';
+                var div2 = div.querySelector('div')
+
+                for (var i = 0; i < div2.childNodes.length; i++) {
+                    var curNode = div2.childNodes[i];
+                    if (curNode.nodeName === "#text" && curNode.nodeValue.trim() === "23") {
+                        curNode.nodeValue = v.text;
+                        break;
+                    }
+                }
+
+                return fragment;
+            }
+            
             get_random = function(list) {
                 return list[Math.floor((Math.random() * list.length))];
             }
-
+            
             const div_viewers = document.getElementById("viewerz");
             const hashCode = s => s.split('').reduce((a, b) => (((a << 5) - a) + b.charCodeAt(0)) | 0, 0);
 
@@ -101,6 +162,15 @@
                 <i class="mail icon"></i> 23
             </div>
         </template>
+        
+        <template id="event">
+            <div class="item">
+                <i class="users icon"></i>
+                <div class="content">
+                    23
+                </div>
+            </div>
+        </template>
 
         <div class="ui middle aligned two column centered grid">
             <div class="row">
@@ -112,7 +182,8 @@
                     <div class="row" id="viewerz">
                     </div>
                     <div class="row" style="height: 75%; overflow: auto">
-                        <ul id="log"></ul>
+                        <div class="ui list" id="log">
+                        </div>
                     </div>
                 </div>
             </div>

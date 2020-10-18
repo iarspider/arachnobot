@@ -272,7 +272,7 @@ class Bot(commands.Bot):
         sess = twitch_api.get_session(twitch_client_id, twitch_client_secret, twitch_redirect_url)
         self.pubsub_nonce = await self.pubsub_subscribe(sess.token["access_token"],
                                                         'channel-points-channel-v1.{0}'.format(self.user_id))
-        socket_token = api.get_socket_token(self.streamlabs_oauth)
+        # socket_token = api.get_socket_token(self.streamlabs_oauth)
         # self.streamlabs_socket.on('message', self.sl_event)
         # self.streamlabs_socket.on('connect', self.sl_connected)
         #
@@ -1153,16 +1153,46 @@ if __name__ == '__main__':
     async def sl_client_connected():
         logger.info('SL client connected!')
 
+    @sl_client.on('disconnect')
+    async def sl_client_disconnected():
+        logger.warning('SL client disconnected!')
 
-    @sl_client.on('message')
-    async def sl_client_message(data):
-        logger.info(f'SL message: {data}')
+
+    # @sl_client.on('message')
+    # async def sl_client_message(data):
+    #     logger.info(f'SL message: {data}')
 
 
     @sl_client.on('event')
     async def sl_client_event(data):
-        logger.info(f'SL event: {data}')
+        # logger.info(f'SL event: {data}')
+        pick_keys = []
+        if data['type'] == 'donation':
+            pick_keys.extend(('from', 'message', 'formattedAmount'))
+        elif data['type'] == 'follow':
+            pick_keys.extend(('name',))
+        elif data['type'] == 'subscription':
+            pick_keys.extend(('name', 'months', 'message', 'sub_plan'))
+        elif data['type'] == 'resub':
+            pick_keys.extend(('name', 'months', 'streak_months', 'message', 'sub_plan'))
+        elif data['type'] == 'host':
+            pick_keys.extend(('name', 'viewers'))
+        elif data['type'] == 'bits':
+            pick_keys.extend(('name', 'amount', 'message'))
+        elif data['type'] == 'raid':
+            pick_keys.extend(('name', 'raiders'))
+        else:
+            logger.warning(f'Unknown SL event type: {data["type"]}')
+            return
 
+        message = {'action': 'event', 'value': {'action': data['type']}}
+        for k in pick_keys:
+            if k in data['message']:
+                message['value'][k] = data['message'][k]
+            else:
+                logger.warning(f'Event {message["action"]} missing key {k}')
+
+        await twitch_bot.queue.put(message)
 
     token = api.get_socket_token(twitch_bot.streamlabs_oauth)
     asyncio.ensure_future(sl_client.connect(f'https://sockets.streamlabs.com?token={token}'))
