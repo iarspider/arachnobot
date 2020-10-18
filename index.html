@@ -41,26 +41,38 @@
                 res = {};
                 switch (v.type) {
                     case 'donation':
-                        res = {icon: 'dollar sign', text: `Донат от {v.from} на сумму {v.formattedAmount}: {v.message}`};
+                        res = {icon: 'dollar sign', text: `Донат от ${v.from} на сумму ${v.formattedAmount}: ${v.message}`};
                         break;
                     case 'follow':
-                        res = {icon: 'eye', text: `Фоллоу: {v.node}`};
+                        res = {icon: 'eye', text: `Фоллоу: ${v.node}`};
                         break;
                     case 'subscription':
-                        res = {icon: 'lightbulb', text: `Подписка: {v.name}, срок {v.months}, уровень {v.sub_plan}: {v.message}`};
+                        res = {icon: 'lightbulb', text: `Подписка:$ {v.name}, срок ${v.months}, уровень ${v.sub_plan}: ${v.message}`};
                         break;
                     case 'resub':
-                        res = {icon: 'lightbulb', text: `Продление: {v.name}, срок {v.months} ({v.streak_months}), уровень {v.sub_plan}: {v.message}`};
+                        res = {icon: 'lightbulb', text: `Продление: ${v.name}, срок ${v.months} (${v.streak_months}), уровень ${v.sub_plan}: ${v.message}`};
                         break;
                     case 'host':
-                        res = {icon: 'home', text: `Хост от {v.name}, зрителей {v.viewers}`};
+                        res = {icon: 'home', text: `Хост от ${v.name}, зрителей ${v.viewers}`};
                         break;
                     case 'bits':
-                        res = {icon: 'dollar sign', text: `Битсы от {v.name} в количестве {v.amount}: {v.message}`};
+                        res = {icon: 'dollar sign', text: `Битсы от ${v.name} в количестве ${v.amount}: ${v.message}`};
                         break;
                     case 'raid':
-                        res = {icon: 'bullhorn', text: `Рейд от {v.name} зрителей {v.raiders}`};
+                        res = {icon: 'bullhorn', text: `Рейд от ${v.name} зрителей ${v.raiders}`};
                         break;
+                    case 'hugs':
+                        res = {icon: 'heart', text: `${v.name} обнял(а) стримера!`};
+                        break;
+                    case 'sit':
+                        res = {icon: 'level up alternate', text: `${v.name} велел стримлеру не горбиться!`};
+                        break;
+                    case 'fun':
+                        res = {icon: 'fire', text: `${v.name} добавил упорину!`};
+                        break;
+                    default:
+                        console.log(`Unknown event type ${v.name}`);
+                        return;
                 }
                 
                 node = crete_event(res);

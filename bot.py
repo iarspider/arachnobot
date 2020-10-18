@@ -373,15 +373,34 @@ class Bot(commands.Bot):
             return
 
         reward = data['data']['redemption']['reward']['title']
+        reward_key = reward.replace(' ', '')
         # noinspection PyUnusedLocal
         prompt = data['data']['redemption']['reward']['prompt']
+        try:
+            requestor = data['data']['redemption']['user'].get('display_name',
+                                                               data['data']['redemption']['user']['login'])
+        except KeyError:
+            d = datetime.datetime.now().timestamp()
+            logger.error(f"Failed to get reward requestor! Saving reward in {d}.json")
+            with open('{d}.json', 'w') as f:
+                simplejson.dump(reward, f)
+            requestor = 'Unknown'
 
         logger.debug("Reward:", reward)
-        logger.debug("Key:", reward.replace(' ', ''))
+        logger.debug("Key:", reward_key)
         logger.debug("Prompt:", prompt)
 
-        if reward.replace(' ', '') == "Смена голоса на 1 минуту".replace(' ', ''):
+        if reward_key == "Смена голоса на 1 минуту".replace(' ', ''):
             asyncio.ensure_future(self.activate_voicemod())
+
+        if reward_key == "Обнять стримера".replace(' ', ''):
+            await self.queue.put({'type': 'event', 'value': {'type': 'hugs', 'from': requestor}})
+
+        if reward_key == "Стримлер! Не горбись!".replace(' ', ''):
+            await self.queue.put({'type': 'event', 'value': {'type': 'sit', 'from': requestor}})
+
+        if reward_key == "Добавить упорину".replace(' ', ''):
+            await self.queue.put({'type': 'event', 'value': {'type': 'fun', 'from': requestor}})
 
     async def event_pubsub_response(self, data):
         if data['nonce'] == self.pubsub_nonce and self.pubsub_nonce != '':
@@ -1153,6 +1172,7 @@ if __name__ == '__main__':
     async def sl_client_connected():
         logger.info('SL client connected!')
 
+
     @sl_client.on('disconnect')
     async def sl_client_disconnected():
         logger.warning('SL client disconnected!')
@@ -1161,7 +1181,6 @@ if __name__ == '__main__':
     # @sl_client.on('message')
     # async def sl_client_message(data):
     #     logger.info(f'SL message: {data}')
-
 
     @sl_client.on('event')
     async def sl_client_event(data):
@@ -1193,6 +1212,7 @@ if __name__ == '__main__':
                 logger.warning(f'Event {message["action"]} missing key {k}')
 
         await twitch_bot.queue.put(message)
+
 
     token = api.get_socket_token(twitch_bot.streamlabs_oauth)
     asyncio.ensure_future(sl_client.connect(f'https://sockets.streamlabs.com?token={token}'))
@@ -1228,7 +1248,7 @@ if __name__ == '__main__':
     async def on_ws_connected(sid, _):
         global twitch_bot, timer
         twitch_bot.dashboard = sid
-        logger.info(f"connected! websocket is f{sid}")
+        logger.info(f"Dashboard connected with id f{sid}")
         timer = asyncio.ensure_future(create_timer(1, dashboard_loop))
 
 
