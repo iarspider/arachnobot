@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Chat</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css" integrity="sha512-+4zCK9k+qNFUR5X+cKL9EIR+ZOhtIloNl9GIKS57V1MyNsYpYcUrUeQc9vNfzsWfV28IaLL3i96P9sdNyeRssA==" crossorigin="anonymous" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.7/semantic.min.css" integrity="sha512-g/MzOGVPy3OQ4ej1U+qe4D/xhLwUn5l5xL0Fa7gdC258ZWVJQGwsbIR47SWMpRxSPjD0tfu/xkilTy+Lhrl3xg==" crossorigin="anonymous" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.7/semantic.min.js" integrity="sha512-1Nyd5H4Aad+OyvVfUOkO/jWPCrEvYIsQENdnVXt1+Jjc4NoJw28nyRdrpOCyFH4uvR3JmH/5WmfX1MJk2ZlhgQ==" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js" integrity="sha512-AcZyhRP/tbAEsXCCGlziPun5iFvcSUpEz2jKkx0blkYKbxU81F+iq8FURwPn1sYFeksJ+sDDrI5XujsqSobWdQ==" crossorigin="anonymous"></script>
+        <style type="text/css">
+            .ui.label {font-size: 24px;} 
+            body {
+                font-size: 24px;
+                background-color: #18181B
+            }
+            .ui.list .item .content {
+                color: gray;
+            }
+            .ui.list .item i.icon {
+                color: gray;
+            }
+        </style>
+    </head>
+    <body>
+        <script>
+            // document.addEventListener("DOMContentLoaded", function(){ $('#select').dropdown(); });
+            // var iarws = new WebSocket("wss://fr.iarazumov.com/ws");
+            const iarws = io("wss://fr.iarazumov.com/", {
+                             transports: ['websocket'],
+                             path: '/ws'});
+//            const iarws = io("wss://fr.iarazumov.com/", {
+//                             path: '/ws'});
+
+            // var drop_data = new Array();
+            on_add = function(v) {
+                var id = 'viewer_' + hashCode(v.name);
+                if (document.getElementById(id) === null) {
+                    var node = create_label(v);
+                    document.getElementById('viewerz').append(node);
+                }
+            }
+
+            on_remove = function(v) {
+                var id = 'viewer_' + hashCode(v.name);
+                var node = document.getElementById(id);
+                if (node !== null) {
+                    node.remove();
+                    node = null;
+                }
+            }
+            
+            on_event = function(v) {
+                console.log('event!');
+                console.log(v);
+                res = {};
+                switch (v.type) {
+                    case 'donation':
+                        res = {icon: 'dollar sign', text: `Донат от ${v.from} на сумму ${v.formatted_amount}: ${v.message}`};
+                        break;
+                    case 'follow':
+                        res = {icon: 'eye', text: `Фоллоу: ${v.name}`};
+                        break;
+                    case 'subscription':
+                        if (v.sub_type == 'subgift') {
+                            res = {icon: 'lightbulb', text: `Подписка: подарок от ${v.gifter_display_name} для ${v.name}, срок ${v.months}, уровень ${v.sub_plan}: ${v.message}`};
+                        } else {
+                            res = {icon: 'lightbulb', text: `Подписка: ${v.name}, срок ${v.months}, уровень ${v.sub_plan}: ${v.message}`};
+                        }
+                        
+                        break;
+                    case 'resub':
+                        res = {icon: 'lightbulb', text: `Продление: ${v.name}, срок ${v.streak_months} (всего ${v.months}), уровень ${v.sub_plan}: ${v.message}`};
+                        break;
+                    case 'host':
+                        res = {icon: 'home', text: `Хост от ${v.name}, зрителей ${v.viewers}`};
+                        break;
+                    case 'bits':
+                        res = {icon: 'dollar sign', text: `Битсы от ${v.name} в количестве ${v.amount}: ${v.message}`};
+                        break;
+                    case 'raid':
+                        res = {icon: 'bullhorn', text: `Рейд от ${v.name} зрителей ${v.raiders}`};
+                        break;
+                    case 'hugs':
+                        res = {icon: 'heart', text: `${v.from} обнял(а) стримера!`};
+                        break;
+                    case 'sit':
+                        res = {icon: 'level up alternate', text: `${v.from} велел стримлеру не горбиться!`};
+                        break;
+                    case 'fun':
+                        res = {icon: 'fire', text: `${v.from} добавил упорину!`};
+                        break;
+                    default:
+                        console.log(`Unknown event type ${v.type}`);
+                        return;
+                }
+                
+                node = create_event(res);
+                document.getElementById('log').append(node);
+            }
+            
+            create_event = function(v) { // v.icon, v.text
+                var fragment = document.getElementById('event').content.cloneNode(true);
+                var div = fragment.querySelector('div');
+                var icon = fragment.querySelector('i');
+                icon.className = v.icon + ' icon';
+                var div2 = div.querySelector('div')
+
+                for (var i = 0; i < div2.childNodes.length; i++) {
+                    var curNode = div2.childNodes[i];
+                    if (curNode.nodeName === "#text" && curNode.nodeValue.trim() === "23") {
+                        curNode.nodeValue = v.text;
+                        break;
+                    }
+                }
+
+                return fragment;
+            }
+
+            create_label = function(v) {
+                var fragment = document.getElementById('template').content.cloneNode(true);
+                var div = fragment.querySelector('div');
+                var icon = fragment.querySelector('i');
+                icon.className = v.status + ' icon';
+                if (v.femme) {
+                    icon2 = document.createElement('i');
+                    icon2.className = 'venus icon';
+                    icon.parentNode.insertBefore(icon2, icon.nextSibling);
+                }
+
+                div.id = 'viewer_' + hashCode(v.name);
+                div.style.color = v.color;
+                for (var i = 0; i < div.childNodes.length; i++) {
+                    var curNode = div.childNodes[i];
+                    if (curNode.nodeName === "#text" && curNode.nodeValue.trim() === "23") {
+                        curNode.nodeValue = v.name;
+                        break;
+                    }
+                }
+
+                return fragment;
+            }
+
+            create_event = function(v) { // v.icon, v.text
+                var fragment = document.getElementById('event').content.cloneNode(true);
+                var div = fragment.querySelector('div');
+                var icon = fragment.querySelector('i');
+                icon.className = v.icon + ' icon';
+                var div2 = div.querySelector('div')
+
+                for (var i = 0; i < div2.childNodes.length; i++) {
+                    var curNode = div2.childNodes[i];
+                    if (curNode.nodeName === "#text" && curNode.nodeValue.trim() === "23") {
+                        curNode.nodeValue = v.text;
+                        break;
+                    }
+                }
+
+                return fragment;
+            }
+            
+            get_random = function(list) {
+                return list[Math.floor((Math.random() * list.length))];
+            }
+            
+            const div_viewers = document.getElementById("viewerz");
+            const hashCode = s => s.split('').reduce((a, b) => (((a << 5) - a) + b.charCodeAt(0)) | 0, 0);
+
+            let viewers = [];
+            
+            /*          
+            iarws.onmessage = function (event) {
+                var content = JSON.parse(event.data);
+
+                if (content.action === "add") {
+                    on_add(content.value);
+                }
+                if (content.action === "remove") {
+                    on_delete(content.value);
+                }
+            };
+            */
+            iarws.on('add', on_add);
+            iarws.on('remove', on_remove);
+            iarws.on('event', on_event);
+//            iarws.on('reconnect_attempt', () => {
+//                iarws.io.opts.transports = ['polling', 'websocket'];
+//            });
+            
+        </script>
+
+        <template id="template">
+            <div class="ui black label" style="color: #8F8F8F">
+                <i class="mail icon"></i> 23
+            </div>
+        </template>
+        
+        <template id="event">
+            <div class="item">
+                <i class="users icon"></i>
+                <div class="content">
+                    23
+                </div>
+            </div>
+        </template>
+
+        <div class="ui middle aligned two column centered grid">
+            <div class="row">
+                <div class="four wide column">
+                    <iframe frameborder="0" scrolling="off" src="https://www.twitch.tv/embed/iarspider/chat?parent=fr.iarazumov.com&darkpopout" height="900" width="100%">
+                    </iframe>
+                </div>
+                <div class="eight wide column">
+                    <div class="row" style="height: 25%; overflow: auto" id="viewerz">
+                    </div>
+                    <div class="row" style="height: 75%; overflow: auto">
+                        <div class="ui list" id="log" style="text-color: white">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
