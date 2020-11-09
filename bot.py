@@ -31,7 +31,7 @@ from config import *
 try:
     import pywinauto
 except ImportError as e:
-    print("[WARN] PyWinAuto not found, sending keys will not work")
+    print("[WARN] PyWinAuto not found, sending keys will not work" + str(e))
     pywinauto = None
 
 import logging
@@ -296,7 +296,7 @@ class Bot(commands.Bot):
 
         logger.debug(f"Tags: {user.tags}")
         logger.debug(f"Badges: {user.badges}")
-        logger.info(f"Send user {user.display_name} with status {status} and color {color}")
+        logger.debug(f"Send user {user.display_name} with status {status} and color {color}")
 
         await self.queue.put({'action': 'add', 'value': {'name': user.display_name, 'status': status,
                                                          'color': color, 'femme': femme}})
@@ -310,6 +310,8 @@ class Bot(commands.Bot):
     async def event_message(self, message):
         # if message.author.name.lower() not in self.viewers:
         await self.send_viewer_joined(message.author)
+
+        logger.debug("JOIN sent")
 
         self.viewers.add(message.author.name.lower())
         if message.author.is_mod:
@@ -339,6 +341,7 @@ class Bot(commands.Bot):
                 args = ''
             message.content = command.lower() + args
 
+        logger.debug("handle_command start")
         await self.handle_commands(message)
 
     # async def event_join(self, user):
@@ -369,6 +372,8 @@ class Bot(commands.Bot):
     async def event_pubsub_message_channel_points_channel_v1(self, data):
         # import pprint
         # pprint.pprint(data)
+        d = datetime.datetime.now().timestamp()
+
         if data.get('type', '') != 'reward-redeemed':
             return
 
@@ -380,10 +385,9 @@ class Bot(commands.Bot):
             requestor = data['data']['redemption']['user'].get('display_name',
                                                                data['data']['redemption']['user']['login'])
         except KeyError:
-            d = datetime.datetime.now().timestamp()
             logger.error(f"Failed to get reward requestor! Saving reward in {d}.json")
-            with open('{d}.json', 'w') as f:
-                simplejson.dump(reward, f)
+            with open(f'{d}.json', 'w', encoding='utf-8') as f:
+                simplejson.dump(data, f)
             requestor = 'Unknown'
 
         logger.debug("Reward:", reward)
@@ -394,13 +398,16 @@ class Bot(commands.Bot):
             asyncio.ensure_future(self.activate_voicemod())
 
         if reward_key == "Обнять стримера".replace(' ', ''):
-            await self.queue.put({'type': 'event', 'value': {'type': 'hugs', 'from': requestor}})
+            logger.debug(f"Queued redepmtion: hugs, {requestor}")
+            await self.queue.put({'action': 'event', 'value': {'type': 'hugs', 'from': requestor}})
 
         if reward_key == "Стримлер! Не горбись!".replace(' ', ''):
-            await self.queue.put({'type': 'event', 'value': {'type': 'sit', 'from': requestor}})
+            logger.debug(f"Queued redepmtion: sit, {requestor}")
+            await self.queue.put({'action': 'event', 'value': {'type': 'sit', 'from': requestor}})
 
         if reward_key == "Добавить упорину".replace(' ', ''):
-            await self.queue.put({'type': 'event', 'value': {'type': 'fun', 'from': requestor}})
+            logger.debug(f"Queued redepmtion: fun, {requestor}")
+            await self.queue.put({'action': 'event', 'value': {'type': 'fun', 'from': requestor}})
 
     async def event_pubsub_response(self, data):
         if data['nonce'] == self.pubsub_nonce and self.pubsub_nonce != '':
@@ -522,6 +529,9 @@ class Bot(commands.Bot):
     # noinspection PyUnusedLocal
     @commands.command(name='end', aliases=['fin', 'конец', 'credits'])
     async def end(self, ctx: Context):
+        if not self.check_sender(ctx, 'iarspider'):
+            return
+
         self.ws.call(obsws_requests.SetCurrentScene('End'))
         try:
             api.roll_credits(self.streamlabs_oauth)
@@ -547,7 +557,7 @@ class Bot(commands.Bot):
     # async def test(self, ctx: Context):
     #     await ctx.send(f'Hello {ctx.author.name}!')
 
-    @commands.command(name='roll', aliases=['dice', 'кинь'])
+    @commands.command(name='roll', aliases=['dice', 'кинь', 'r'])
     async def roll(self, ctx: Context):
         dices = []
 
@@ -589,7 +599,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='deny', aliases=('no', 'pass'))
     async def deny_attack(self, ctx: Context):
-        defender = ctx.author.name
+        defender = ctx.author.display_name
 
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
@@ -604,7 +614,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='accept', aliases=('yes', 'ok'))
     async def accept_attack(self, ctx: Context):
-        defender = ctx.author.name
+        defender = ctx.author.display_name
 
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
@@ -636,7 +646,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='attack')
     async def attack(self, ctx: Context):
-        attacker = ctx.author.name
+        attacker = ctx.author.display_name
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
             await ctx.send("Использование: !attack <кого>")
@@ -676,7 +686,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='bite', aliases=['кусь'])
     async def bite(self, ctx: Context):
-        attacker = ctx.author.name
+        attacker = ctx.author.display_name
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
             await ctx.send("Использование: !bite <кого>")
@@ -1010,6 +1020,10 @@ class Bot(commands.Bot):
     # async def nom(self, ctx: Context):
     #     await self.do_rip(ctx, 'Ом-ном-ном!')
 
+    @commands.command(name='bomb', aliases=['man', 'manual', 'руководство'])
+    async def man(self, ctx: Context):
+        await ctx.send("Руководство тут - https://bombmanual.com/ru/web/index.html")
+
     @commands.command(name='post', aliases=['почта'])
     async def post(self, ctx: Context):
         last_post = self.last_post.get(ctx.author.name, None)
@@ -1053,7 +1067,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='help', aliases=('помощь', 'справка'))
     async def help(self, ctx: Context):
-        asyncio.ensure_future(ctx.send(f"Никто тебе не поможет, {ctx.author.name}!"))
+        asyncio.ensure_future(ctx.send(f"Никто тебе не поможет, {ctx.author.display_name}!"))
 
     @commands.command(name='spin')
     async def spin(self, ctx: Context):
@@ -1061,10 +1075,10 @@ class Bot(commands.Bot):
             return
 
         # points = api.get_points(self.streamlabs_oauth, ctx.author.name)
-        httpclient_logging_patch()
+        # httpclient_logging_patch()
         requests.post('https://streamlabs.com/api/v1.0/wheel/spin',
                       data={'access_token': self.streamlabs_oauth.access_token})
-        httpclient_logging_patch(logging.INFO)
+        # httpclient_logging_patch(logging.INFO)
 
     @commands.command(name='translit', aliases=('translate', 'tr'))
     async def translit(self, ctx: Context):
@@ -1192,7 +1206,9 @@ if __name__ == '__main__':
         elif data['type'] == 'follow':
             pick_keys.extend(('name',))
         elif data['type'] == 'subscription':
-            pick_keys.extend(('name', 'months', 'message', 'sub_plan'))
+            pick_keys.extend(('name', 'months', 'message', 'sub_plan', 'sub_type'))
+            if data['message'][0]['sub_type'] == 'subgift':
+                pick_keys.extend(('gifter_display_name', ))
         elif data['type'] == 'resub':
             pick_keys.extend(('name', 'months', 'streak_months', 'message', 'sub_plan'))
         elif data['type'] == 'host':
@@ -1227,26 +1243,6 @@ if __name__ == '__main__':
 
     token = api.get_socket_token(twitch_bot.streamlabs_oauth)
     asyncio.ensure_future(sl_client.connect(f'https://sockets.streamlabs.com?token={token}'))
-    # # noinspection PyUnusedLocal
-    # async def on_ws_connected(websocket, path):
-    #     logger.info(f"connected! websocket is f{websocket}")
-    #     try:
-    #         global twitch_bot
-    #         twitch_bot.dashboard = websocket
-    #         while True:
-    #             try:
-    #                 item = twitch_bot.queue.get_nowait()
-    #                 logger.info(f"send item {item}")
-    #                 await websocket.send(simplejson.dumps(item))
-    #                 logger.info("sent")
-    #             except asyncio.QueueEmpty:
-    #                 # logger.info("get item failed")
-    #                 await asyncio.sleep(1)
-    #     except Exception as ex:
-    #         logger.error('on_ws_connected failed: ' + str(ex))
-
-    # start_server = websockets.serve(on_ws_connected, "0.0.0.0", 8081)
-    # asyncio.ensure_future(start_server, loop=_loop)
 
     sio_server = socketio.AsyncServer(async_mode='asgi',  # logger=True, engineio_logger=True,
                                       cors_allowed_origins='https://fr.iarazumov.com')
@@ -1288,56 +1284,6 @@ if __name__ == '__main__':
 
     asyncio.ensure_future(discord_bot.start(discord_bot_token))
     asyncio.ensure_future(twitch_bot.start())
-    # twitch_bot.run()
     _loop.run_until_complete(server.serve())
     _loop.run_until_complete(discord_bot.close())
     _loop.stop()
-    # _loop.run_forever()
-    #
-    # data = {'type': 'donation', 'message': [
-    #     {'priority': 10, '_id': '5f8b50e98d327', 'from': 'IARSpider', 'fromId': '', 'to': 'IARSpider',
-    #      'message': 'test', 'amount': 182.29372533261795, 'currency': 'RUB',
-    #      'payload': {'id': 139660587, 'name': 'IARSpider', 'amount': 182.29372533261795,
-    #                  'formatted_amount': 'RUB182.29', 'formattedAmount': 'RUB182.29', 'message': 'test',
-    #                  'currency': 'RUB', 'emotes': '', 'iconClassName': 'fab paypal', 'to': {'name': 'IARSpider'},
-    #                  'from': 'IARSpider', 'from_user_id': 567482, 'donation_currency': 'EUR', 'source': 'paypal',
-    #                  '_id': '348f90f1504bdefc4caeba4bc9f4f122', 'priority': 10}, 'formattedAmount': 'RUB182.29',
-    #      'gif': None, 'facemask': None, 'mask_name': None, 'mask_rarity': None, 'pro': None, 'pro_extras': None,
-    #    'senderId': 567482, 'emotes': None, 'wishListItem': None, 'name': 'IARSpider', 'isTest': False, 'repeat': True,
-    #      'alert_status': 1, 'createdAt': '2020-10-17 20:15:37', 'type': 'donation', 'source': '',
-    #      'donation_id': 139660587, 'legacyHash': 'donation:IARSpider:test:182',
-    #      'hash': 'donation:IARSpider:test:182:139660587', 'read': False, 'donationCurrency': 'EUR', 'wotcCode': None,
-    #      'crate_item': None, 'attachments': [], 'clippingEnabled': True, 'charity': False, 'forceShow': False,
-    #      'success': False, 'forceRepeat': True, 'formatted_amount': 'RUB182.29'}], 'for': 'streamlabs',
-    #         'event_id': 'evt_5f3a05e3a2cc8f83de5fc370ab81b418'}
-    # data = {'type': 'follow', 'message': [
-    #     {'name': 'IARSpider', 'isTest': True, '_id': '9352d1aa1d906f58ae03f9b2c24ea914', 'priority': 10}],
-    #         'for': 'twitch_account', 'event_id': 'evt_6e26e104fcdd177b7aaae63a713fef23'}
-    # data = {'type': 'subscription', 'message': [
-    #     {'name': 'IARSpider', 'isTest': True, 'months': 1, 'message': 'This is a test', 'emotes': None,
-    #      'sub_plan': '1000', '_id': '5795dadcad7dcc72118f0e6341dc2d9d', 'priority': 10}], 'for': 'twitch_account',
-    #         'event_id': 'evt_b54938504b840037d859230f78b00b43'}
-    # data = {'type': 'resub', 'message': [
-    #     {'name': 'IARSpider', 'isTest': True, 'months': 8, 'streak_months': 4, 'message': 'This is a test',
-    #     'emotes': None, 'sub_plan': '1000', 'amount': 83, '_id': '6a0b7fea57cea9f0ba2d042f70262e9b', 'priority': 10}],
-    #         'for': 'twitch_account', 'event_id': 'evt_2ec7e5362bc09b718da51ca272b9cc6c'}
-    # data = {'type': 'host', 'message': [
-    #     {'name': 'IARSpider', 'isTest': True, 'viewers': 491, '_id': 'b4d53a67175b33b695cc9ea543aa279f',
-    #      'priority': 10}], 'for': 'twitch_account', 'event_id': 'evt_7ca1ded5b02edc82614998b9ceb54b20'}
-    # data = {'type': 'bits', 'message': [
-    #     {'name': 'IARSpider', 'isTest': True, 'amount': '1', 'message': 'cheer1 this is a test bit alert',
-    #      'currency': 'RUB', '_id': 'ac935c1ccd3ff8e2bf3430f5feeaa4ad', 'priority': 10}], 'for': 'twitch_account',
-    #         'event_id': 'evt_210f4638a5a82b20a3bcd7ffb0f79a7b'}
-    # data = {'type': 'raid', 'message': [
-    #     {'name': 'IARSpider', 'isTest': True, 'raiders': 927, '_id': '98d84f5070c7457d5ef2b57c11b42883',
-    #      'priority': 10}], 'for': 'twitch_account', 'event_id': 'evt_35b84e788985457d2688fc5e824aa065'}
-    # data = {'type': 'subscription', 'message': [
-    #     {'priority': 10, '_id': '5f8c454af356b', 'from': 'barabusik022', 'from_display_name': 'Barabusik022',
-    #      'emotes': None, 'months': 1, 'streak_months': None, 'message': '', 'payload': [], 'name': 'barabusik022',
-    #      'display_name': 'Barabusik022', 'subPlan': '1000', 'sub_plan': '1000', 'subscriber_twitch_id': 137911875,
-    #    'gifter': 'nickopolidiss', 'gifter_display_name': 'Nickopolidiss', 'count': 1, 'repeat': True, 'isTest': False,
-    #      'createdAt': '2020-10-18 13:38:18', 'platform': 'twitch_account', 'planName': '', 'type': 'subscription',
-    #      'hash': 'subscription:barabusik022:', 'read': False, 'amount': None, 'membershipLevel': None,
-    #      'membershipLevelName': None, 'massSubGiftChildAlerts': [], 'isSubgiftExpanded': True,
-    #      'benefit_end_month': None, 'historical': True, 'forceShow': False, 'success': False, 'forceRepeat': False}],
-    #         'for': 'twitch_account', 'event_id': 'evt_42b3a8e30aa06d763f430d08c794de27'}

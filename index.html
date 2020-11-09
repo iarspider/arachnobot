@@ -62,7 +62,12 @@
                         res = {icon: 'eye', text: `Фоллоу: ${v.name}`};
                         break;
                     case 'subscription':
-                        res = {icon: 'lightbulb', text: `Подписка: ${v.name}, срок ${v.months}, уровень ${v.sub_plan}: ${v.message}`};
+                        if (v.sub_type == 'subgift') {
+                            res = {icon: 'lightbulb', text: `Подписка: подарок от ${v.gifter_display_name} для ${v.name}, срок ${v.months}, уровень ${v.sub_plan}: ${v.message}`};
+                        } else {
+                            res = {icon: 'lightbulb', text: `Подписка: ${v.name}, срок ${v.months}, уровень ${v.sub_plan}: ${v.message}`};
+                        }
+                        
                         break;
                     case 'resub':
                         res = {icon: 'lightbulb', text: `Продление: ${v.name}, срок ${v.streak_months} (всего ${v.months}), уровень ${v.sub_plan}: ${v.message}`};
@@ -77,16 +82,16 @@
                         res = {icon: 'bullhorn', text: `Рейд от ${v.name} зрителей ${v.raiders}`};
                         break;
                     case 'hugs':
-                        res = {icon: 'heart', text: `${v.name} обнял(а) стримера!`};
+                        res = {icon: 'heart', text: `${v.from} обнял(а) стримера!`};
                         break;
                     case 'sit':
-                        res = {icon: 'level up alternate', text: `${v.name} велел стримлеру не горбиться!`};
+                        res = {icon: 'level up alternate', text: `${v.from} велел стримлеру не горбиться!`};
                         break;
                     case 'fun':
-                        res = {icon: 'fire', text: `${v.name} добавил упорину!`};
+                        res = {icon: 'fire', text: `${v.from} добавил упорину!`};
                         break;
                     default:
-                        console.log(`Unknown event type ${v.name}`);
+                        console.log(`Unknown event type ${v.type}`);
                         return;
                 }
                 

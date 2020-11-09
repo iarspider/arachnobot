@@ -11,7 +11,7 @@ requests-oauthlib = "*"
 python-vlc = "*"
 simplejson = "*"
 websocket-client = "*"
-pywin32 = "*"
+pywin32 = {path = "./pywin32-228-cp39-cp39-win_amd64.whl"}
 pywinauto = "*"
 obs-websocket-py = "*"
 py-dateutil = "*"
@@ -25,4 +25,4 @@ watchdog = "*"
 uvicorn = "*"
 
 [requires]
-python_version = "3.8"
+python_version = "3.9"
