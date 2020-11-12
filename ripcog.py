@@ -7,7 +7,7 @@ from twitchio.ext import commands
 
 
 @commands.core.cog()
-class RIPcog:
+class RIPCog:
     def __init__(self, bot):
         self.bot = bot
         self.logger = bot.logger
@@ -84,6 +84,15 @@ class RIPcog:
 
         asyncio.ensure_future(ctx.send("{0} TwitchVotes ".format(args[0])))
 
+    async def mc_rip(self):
+        try:
+            with open(r"e:\MultiMC\instances\InSphere Deeper 0.8.3\.minecraft\LP World v3_deathcounter.txt") as f:
+                self.deaths[0] = int(f.read())
+                self.deaths[1] = self.deaths[0]
+                self.write_rip()
+        except OSError:
+            return
+        
     # @commands.command(name='ripz')
     # async def ripz(self, ctx: Context):
     #     """

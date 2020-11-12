@@ -1,10 +1,8 @@
 import asyncio
-import codecs
-import copy
 import datetime
 import pathlib
 import random
-from collections import deque, defaultdict
+from collections import defaultdict
 from multiprocessing import Process
 from typing import Union, Iterable, Optional
 
@@ -12,11 +10,9 @@ import colorlog
 import discord
 import pygame
 import requests
-import simplejson
 import socketio
 import twitchio
 import uvicorn
-from pytils import numeral
 from requests.structures import CaseInsensitiveDict
 # For typing
 from twitchio.dataclasses import Context, User
@@ -24,12 +20,6 @@ from twitchio.ext import commands
 
 import twitch_api
 from config import *
-
-try:
-    import pywinauto
-except ImportError as e:
-    print("[WARN] PyWinAuto not found, sending keys will not work" + str(e))
-    pywinauto = None
 
 import logging
 import http.client as http_client
@@ -127,19 +117,15 @@ class Bot(commands.Bot):
         self.vmod_active = False
         self.pubsub_nonce = ''
 
-        s1 = "&qwertyuiop[]asdfghjkl;'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL;\"ZXCVBNM<>?`~"
-        s2 = "?йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,ёЁ"
-        self.trans = str.maketrans(s1, s2)
-
-        self.last_messages = CaseInsensitiveDict()
         self.attacks = defaultdict(list)
         self.bots = (self.nick, 'nightbot', 'pretzelrocks', 'streamlabs', 'commanderroot', 'electricallongboard')
         self.countdown_to: Optional[datetime.datetime] = None  # ! keep this here !
+        self.last_messages = CaseInsensitiveDict()  # ! keep this here !
+
         self.dashboard = None
         self.queue = asyncio.Queue()
 
         self.setup_mixer()
-        self.write_plusch()
 
     # Fill in missing stuff
     def get_cog(self, name):
@@ -152,14 +138,6 @@ class Bot(commands.Bot):
     # twitchio, I can and will handle pubsub
     async def event_pubsub(self, data):
         pass
-
-    @staticmethod
-    async def sl_event(data):
-        logger.debug(f'SL event: {data}!')
-
-    @staticmethod
-    async def sl_connected():
-        logger.debug(f'SL connected!')
 
     # noinspection PyPep8Naming
     @staticmethod
@@ -193,16 +171,6 @@ class Bot(commands.Bot):
         return nick.lower() in self.vips
 
     # Events don't need decorators when subclassed
-    async def event_ready(self):
-        logger.info(f'Ready | {self.nick}')
-        self.user_id = self.my_get_users(self.initial_channels[0].lstrip('#'))['id']
-        sess = twitch_api.get_session(twitch_client_id, twitch_client_secret, twitch_redirect_url)
-        self.pubsub_nonce = await self.pubsub_subscribe(sess.token["access_token"],
-                                                        'channel-points-channel-v1.{0}'.format(self.user_id))
-        # socket_token = api.get_socket_token(self.streamlabs_oauth)
-        # self.streamlabs_socket.on('message', self.sl_event)
-        # self.streamlabs_socket.on('connect', self.sl_connected)
-        #
 
     async def send_viewer_joined(self, user: User):
         if user.name.lower() in self.bots:
@@ -233,130 +201,6 @@ class Bot(commands.Bot):
             return
 
         await self.queue.put({'action': 'remove', 'value': user.display_name})
-
-    async def event_message(self, message):
-        # if message.author.name.lower() not in self.viewers:
-        await self.send_viewer_joined(message.author)
-
-        logger.debug("JOIN sent")
-
-        self.viewers.add(message.author.name.lower())
-        if message.author.is_mod:
-            self.mods.add(message.author.name.lower())
-        if message.author.is_subscriber:
-            self.subs.add(message.author.name.lower())
-
-        if message.author.badges.get('vip', 0) == 1:
-            self.vips.add(message.author.name.lower())
-
-        if message.author.name not in self.last_messages:
-            self.last_messages[message.author.name] = deque(maxlen=10)
-
-        if message.author.name.lower() not in self.bots:
-            if not message.content.startswith('!'):
-                self.last_messages[message.author.name].append(message.content)
-                logger.debug(f"Updated last messages for {message.author.name}, " +
-                             f"will remember last {len(self.last_messages[message.author.name])}")
-
-        if message.content.startswith('!'):
-            message.content = '!' + message.content.lstrip('! ')
-            try:
-                command, args = message.content.split(' ', 1)
-                args = ' ' + args
-            except ValueError:
-                command = message.content
-                args = ''
-            message.content = command.lower() + args
-
-        logger.debug("handle_command start")
-        await self.handle_commands(message)
-
-    # async def event_join(self, user):
-    #     if user.name.lower() not in self.viewers:
-    #         # await self.send_viewer_joined(user.name)
-    #         # self.viewers.add(user.name.lower())
-    #         logger.info(f"User {user.name} joined! tags {user.tags}, badges {user.badges}")
-
-    async def event_part(self, user: User):
-        if user.name.lower() in self.viewers:
-            await asyncio.ensure_future(self.send_viewer_left(user))
-
-        try:
-            self.viewers.remove(user.name.lower())
-        except KeyError:
-            pass
-
-        try:
-            self.mods.remove(user.name.lower())
-        except KeyError:
-            pass
-
-        try:
-            self.subs.remove(user.name.lower())
-        except KeyError:
-            pass
-
-    async def event_pubsub_message_channel_points_channel_v1(self, data):
-        # import pprint
-        # pprint.pprint(data)
-        d = datetime.datetime.now().timestamp()
-
-        if data.get('type', '') != 'reward-redeemed':
-            return
-
-        reward = data['data']['redemption']['reward']['title']
-        reward_key = reward.replace(' ', '')
-        # noinspection PyUnusedLocal
-        prompt = data['data']['redemption']['reward']['prompt']
-        try:
-            requestor = data['data']['redemption']['user'].get('display_name',
-                                                               data['data']['redemption']['user']['login'])
-        except KeyError:
-            logger.error(f"Failed to get reward requestor! Saving reward in {d}.json")
-            with open(f'{d}.json', 'w', encoding='utf-8') as f:
-                simplejson.dump(data, f)
-            requestor = 'Unknown'
-
-        logger.debug("Reward:", reward)
-        logger.debug("Key:", reward_key)
-        logger.debug("Prompt:", prompt)
-
-        if reward_key == "Смена голоса на 1 минуту".replace(' ', ''):
-            vmod = self.get_cog('VMcog')
-            asyncio.ensure_future(vmod.activate_voicemod())
-
-        if reward_key == "Обнять стримера".replace(' ', ''):
-            logger.debug(f"Queued redepmtion: hugs, {requestor}")
-            await self.queue.put({'action': 'event', 'value': {'type': 'hugs', 'from': requestor}})
-
-        if reward_key == "Стримлер! Не горбись!".replace(' ', ''):
-            logger.debug(f"Queued redepmtion: sit, {requestor}")
-            await self.queue.put({'action': 'event', 'value': {'type': 'sit', 'from': requestor}})
-
-        if reward_key == "Добавить упорину".replace(' ', ''):
-            logger.debug(f"Queued redepmtion: fun, {requestor}")
-            await self.queue.put({'action': 'event', 'value': {'type': 'fun', 'from': requestor}})
-
-    async def event_pubsub_response(self, data):
-        if data['nonce'] == self.pubsub_nonce and self.pubsub_nonce != '':
-            if data['error'] != '':
-                raise RuntimeError("PubSub failed: " + data['error'])
-            else:
-                self.pubsub_nonce = ''  # We are done
-
-    async def event_pubsub_message(self, data):
-        data = data['data']
-        topic = data['topic'].rsplit('.', 1)[0].replace('-', '_')
-        data['message'] = simplejson.loads(data['message'])
-        handler = getattr(self, 'event_pubsub_message_' + topic, None)
-        if handler:
-            asyncio.ensure_future(handler(data['message']))
-
-    async def event_raw_pubsub(self, data):
-        topic = data['type'].lower()
-        handler = getattr(self, 'event_pubsub_' + topic, None)
-        if handler:
-            asyncio.ensure_future(handler(data))
 
     @staticmethod
     def check_sender(ctx: Context, users: Union[str, Iterable[str]]):
@@ -606,27 +450,6 @@ class Bot(commands.Bot):
         except requests.HTTPError:
             logger.error("Failed to run commercial:", res.json())
 
-    def write_plusch(self):
-        with codecs.open("plusch.txt", "w", "utf8") as f:
-            f.write("Кого-то поплющило {0}...".format(numeral.get_plural(self.plusches, ('раз', 'раза', 'раз'))))
-
-    @commands.command(name='plusch', aliases=['плющ'])
-    async def plusch(self, ctx: Context):
-        # if not self.is_mod(ctx.author.name) and ctx.author.name != 'iarspider':
-        #     asyncio.ensure_future(ctx.send("No effect? I'm gonna need a bigger sword! (c)"))
-        #     return
-
-        who = " ".join(ctx.message.content.split()[1:])
-        asyncio.ensure_future(ctx.send("Эк {0} поплющило...".format(who)))
-        self.plusches += 1
-        self.write_plusch()
-
-    @commands.command(name='eplusch', aliases=['экипоплющило'])
-    async def eplusch(self, ctx: Context):
-        asyncio.ensure_future(ctx.send("Эки кого-то поплющило..."))
-        self.plusches += 1
-        self.write_plusch()
-
     @commands.command(name='bomb', aliases=['man', 'manual', 'руководство'])
     async def man(self, ctx: Context):
         await ctx.send("Руководство тут - https://bombmanual.com/ru/web/index.html")
@@ -635,61 +458,6 @@ class Bot(commands.Bot):
     async def help(self, ctx: Context):
         # asyncio.ensure_future(ctx.send(f"Никто тебе не поможет, {ctx.author.display_name}!"))
         asyncio.ensure_future(ctx.send(f"@{ctx.author.display_name} Справка по командам бота тут: "))
-
-    @commands.command(name='translit', aliases=('translate', 'tr'))
-    async def translit(self, ctx: Context):
-        params = ctx.message.content.split()[1:]
-        # print("translit(): ", params)
-        if len(params) < 1 or len(params) > 2:
-            return
-
-        if len(params) == 1:
-            try:
-                count = int(params[0])
-                author = ctx.author.name.lstrip('@')
-            except ValueError:
-                author = params[0].lstrip('@')
-                count = 1
-        else:
-            author = params[0]
-            count = int(params[1])
-
-        # print(f"translit(): author {author}, count {count}")
-
-        if self.last_messages.get(author, None) is None:
-            asyncio.ensure_future(ctx.send(f"{author} ещё ничего не посылал!"))
-            return
-
-        if len(self.last_messages[author]) < count:
-            count = len(self.last_messages[author])
-
-        messages = copy.copy(self.last_messages[author])
-        messages.reverse()
-
-        res = ["Перевод окончен"]
-
-        format_fields = ['', '', '']
-        format_fields[0] = '' if count == 1 else str(count) + ' '
-        format_fields[1] = 'ее' if count == 1 else 'их'
-        format_fields[2] = {1: 'е', 2: 'я', 3: 'я', 4: 'я'}.get(count, 'й')
-
-        for i in range(count):
-            message = messages[i].translate(self.trans)
-            res.append(f'{message}')
-
-        res.append("Перевожу {0}последн{1} сообщени{2} @{author}:".format(*format_fields, author=author))
-
-        for m in reversed(res):
-            await ctx.send(m)
-
-    async def mc_rip(self):
-        try:
-            with open(r"e:\MultiMC\instances\InSphere Deeper 0.8.3\.minecraft\LP World v3_deathcounter.txt") as f:
-                self.deaths[0] = int(f.read())
-                self.deaths[1] = self.deaths[0]
-                self.write_rip()
-        except OSError:
-            return
 
 
 twitch_bot: Optional[Bot] = None
@@ -707,6 +475,8 @@ if __name__ == '__main__':
     # Run bot
     _loop = asyncio.get_event_loop()
     twitch_bot = Bot()
+    for extension in ('discordcog', 'eventcog', 'obscog', 'pluschcog', 'ripcog', 'SLCog', 'vmodcog', 'elfcog'):
+        twitch_bot.load_module(extension)
 
     invalid = list(twitchio.dataclasses.Messageable.__invalid__)
     invalid.remove('w')
