@@ -5,6 +5,7 @@ import datetime
 import pathlib
 import random
 from collections import deque, defaultdict
+from multiprocessing import Process
 from typing import Union, Iterable, Optional
 
 import colorlog
@@ -12,19 +13,15 @@ import discord
 import pygame
 import requests
 import simplejson
-import twitchio
-from pytils import numeral
-from obswebsocket import obsws
-from obswebsocket import requests as obsws_requests
-from requests.structures import CaseInsensitiveDict
 import socketio
+import twitchio
 import uvicorn
-from multiprocessing import Process
+from pytils import numeral
+from requests.structures import CaseInsensitiveDict
 # For typing
 from twitchio.dataclasses import Context, User
 from twitchio.ext import commands
 
-import streamlabs_api as api
 import twitch_api
 from config import *
 
@@ -38,8 +35,6 @@ import logging
 import http.client as http_client
 
 httpclient_logger = logging.getLogger("http.client")
-discord_channel: discord.TextChannel
-discord_role: discord.Role
 logger: logging.Logger
 proc: Process
 timer: asyncio.Task
@@ -50,6 +45,8 @@ def setup_logging(logfile, debug, color, http_debug):
     global logger
     logger = logging.getLogger("bot")
     logger.propagate = False
+    ws_logger = logging.getLogger('websockets.server')
+
     handler = logging.StreamHandler()
     if color:
         handler.setFormatter(
@@ -66,21 +63,21 @@ def setup_logging(logfile, debug, color, http_debug):
     logger.addHandler(handler)
     logger.addHandler(file_handler)
 
+    ws_logger.addHandler(handler)
+    ws_logger.addHandler(file_handler)
+
     if not debug:
         logger.setLevel(logging.INFO)
         logging.getLogger('discord').setLevel(logging.INFO)
+        ws_logger.setLevel(logging.INFO)
     else:
         logger.info("Debug logging is ON")
         logger.setLevel(logging.DEBUG)
         logging.getLogger('discord').setLevel(logging.DEBUG)
+        ws_logger.setLevel(logging.DEBUG)
 
     if http_debug:
         http_client.HTTPConnection.debuglevel = 1
-
-    ws_logger = logging.getLogger('websockets.server')
-    ws_logger.setLevel(logging.DEBUG)
-    ws_logger.addHandler(handler)
-    ws_logger.addHandler(file_handler)
 
 
 def httpclient_logging_patch(level=logging.DEBUG):
@@ -110,23 +107,7 @@ class Bot(commands.Bot):
                          initial_channels=['#iarspider'],
                          loop=loop)
 
-        try:
-            # noinspection PyStatementEffect
-            # noinspection PyUnresolvedReferences
-            obsws_address
-            # noinspection PyStatementEffect
-            # noinspection PyUnresolvedReferences
-            obsws_port
-            # noinspection PyStatementEffect
-            # noinspection PyUnresolvedReferences
-            obsws_password
-        except NameError:
-            self.ws = None
-        else:
-            # noinspection PyUnresolvedReferences
-            self.ws = obsws(obsws_address, int(obsws_port), obsws_password)
-            self.ws.connect()
-            self.aud_sources = self.ws.call(obsws_requests.GetSpecialSources())
+        self.logger = logger
 
         self.mods = set()
         self.subs = set()
@@ -134,26 +115,15 @@ class Bot(commands.Bot):
         self.vips = set()
 
         self.db = {}
-        self.streamlabs_oauth = api.get_streamlabs_session(streamlabs_client_id, streamlabs_client_secret,
-                                                           streamlabs_redirect_uri)
 
-        # self.streamlabs_socket = socketio.AsyncClient()
         self.user_id = -1
-
-        self.htmlfile = r'e:\__Stream\web\example.html'
-        self.vr = False
         self.plusches = 0
-        self.deaths = [0, 0]
-
-        self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv', 'wmuga', 'johnrico85']
-        self.write_rip()
 
         self.last_post = CaseInsensitiveDict()
         self.post_timeout = 10 * 60
         self.post_price = {'regular': 20, 'vip': 10, 'mod': 0}
 
         self.vmod = None
-        self.player = None
         self.vmod_active = False
         self.pubsub_nonce = ''
 
@@ -164,23 +134,22 @@ class Bot(commands.Bot):
         self.last_messages = CaseInsensitiveDict()
         self.attacks = defaultdict(list)
         self.bots = (self.nick, 'nightbot', 'pretzelrocks', 'streamlabs', 'commanderroot', 'electricallongboard')
-        self.countdown_to = None
+        self.countdown_to: Optional[datetime.datetime] = None  # ! keep this here !
         self.dashboard = None
         self.queue = asyncio.Queue()
-
-        if pywinauto:
-            self.get_voicemod()
-            self.get_player()
 
         self.setup_mixer()
         self.write_plusch()
 
+    # Fill in missing stuff
+    def get_cog(self, name):
         try:
-            with open('rip.txt') as f:
-                self.deaths[1] = int(f.read().strip())
-        except (FileNotFoundError, TypeError, ValueError):
-            pass
+            return self.cogs[name]
+        except KeyError:
+            logger.error(f"No such cog: {name}")
+            return None
 
+    # twitchio, I can and will handle pubsub
     async def event_pubsub(self, data):
         pass
 
@@ -212,48 +181,6 @@ class Bot(commands.Bot):
         logger.debug("play sound", soundfile)
         pygame.mixer.music.load(str(soundfile))
         pygame.mixer.music.play()
-
-    async def deactivate_voicemod(self):
-        await asyncio.sleep(60)
-        self.get_voicemod()
-        # self.get_discord()
-        if self.vmod is not None:
-            self.vmod_active = False
-            self.vmod.type_keys('%{VK_DIVIDE}', set_foreground=False)  # random voice
-
-            # if self.get_discord() is not None:
-            self.vmod.type_keys('%{VK_NUMPAD0}', set_foreground=False)  # unmute
-
-    async def activate_voicemod(self):
-        while self.vmod_active:
-            await asyncio.sleep(5)
-
-        self.play_sound('vmod.mp3')
-
-        self.get_voicemod()
-
-        if self.vmod is not None:
-            self.vmod.type_keys('%{VK_NUMPAD0}', set_foreground=False)  # mute
-            self.vmod_active = True
-            self.vmod.type_keys('%{VK_MULTIPLY}', set_foreground=False)  # random voice
-
-        asyncio.ensure_future(self.deactivate_voicemod())
-
-    def get_voicemod(self):
-        if not pywinauto:
-            return
-        try:
-            self.vmod = pywinauto.Application().connect(title="Voicemod Desktop").top_window().wrapper_object()
-        except (pywinauto.findwindows.ElementNotFoundError, RuntimeError):
-            logger.warning('Could not find VoiceMod Desktop window')
-
-    def get_player(self):
-        if not pywinauto:
-            return
-        try:
-            self.player = pywinauto.Application().connect(title="Pretzel").top_window().wrapper_object()
-        except (pywinauto.findwindows.ElementNotFoundError, RuntimeError):
-            logger.warning('Could not find PretzelRocks window')
 
     def is_online(self, nick: str):
         nick = nick.lower()
@@ -395,7 +322,8 @@ class Bot(commands.Bot):
         logger.debug("Prompt:", prompt)
 
         if reward_key == "Смена голоса на 1 минуту".replace(' ', ''):
-            asyncio.ensure_future(self.activate_voicemod())
+            vmod = self.get_cog('VMcog')
+            asyncio.ensure_future(vmod.activate_voicemod())
 
         if reward_key == "Обнять стримера".replace(' ', ''):
             logger.debug(f"Queued redepmtion: hugs, {requestor}")
@@ -436,116 +364,6 @@ class Bot(commands.Bot):
             users = (users,)
 
         return ctx.author.name in users
-
-    @commands.command(name='setup')
-    async def setup(self, ctx: Context):
-        if not self.check_sender(ctx, 'iarspider'):
-            return
-
-        if not self.ws:
-            return
-
-        res: obsws_requests.GetStreamingStatus = self.ws.call(obsws_requests.GetStreamingStatus())
-        if res.getStreaming():
-            logger.error('Already streaming!')
-            return
-
-        asyncio.ensure_future(ctx.send('К стриму готов!'))
-        self.ws.call(obsws_requests.SetCurrentProfile('Regular games'))
-        self.ws.call(obsws_requests.SetCurrentSceneCollection('Twitch'))
-
-    @commands.command(name='countdown', aliases=['preroll', 'cd', 'pr', 'св', 'зк'])
-    async def countdown(self, ctx: Context):
-        def write_countdown_html():
-            args = ctx.message.content.split()[1:]
-            parts = tuple(int(x) for x in args[0].split(':'))
-            if len(parts) == 2:
-                m, s = parts
-                # noinspection PyShadowingNames
-                delta = datetime.timedelta(minutes=m, seconds=s)
-                dt = datetime.datetime.now() + delta
-            elif len(parts) == 3:
-                h, m, s = parts
-                dt = datetime.datetime.now().replace(hour=h, minute=m, second=s)
-            else:
-                logger.error("Invalid call to countdown: {0}".format(args[0]))
-                return
-
-            self.countdown_to = dt
-
-            with codecs.open(self.htmlfile.replace('html', 'template'), encoding='UTF-8') as f:
-                lines = f.read()
-
-            lines = lines.replace('@@date@@', dt.isoformat())
-            with codecs.open(self.htmlfile, 'w', encoding='UTF-8') as f:
-                f.write(lines)
-
-        if not self.check_sender(ctx, 'iarspider'):
-            return
-
-        if not self.ws:
-            return
-
-        res: obsws_requests.GetStreamingStatus = self.ws.call(obsws_requests.GetStreamingStatus())
-        if res.getStreaming():
-            logger.error('Already streaming!')
-            return
-
-        write_countdown_html()
-
-        self.ws.call(obsws_requests.DisableStudioMode())
-
-        # Refresh countdown
-        self.ws.call(obsws_requests.SetCurrentScene('Starting'))
-
-        try:
-            self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), True))
-        except KeyError:
-            logger.warning("[WARN] Can't mute mic-2, please check!")
-        self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), True))
-
-        self.ws.call(obsws_requests.EnableStudioMode())
-
-        self.ws.call(obsws_requests.StartStopStreaming())
-        self.get_player()
-        if self.player is not None:
-            self.player.type_keys('+%P', set_foreground=False)  # Pause
-
-        asyncio.ensure_future(ctx.send('Начат обратный отсчёт до {0}!'.format(self.countdown_to.strftime('%X'))))
-        asyncio.ensure_future(self.my_run_commercial(self.user_id))
-
-        if discord_bot is not None and discord_channel is not None:
-            stream = await self.my_get_stream(self.user_id)
-            game = self.my_get_game(stream['game_id'])
-            delta = self.countdown_to - datetime.datetime.now()
-            delta_m = delta.seconds // 60
-            delta_text = numeral.get_plural(delta_m, ('минута', 'минуты', 'минут'))
-            announcement = f"<@&{discord_role.id}> Паучок запустил стрим \"{stream['title']}\" " \
-                           f"по игре \"{game['name']}\"! У вас есть примерно {delta_text} чтобы" \
-                           " открыть стрим - <https://twitch.tv/iarspider>!"
-            await discord_channel.send(announcement)
-            logger.info("Discord notification sent!")
-
-    # noinspection PyUnusedLocal
-    @commands.command(name='end', aliases=['fin', 'конец', 'credits'])
-    async def end(self, ctx: Context):
-        if not self.check_sender(ctx, 'iarspider'):
-            return
-
-        self.ws.call(obsws_requests.SetCurrentScene('End'))
-        try:
-            api.roll_credits(self.streamlabs_oauth)
-        except requests.HTTPError as exc:
-            logger.error("Can't roll credits! " + str(exc))
-            pass
-
-    @commands.command(name='vr')
-    async def toggle_vr(self, ctx: Context):
-        if not self.check_sender(ctx, 'iarspider'):
-            return
-
-        self.vr = not self.vr
-        asyncio.ensure_future(ctx.send('VR-режим {0}'.format('включен' if self.vr else 'выключен')))
 
     # async def event_raw_data(self, data):
     #     lines = data.splitlines(keepends=False)
@@ -593,9 +411,10 @@ class Bot(commands.Bot):
         roll_sum = sum(rolls)
         # print("You rolled:", ";".join(str(x) for x in rolls), "sum is", roll_sum)
         if len(rolls) > 1:
-            await ctx.send("Выкинул: {}={}".format("+".join(str(x) for x in rolls), roll_sum))
+            await ctx.send(
+                "@{} выкинул: {}={}".format(ctx.author.display_name, "+".join(str(x) for x in rolls), roll_sum))
         elif len(rolls) == 1:
-            await ctx.send("Выкинул: {}".format(roll_sum))
+            await ctx.send("@{} выкинул: {}".format(ctx.author.display_name, roll_sum))
 
     @commands.command(name='deny', aliases=('no', 'pass'))
     async def deny_attack(self, ctx: Context):
@@ -738,83 +557,6 @@ class Bot(commands.Bot):
         else:
             await ctx.send("По поручению {0} {1} потрогал @{2}".format(attacker, prefix, defender, target))
 
-    @commands.command(name='bugs', aliases=['баги'])
-    async def bugs(self, ctx: Context):
-        """
-            Показывает текущее число "багов" (очков лояльности)
-
-            %%bugs
-        """
-        user = ctx.author.name
-        # print("Requesting points for", user)
-        try:
-            res = api.get_points(self.streamlabs_oauth, user)
-            # print(res)
-            # res = res['points']
-        except requests.HTTPError:
-            res = 0
-
-        await ctx.send(f'@{user} Набрано багов: {res}')
-        # await ctx.author.send('Набрано багов: {0}'.format(res))
-        # await ctx.send('@' + user + ', ответил в ЛС')
-
-    def switch_to(self, scene: str):
-        res = self.ws.call(obsws_requests.GetStudioModeStatus())
-        if res.getStudioMode():
-            self.ws.call(obsws_requests.SetPreviewScene(scene))
-            self.ws.call(obsws_requests.TransitionToProgram('Stinger'))
-        else:
-            self.ws.call(obsws_requests.SetCurrentScene(scene))
-
-    @commands.command(name='pause', aliases=('break',))
-    async def pause(self, ctx: Context):
-        """
-            Запускает перерыв
-
-            %%pause
-        """
-        if not self.check_sender(ctx, 'iarspider'):
-            asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
-            return
-
-        self.get_player()
-        if self.player is not None:
-            self.player.type_keys('+%P', set_foreground=False)  # Pause
-
-        if self.ws is not None:
-            self.switch_to('Paused')
-            if self.vr:
-                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), True))
-            else:
-                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), True))
-
-        # self.get_chatters()
-        asyncio.ensure_future(ctx.send('Начать перепись населения!'))
-        asyncio.ensure_future(self.my_run_commercial(self.user_id, 60))
-
-    @commands.command(name='start')
-    async def start_(self, ctx: Context):
-        """
-            Начало трансляции. Аналог resume но без подсчёта зрителей
-
-            %%start
-        """
-        if not self.check_sender(ctx, 'iarspider'):
-            asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
-            return
-
-        self.get_player()
-        if self.player is not None:
-            self.player.type_keys('+%P', set_foreground=False)  # Pause
-
-        if self.ws is not None:
-            if self.vr:
-                self.switch_to('VR Game')
-                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), False))
-            else:
-                self.switch_to('Game')
-                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
-
     @staticmethod
     def my_get_users(user_name):
         res = requests.get('https://api.twitch.tv/helix/users', params={'login': user_name},
@@ -864,39 +606,6 @@ class Bot(commands.Bot):
         except requests.HTTPError:
             logger.error("Failed to run commercial:", res.json())
 
-    @commands.command(name='resume')
-    async def resume(self, ctx: Context):
-        """
-            Отменяет перерыв
-
-            %%resume
-        """
-        if not self.check_sender(ctx, 'iarspider'):
-            asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
-            return
-
-        self.get_player()
-        if self.player is not None:
-            self.player.type_keys('+%P', set_foreground=False)  # Pause
-
-        if self.ws is not None:
-            if self.vr:
-                self.switch_to('VR Game')
-                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), False))
-            else:
-                self.switch_to('Game')
-                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
-
-        try:
-            res = await self.my_get_stream(self.user_id)
-            viewers = numeral.get_plural(res['viewer_count'], ('зритель', 'зрителя', 'зрителей'))
-            asyncio.ensure_future(
-                ctx.send(
-                    'Перепись населения завершена успешно! Население стрима составляет {0}'.format(viewers)))
-        except (KeyError, TypeError) as exc:
-            asyncio.ensure_future(ctx.send('Перепись населения не удалась :('))
-            logger.error(str(exc))
-
     def write_plusch(self):
         with codecs.open("plusch.txt", "w", "utf8") as f:
             f.write("Кого-то поплющило {0}...".format(numeral.get_plural(self.plusches, ('раз', 'раза', 'раз'))))
@@ -918,167 +627,14 @@ class Bot(commands.Bot):
         self.plusches += 1
         self.write_plusch()
 
-    def write_rip(self):
-        with codecs.open('rip_display.txt', 'w', 'utf8') as f:
-            f.write(u'☠: {0} ({1})'.format(*self.deaths))
-            # f.write(u'☠: {1}'.format(*self.deaths))
-
-        with open('rip.txt', 'w') as f:
-            f.write(str(self.deaths[1]))
-
-    async def do_rip(self, ctx: Context, reason: Optional[str] = None):
-        if not (self.is_mod(ctx.author.name) or self.is_vip(
-                ctx.author.name) or ctx.author.name.lower() in self.rippers):
-            asyncio.ensure_future(ctx.send("Эту кнопку не трожь!"))
-            return
-
-        self.deaths[0] += 1
-        self.deaths[1] += 1
-
-        self.write_rip()
-        if reason:
-            await ctx.send(reason)
-
-        asyncio.ensure_future(ctx.send("riPepperonis {0}".format(*self.deaths)))
-
-    @commands.command(name='rip', aliases=("смерть",))
-    async def rip(self, ctx: Context):
-        """
-            Счётчик смертей
-
-            %% rip
-        """
-        await self.do_rip(ctx)
-
-    @commands.command(name='unrip')
-    async def unrip(self, ctx: Context):
-        """
-        Отмена смерти
-        """
-        if not self.check_sender(ctx, 'iarspider'):
-            return
-
-        self.deaths[0] -= 1
-        self.deaths[1] -= 1
-
-        self.write_rip()
-
-        asyncio.ensure_future(ctx.send("MercyWing1 PinkMercy MercyWing2".format(*self.deaths)))
-
-    @commands.command(name='enrip')
-    async def enrip(self, ctx: Context):
-        """
-        Временно (до перезапуска бота) добавляет пользователя в rip-список
-        """
-        if not self.check_sender(ctx, 'iarspider'):
-            return
-
-        args = ctx.message.content.split()[1:]
-        if len(args) != 1:
-            asyncio.ensure_future(ctx.send("Неправильный запрос"))
-        self.rippers.append(args[0])
-
-        asyncio.ensure_future(ctx.send("{0} TwitchVotes ".format(args[0])))
-
-    # @commands.command(name='ripz')
-    # async def ripz(self, ctx: Context):
-    #     """
-    #         Счётчик смертей
-    #
-    #         %% ripz
-    #     """
-    #     await self.do_rip(ctx, "#Отзомбячено!")
-    #
-    # @commands.command(name='riph')
-    # async def riph(self, ctx: Context):
-    #     """
-    #         Счётчик смертей
-    #
-    #         %% riph
-    #     """
-    #     await self.do_rip(ctx, "#Захедкраблено")
-    #
-    # @commands.command(name='ripc')
-    # async def ripc(self, ctx: Context):
-    #     """
-    #         Счётчик смертей
-    #
-    #         %% ripc
-    #     """
-    #     await self.do_rip(ctx, "#Укомбайнено")
-    #
-    # @commands.command(name='ripb')
-    # async def ripb(self, ctx: Context):
-    #     """
-    #         Счётчик смертей
-    #
-    #         %% ripb
-    #     """
-    #     await self.do_rip(ctx, "#Барнакнуто")
-    #
-    # @commands.command(name='ripn', aliases=['nom', 'omnomnom', 'ном', 'ням', 'омномном'])
-    # async def nom(self, ctx: Context):
-    #     await self.do_rip(ctx, 'Ом-ном-ном!')
-
     @commands.command(name='bomb', aliases=['man', 'manual', 'руководство'])
     async def man(self, ctx: Context):
         await ctx.send("Руководство тут - https://bombmanual.com/ru/web/index.html")
 
-    @commands.command(name='post', aliases=['почта'])
-    async def post(self, ctx: Context):
-        last_post = self.last_post.get(ctx.author.name, None)
-        if last_post is not None:
-            delta = datetime.datetime.now() - last_post
-            if delta.seconds < 10 * 60:
-                asyncio.ensure_future(ctx.send("Не надо так часто отправлять почту!"))
-                return
-
-        if self.is_mod(ctx.author.name):
-            price = self.post_price['mod']
-        elif self.is_vip(ctx.author.name):
-            price = self.post_price['vip']
-        else:
-            price = self.post_price['regular']
-
-        points = api.get_points(self.streamlabs_oauth, ctx.author.name)
-
-        if points < price:
-            asyncio.ensure_future(ctx.send(f"У вас недостаточно багов для отправки почты - вам нужно минимум "
-                                           f" {price}. Проверить баги: !баги"))
-        else:
-            res = api.sub_points(self.streamlabs_oauth, ctx.author.name, price)
-            logger.debug(res)
-            self.play_sound("pochta.mp3")
-
-    @commands.command(name='sos', aliases=['alarm'])
-    async def sos(self, ctx: Context):
-        if not (self.is_mod(ctx.author.name) or ctx.author.name.lower() == 'iarspider'):
-            asyncio.ensure_future(ctx.send("Эта кнопочка - не для тебя. Руки убрал, ЖИВО!"))
-            return
-
-        self.play_sound("matmatmat.mp3")
-
-    @commands.command(name='vmod')
-    async def vmod(self, ctx: Context):
-        if ctx.author.name.lower() != 'iarspider':
-            return
-
-        await self.activate_voicemod()
-
     @commands.command(name='help', aliases=('помощь', 'справка'))
     async def help(self, ctx: Context):
-        asyncio.ensure_future(ctx.send(f"Никто тебе не поможет, {ctx.author.display_name}!"))
-
-    @commands.command(name='spin')
-    async def spin(self, ctx: Context):
-        if ctx.author.name.lower() != 'iarspider':
-            return
-
-        # points = api.get_points(self.streamlabs_oauth, ctx.author.name)
-        # httpclient_logging_patch()
-        requests.post('https://streamlabs.com/api/v1.0/wheel/spin',
-                      data={'access_token': self.streamlabs_oauth.access_token})
-        # httpclient_logging_patch(logging.INFO)
+        # asyncio.ensure_future(ctx.send(f"Никто тебе не поможет, {ctx.author.display_name}!"))
+        asyncio.ensure_future(ctx.send(f"@{ctx.author.display_name} Справка по командам бота тут: "))
 
     @commands.command(name='translit', aliases=('translate', 'tr'))
     async def translit(self, ctx: Context):
@@ -1142,26 +698,6 @@ sio_client: Optional[socketio.AsyncClient] = None
 sio_server: Optional[socketio.AsyncServer] = None
 app: Optional[socketio.WSGIApp] = None
 
-
-async def on_ready():
-    global discord_channel, discord_role
-    # print("Discord | on_ready")
-    guild = discord.utils.find(lambda g: g.name == discord_guild_name, discord_bot.guilds)
-
-    if guild is None:
-        raise RuntimeError(f"Failed to join Discord guild {discord_guild_name}!")
-
-    discord_channel = discord.utils.find(lambda c: c.name == discord_channel_name, guild.channels)
-    if discord_channel is None:
-        raise RuntimeError(f"Failed to join Discord channel {discord_channel_name}!")
-
-    logger.info(f"Ready | {discord_bot.user} @ {guild.name}")
-
-    discord_role = discord.utils.find(lambda r: r.name == discord_role_name, guild.roles)
-    if discord_role is None:
-        raise RuntimeError(f"No role {discord_role_name} in guild {discord_guild_name}!")
-
-
 if __name__ == '__main__':
     import logging
 
@@ -1171,78 +707,10 @@ if __name__ == '__main__':
     # Run bot
     _loop = asyncio.get_event_loop()
     twitch_bot = Bot()
-    discord_bot = discord.Client()
-    discord_bot.event(on_ready)
 
     invalid = list(twitchio.dataclasses.Messageable.__invalid__)
     invalid.remove('w')
     twitchio.dataclasses.Messageable.__invalid__ = tuple(invalid)
-
-    # noinspection PyUnboundLocalVariable
-    sl_client = socketio.AsyncClient(logger=logger)
-
-
-    @sl_client.on('connect')
-    async def sl_client_connected():
-        logger.info('SL client connected!')
-
-
-    @sl_client.on('disconnect')
-    async def sl_client_disconnected():
-        logger.warning('SL client disconnected!')
-
-
-    # @sl_client.on('message')
-    # async def sl_client_message(data):
-    #     logger.info(f'SL message: {data}')
-
-
-    @sl_client.on('event')
-    async def sl_client_event(data):
-        logger.info(f'SL event: {data}')
-        pick_keys = []
-        if data['type'] == 'donation':
-            pick_keys.extend(('from', 'message', 'formatted_amount'))
-        elif data['type'] == 'follow':
-            pick_keys.extend(('name',))
-        elif data['type'] == 'subscription':
-            pick_keys.extend(('name', 'months', 'message', 'sub_plan', 'sub_type'))
-            if data['message'][0]['sub_type'] == 'subgift':
-                pick_keys.extend(('gifter_display_name', ))
-        elif data['type'] == 'resub':
-            pick_keys.extend(('name', 'months', 'streak_months', 'message', 'sub_plan'))
-        elif data['type'] == 'host':
-            pick_keys.extend(('name', 'viewers'))
-        elif data['type'] == 'bits':
-            pick_keys.extend(('name', 'amount', 'message'))
-        elif data['type'] == 'raid':
-            pick_keys.extend(('name', 'raiders'))
-        elif data['type'] == 'alertPlaying':
-            return
-        else:
-            logger.warning(f'Unknown SL event type: {data["type"]}')
-            return
-
-        def copy_keys(from_, to_, keys_):
-            for k_ in keys_:
-                if k_ in from_:
-                    to_[k_] = from_[k_]
-                else:
-                    logger.warning(f'Event {data["type"]} missing key {k_}')
-                    to_[k_] = 'UNKNOWN'
-
-        message = {'action': 'event', 'value': {'type': data['type']}}
-        if isinstance(data['message'], list):
-            for msg in data['message']:
-                copy_keys(msg, message['value'], pick_keys)
-        else:
-            copy_keys(data['message'], message['value'], pick_keys)
-
-        await twitch_bot.queue.put(message)
-
-
-    token = api.get_socket_token(twitch_bot.streamlabs_oauth)
-    asyncio.ensure_future(sl_client.connect(f'https://sockets.streamlabs.com?token={token}'))
 
     sio_server = socketio.AsyncServer(async_mode='asgi',  # logger=True, engineio_logger=True,
                                       cors_allowed_origins='https://fr.iarazumov.com')
