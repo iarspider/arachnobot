@@ -24,15 +24,20 @@
     </head>
     <body>
         <script>
-            // document.addEventListener("DOMContentLoaded", function(){ $('#select').dropdown(); });
-            // var iarws = new WebSocket("wss://fr.iarazumov.com/ws");
             const iarws = io("wss://fr.iarazumov.com/", {
                              transports: ['websocket'],
                              path: '/ws'});
-//            const iarws = io("wss://fr.iarazumov.com/", {
-//                             path: '/ws'});
 
-            // var drop_data = new Array();
+            hashCode = function(s){
+                var hash = 0;
+                for (var i = 0; i < s.length; i++) {
+                    var character = s.charCodeAt(i);
+                    hash = ((hash<<5)-hash)+character;
+                    hash = hash & hash; // Convert to 32bit integer
+                }
+                return hash;
+            }
+            
             on_add = function(v) {
                 var id = 'viewer_' + hashCode(v.name);
                 if (document.getElementById(id) === null) {
@@ -164,7 +169,6 @@
             }
             
             const div_viewers = document.getElementById("viewerz");
-            const hashCode = s => s.split('').reduce((a, b) => (((a << 5) - a) + b.charCodeAt(0)) | 0, 0);
 
             let viewers = [];
             

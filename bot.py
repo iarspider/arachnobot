@@ -599,7 +599,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='deny', aliases=('no', 'pass'))
     async def deny_attack(self, ctx: Context):
-        defender = ctx.author.display_name
+        defender = ctx.author.name
 
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
@@ -607,6 +607,7 @@ class Bot(commands.Bot):
         attacker = args[0].strip('@')
 
         if not attacker.lower() in self.attacks[defender]:
+            logger.warning(f"accept_attack: no duel {attacker} x {defender}")
             return
 
         self.attacks[defender].remove(attacker.lower())
@@ -614,7 +615,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='accept', aliases=('yes', 'ok'))
     async def accept_attack(self, ctx: Context):
-        defender = ctx.author.display_name
+        defender = ctx.author.name
 
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
@@ -622,6 +623,7 @@ class Bot(commands.Bot):
         attacker = args[0].strip('@')
 
         if not attacker.lower() in self.attacks[defender]:
+            logger.warning(f"accept_attack: no duel {attacker} x {defender}")
             return
 
         self.attacks[defender].remove(attacker.lower())
@@ -646,7 +648,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='attack')
     async def attack(self, ctx: Context):
-        attacker = ctx.author.display_name
+        attacker = ctx.author.name
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
             await ctx.send("Использование: !attack <кого>")
@@ -676,7 +678,7 @@ class Bot(commands.Bot):
             await ctx.send("Ботика не трожь!")
             return
 
-        asyncio.ensure_future(ctx.send(f"@{defender}, тебя вызвал на дуэль {attacker}!"
+        asyncio.ensure_future(ctx.send(f"@{defender}, тебя вызвал на дуэль {ctx.author.display_name}!"
                                        f" Чтобы принять вызов пошли в чат !accept {attacker}"
                                        f", чтобы отказаться - !deny {attacker}."))
 
@@ -1067,7 +1069,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='help', aliases=('помощь', 'справка'))
     async def help(self, ctx: Context):
-        asyncio.ensure_future(ctx.send(f"Никто тебе не поможет, {ctx.author.display_name}!"))
+        asyncio.ensure_future(ctx.send(f"Справка по командам ботика: https://iarspider.github.io/arachnobot/help"))
 
     @commands.command(name='spin')
     async def spin(self, ctx: Context):
