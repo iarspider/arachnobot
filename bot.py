@@ -756,7 +756,7 @@ class Bot(commands.Bot):
         except requests.HTTPError:
             res = 0
 
-        await ctx.send(f'@{user} Набрано багов: {res}')
+        await ctx.send(f'@{ctx.author.display_name} Набрано багов: {res}')
         # await ctx.author.send('Набрано багов: {0}'.format(res))
         # await ctx.send('@' + user + ', ответил в ЛС')
 
