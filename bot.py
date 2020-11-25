@@ -49,6 +49,8 @@ sl_client: socketio.AsyncClient
 def setup_logging(logfile, debug, color, http_debug):
     global logger
     logger = logging.getLogger("bot")
+    ws_logger = logging.getLogger('websockets.server')
+
     logger.propagate = False
     handler = logging.StreamHandler()
     if color:
@@ -66,21 +68,23 @@ def setup_logging(logfile, debug, color, http_debug):
     logger.addHandler(handler)
     logger.addHandler(file_handler)
 
+    ws_logger.addHandler(handler)
+    ws_logger.addHandler(file_handler)
+
     if not debug:
         logger.setLevel(logging.INFO)
         logging.getLogger('discord').setLevel(logging.INFO)
+        ws_logger.setLevel(logging.INFO)
     else:
         logger.info("Debug logging is ON")
         logger.setLevel(logging.DEBUG)
         logging.getLogger('discord').setLevel(logging.DEBUG)
+        ws_logger.setLevel(logging.DEBUG)
 
     if http_debug:
         http_client.HTTPConnection.debuglevel = 1
 
-    ws_logger = logging.getLogger('websockets.server')
-    ws_logger.setLevel(logging.DEBUG)
-    ws_logger.addHandler(handler)
-    ws_logger.addHandler(file_handler)
+
 
 
 def httpclient_logging_patch(level=logging.DEBUG):
