@@ -23,6 +23,10 @@ colorlog = "*"
 pytils = "*"
 watchdog = "*"
 uvicorn = "*"
+aiohttp = "==3.7.3"
+chardet = "==4.0.0"
+multidict = "==5.1.0"
+yarl = "==1.6.3"
 
 [requires]
 python_version = "3.9"

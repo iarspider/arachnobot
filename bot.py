@@ -156,7 +156,7 @@ class Bot(commands.Bot):
     @staticmethod
     def play_sound(sound: str):
         soundfile = pathlib.Path(__file__).with_name(sound)
-        logger.debug("play sound", soundfile)
+        logger.debug("play sound %s", soundfile)
         pygame.mixer.music.load(str(soundfile))
         pygame.mixer.music.play()
 
@@ -169,8 +169,6 @@ class Bot(commands.Bot):
 
     def is_vip(self, nick: str):
         return nick.lower() in self.vips
-
-    # Events don't need decorators when subclassed
 
     async def send_viewer_joined(self, user: User):
         if user.name.lower() in self.bots:
@@ -214,11 +212,6 @@ class Bot(commands.Bot):
     #     for line in lines:
     #         print('>', line)
 
-    # Commands use a different decorator
-    # @commands.command(name='test')
-    # async def test(self, ctx: Context):
-    #     await ctx.send(f'Hello {ctx.author.name}!')
-
     @commands.command(name='roll', aliases=['dice', 'кинь', 'r'])
     async def roll(self, ctx: Context):
         dices = []
@@ -259,93 +252,6 @@ class Bot(commands.Bot):
                 "@{} выкинул: {}={}".format(ctx.author.display_name, "+".join(str(x) for x in rolls), roll_sum))
         elif len(rolls) == 1:
             await ctx.send("@{} выкинул: {}".format(ctx.author.display_name, roll_sum))
-
-    @commands.command(name='deny', aliases=('no', 'pass'))
-    async def deny_attack(self, ctx: Context):
-        defender = ctx.author.display_name
-
-        args = ctx.message.content.split()[1:]
-        if len(args) != 1:
-            await ctx.send("Использование: !deny <от кого>")
-        attacker = args[0].strip('@')
-
-        if not attacker.lower() in self.attacks[defender]:
-            return
-
-        self.attacks[defender].remove(attacker.lower())
-        asyncio.ensure_future(ctx.send(f"Бой между {attacker} и {defender} не состоится, можете расходиться"))
-
-    @commands.command(name='accept', aliases=('yes', 'ok'))
-    async def accept_attack(self, ctx: Context):
-        defender = ctx.author.display_name
-
-        args = ctx.message.content.split()[1:]
-        if len(args) != 1:
-            await ctx.send("Использование: !accept <от кого>")
-        attacker = args[0].strip('@')
-
-        if not attacker.lower() in self.attacks[defender]:
-            return
-
-        self.attacks[defender].remove(attacker.lower())
-
-        await ctx.send("Пусть начнётся битва: {0} против {1}!".format(attacker, defender))
-
-        attack_d = random.randint(1, 20)
-        defence_d = random.randint(1, 20)
-
-        if attack_d > defence_d:
-            await ctx.send(
-                "@{0} побеждает с результатом {1}:{2}!".format(attacker, attack_d, defence_d))
-            await ctx.timeout(defender, 60)
-        elif attack_d < defence_d:
-            await ctx.send(
-                "@{0} побеждает с результатом {2}:{1}!".format(defender, attack_d, defence_d))
-            await ctx.timeout(attacker, 60)
-        else:
-            await ctx.send("Бойцы вырубили друг друга!")
-            await ctx.timeout(defender, 30)
-            await ctx.timeout(attacker, 30)
-
-    @commands.command(name='attack')
-    async def attack(self, ctx: Context):
-        attacker = ctx.author.display_name
-        args = ctx.message.content.split()[1:]
-        if len(args) != 1:
-            await ctx.send("Использование: !attack <кого>")
-        defender = args[0].strip('@')
-
-        if self.is_mod(attacker):
-            await ctx.send("Модерам не нужны кубики, чтобы кого-то забанить :)")
-            return
-
-        if self.is_mod(defender):
-            await ctx.send(f"А вот модеров не трожь, @{attacker}!")
-            await asyncio.sleep(15)
-            await ctx.timeout(attacker, 1)
-            return
-
-        # if not self.is_online(defender):
-        #     await ctx.send(
-        #         f"Эй, @{attacker}, ты не можешь напасть на {defender} - он(а) сейчас не в сети!")
-        #     return
-
-        if defender.lower() == attacker.lower():
-            await ctx.send("РКН на тебя нет, негодяй!")
-            await ctx.timeout(defender, 120)
-            return
-
-        if defender.lower() in self.bots:
-            await ctx.send("Ботика не трожь!")
-            return
-
-        asyncio.ensure_future(ctx.send(f"@{defender}, тебя вызвал на дуэль {attacker}!"
-                                       f" Чтобы принять вызов пошли в чат !accept {attacker}"
-                                       f", чтобы отказаться - !deny {attacker}."))
-
-        attacker = attacker.lower()
-        defender = defender.lower()
-        self.attacks[defender].append(attacker)
 
     @commands.command(name='bite', aliases=['кусь'])
     async def bite(self, ctx: Context):
@@ -475,7 +381,8 @@ if __name__ == '__main__':
     # Run bot
     _loop = asyncio.get_event_loop()
     twitch_bot = Bot()
-    for extension in ('discordcog', 'eventcog', 'obscog', 'pluschcog', 'ripcog', 'SLCog', 'vmodcog', 'elfcog'):
+    for extension in ('discordcog', 'eventcog', 'obscog', 'pluschcog', 'ripcog', 'SLCog',
+                      'vmodcog', 'elfcog', 'duelcog'):
         twitch_bot.load_module(extension)
 
     invalid = list(twitchio.dataclasses.Messageable.__invalid__)

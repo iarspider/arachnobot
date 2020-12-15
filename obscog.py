@@ -253,3 +253,26 @@ class OBSCog:
         except (KeyError, TypeError) as exc:
             asyncio.ensure_future(ctx.send('Перепись населения не удалась :('))
             self.logger.error(str(exc))
+
+    @commands.command(name='ужин')
+    async def dinner(self, ctx: Context):
+        if not self.check_sender(ctx, 'iarspider'):
+            asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
+            return
+
+        self.ws.call(obsws_requests.SetSceneItemProperties(scene_name="Paused", item="ужин", visible=True))
+        ###
+        self.get_player()
+        if self.player is not None:
+            self.player.type_keys('+%P', set_foreground=False)  # Pause
+
+        if self.ws is not None:
+            self.switch_to('Paused')
+            if self.vr:
+                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), True))
+            else:
+                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), True))
+
+        # self.get_chatters()
+        asyncio.ensure_future(ctx.send('Начать перепись населения!'))
+        asyncio.ensure_future(self.my_run_commercial(self.user_id, 60))
