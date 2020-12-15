@@ -1,5 +1,7 @@
+import asyncio
 import datetime
 from typing import Optional
+import warnings
 
 import discord
 from pytils import numeral
@@ -18,13 +20,25 @@ class DiscordCog:
 
         self.main()
 
+    def __getattr__(self, item):
+        if item != '__bases__':
+            self.logger.warning(f"[Discord] Failed to get attribute {item}, redirecting to self.bot!")
+        return self.bot.__getattribute__(item)
+
+    async def start_bot(self):
+        # Only needed until discord.py updates it's dependencies
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            await self.discord_bot.start(discord_bot_token)
+
     def main(self):
         self.discord_bot = discord.Client()
         self.discord_bot.event(self.on_ready)
+        asyncio.ensure_future(self.start_bot())
 
     async def on_ready(self):
         # print("Discord | on_ready")
-        guild = discord.utils.find(lambda g: g.name == discord_guild_name, discord_bot.guilds)
+        guild = discord.utils.find(lambda g: g.name == discord_guild_name, self.discord_bot.guilds)
 
         if guild is None:
             raise RuntimeError(f"Failed to join Discord guild {discord_guild_name}!")
@@ -39,7 +53,7 @@ class DiscordCog:
         if discord_role is None:
             raise RuntimeError(f"No role {discord_role_name} in guild {discord_guild_name}!")
 
-    def announce(self):
+    async def announce(self):
         if self.discord_bot is not None and self.discord_channel is not None:
             stream = await self.bot.my_get_stream(self.bot.user_id)
             game = self.bot.my_get_game(stream['game_id'])

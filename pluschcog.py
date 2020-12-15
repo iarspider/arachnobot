@@ -12,6 +12,7 @@ class PluschCog:
     def __init__(self, bot):
         self.bot = bot
         self.logger = bot.logger
+        self.plusches = 0
 
         self.write_plusch()
 

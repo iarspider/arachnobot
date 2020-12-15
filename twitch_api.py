@@ -21,9 +21,8 @@ def get_token(client_id, client_secret, redirect_uri):
     webbrowser.open_new(authorization_url)
 
     authorization_response = input('Enter the full callback URL: ').strip()
-    token = oauth.fetch_token("https://id.twitch.tv/oauth2/token", client_id=client_id, client_secret=client_secret,
-                              authorization_response=authorization_response, force_querystring=True,
-                              include_client_id=True)
+    token = oauth.fetch_token("https://id.twitch.tv/oauth2/token", include_client_id=True, client_secret=client_secret,
+                              authorization_response=authorization_response, force_querystring=True)
 
     token_saver(token)
     return token
@@ -49,8 +48,8 @@ def validate(oauth: OAuth2Session, can_refresh=True):
 
 def get_session(client_id, client_secret, redirect_uri):
     try:
-        f = open("twitch_token.json", 'r')
-        token = simplejson.load(f)
+        with open("twitch_token.json", 'r') as f:
+            token = simplejson.load(f)
     except (OSError, simplejson.JSONDecodeError, FileNotFoundError):
         print("Failed to load token!")
         token = get_token(client_id, client_secret, redirect_uri)

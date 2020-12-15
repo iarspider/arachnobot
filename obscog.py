@@ -50,6 +50,11 @@ class OBSCog:
         if pywinauto:
             self.get_player()
 
+    def __getattr__(self, item):
+        if item != '__bases__':
+            self.logger.warning(f"[OBS] Failed to get attribute {item}, redirecting to self.bot!")
+        return self.bot.__getattribute__(item)
+
     def get_player(self):
         if not pywinauto:
             return
@@ -60,7 +65,7 @@ class OBSCog:
 
     @commands.command(name='setup')
     async def setup(self, ctx: Context):
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.bot.check_sender(ctx, 'iarspider'):
             return
 
         if not self.ws:
@@ -101,7 +106,7 @@ class OBSCog:
             with codecs.open(self.htmlfile, 'w', encoding='UTF-8') as f:
                 f.write(lines)
 
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.bot.check_sender(ctx, 'iarspider'):
             return
 
         if not self.ws:
@@ -132,17 +137,17 @@ class OBSCog:
         if self.player is not None:
             self.player.type_keys('+%P', set_foreground=False)  # Pause
 
-        asyncio.ensure_future(ctx.send('Начат обратный отсчёт до {0}!'.format(self.countdown_to.strftime('%X'))))
-        asyncio.ensure_future(self.my_run_commercial(self.user_id))
+        asyncio.ensure_future(ctx.send('Начат обратный отсчёт до {0}!'.format(self.bot.countdown_to.strftime('%X'))))
+        asyncio.ensure_future(self.bot.my_run_commercial(self.user_id))
 
-        discord_bot = self.bot.get_cog('discord')
+        discord_bot = self.bot.get_cog('DiscordCog')
         if discord_bot:
             asyncio.ensure_future(discord_bot.announce())
 
     # noinspection PyUnusedLocal
     @commands.command(name='end', aliases=['fin', 'конец', 'credits'])
     async def end(self, ctx: Context):
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.bot.check_sender(ctx, 'iarspider'):
             return
 
         api = self.bot.get_cog("SLCog")
@@ -158,7 +163,7 @@ class OBSCog:
 
     @commands.command(name='vr')
     async def toggle_vr(self, ctx: Context):
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.bot.check_sender(ctx, 'iarspider'):
             return
 
         self.vr = not self.vr
@@ -179,7 +184,7 @@ class OBSCog:
 
             %%pause
         """
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.bot.check_sender(ctx, 'iarspider'):
             asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
             return
 
@@ -196,7 +201,7 @@ class OBSCog:
 
         # self.get_chatters()
         asyncio.ensure_future(ctx.send('Начать перепись населения!'))
-        asyncio.ensure_future(self.my_run_commercial(self.user_id, 60))
+        asyncio.ensure_future(self.bot.my_run_commercial(self.user_id, 60))
 
     @commands.command(name='start')
     async def start_(self, ctx: Context):
@@ -205,7 +210,7 @@ class OBSCog:
 
             %%start
         """
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.bot.check_sender(ctx, 'iarspider'):
             asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
             return
 
@@ -228,7 +233,7 @@ class OBSCog:
 
             %%resume
         """
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.bot.check_sender(ctx, 'iarspider'):
             asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
             return
 
@@ -256,7 +261,7 @@ class OBSCog:
 
     @commands.command(name='ужин')
     async def dinner(self, ctx: Context):
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.bot.check_sender(ctx, 'iarspider'):
             asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
             return
 
@@ -275,4 +280,4 @@ class OBSCog:
 
         # self.get_chatters()
         asyncio.ensure_future(ctx.send('Начать перепись населения!'))
-        asyncio.ensure_future(self.my_run_commercial(self.user_id, 60))
+        asyncio.ensure_future(self.bot.my_run_commercial(self.bot.user_id, 60))

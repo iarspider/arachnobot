@@ -3,13 +3,18 @@ import asyncio
 from twitchio import Context
 from twitchio.ext import commands
 
+import warnings
+
+warnings.simplefilter("ignore", UserWarning)
 try:
     import pywinauto
+    warnings.resetwarnings()
 except ImportError as e:
     print('Failed to import pywinauto: {0}'.format(e))
     pywinauto = None
 
 
+@commands.cog()
 class VMcog:
     def __init__(self, bot):
         self.bot = bot
