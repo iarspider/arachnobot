@@ -11,11 +11,9 @@ requests-oauthlib = "*"
 python-vlc = "*"
 simplejson = "*"
 websocket-client = "*"
-pywin32 = {path = "./pywin32-228-cp39-cp39-win_amd64.whl"}
 pywinauto = "*"
 obs-websocket-py = "*"
 py-dateutil = "*"
-pygame = "*"
 discord-py = "*"
 python-dotenv = "*"
 python-socketio = "*"
@@ -23,6 +21,9 @@ colorlog = "*"
 pytils = "*"
 watchdog = "*"
 uvicorn = "*"
+youtube-dl = "*"
+pywin32 = {path = "./pywin32-228-cp39-cp39-win_amd64.whl"}
+pygame = {path = "./pygame-1.9.6-cp39-cp39-win_amd64.whl"}
 
 [requires]
 python_version = "3.9"

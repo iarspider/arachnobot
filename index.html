@@ -28,18 +28,8 @@
                              transports: ['websocket'],
                              path: '/ws'});
 
-            hashCode = function(s){
-                var hash = 0;
-                for (var i = 0; i < s.length; i++) {
-                    var character = s.charCodeAt(i);
-                    hash = ((hash<<5)-hash)+character;
-                    hash = hash & hash; // Convert to 32bit integer
-                }
-                return hash;
-            }
-            
             on_add = function(v) {
-                var id = 'viewer_' + hashCode(v.name);
+                var id = 'viewer_' + v.name;
                 if (document.getElementById(id) === null) {
                     var node = create_label(v);
                     document.getElementById('viewerz').append(node);
@@ -47,7 +37,7 @@
             }
 
             on_remove = function(v) {
-                var id = 'viewer_' + hashCode(v.name);
+                var id = 'viewer_' + v.name;
                 var node = document.getElementById(id);
                 if (node !== null) {
                     node.remove();
@@ -133,7 +123,7 @@
                     icon.parentNode.insertBefore(icon2, icon.nextSibling);
                 }
 
-                div.id = 'viewer_' + hashCode(v.name);
+                div.id = 'viewer_' + v.name;
                 div.style.color = v.color;
                 for (var i = 0; i < div.childNodes.length; i++) {
                     var curNode = div.childNodes[i];

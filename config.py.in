@@ -17,6 +17,9 @@ obsws_address = "127.0.0.1"
 obsws_password = "spider"
 obsws_port = "4444"
 
+music_login = ""
+music_password = ""
+
 twitch_ladies = (
     "aiyonamurakami", "chillmeow", "karzti", "tarakanchik14", "laimaaaa", "womens_games", "trurl_constructor", "sum174",
     "looputaps", "prayda_alpha", "babytigeronthesunflower", "iieerraa", "metamorfa", "gingerbreadcat", "marna149",

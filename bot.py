@@ -255,7 +255,7 @@ class Bot(commands.Bot):
         if not pywinauto:
             return
         try:
-            self.player = pywinauto.Application().connect(title="Pretzel").top_window().wrapper_object()
+            self.player = pywinauto.Application().connect(title="Pretzel Rocks").top_window().wrapper_object()
         except (pywinauto.findwindows.ElementNotFoundError, RuntimeError):
             logger.warning('Could not find PretzelRocks window')
 
@@ -457,6 +457,7 @@ class Bot(commands.Bot):
         asyncio.ensure_future(ctx.send('К стриму готов!'))
         self.ws.call(obsws_requests.SetCurrentProfile('Regular games'))
         self.ws.call(obsws_requests.SetCurrentSceneCollection('Twitch'))
+        self.ws.call(obsws_requests.SetSceneItemProperties(scene_name="Paused", item="ужин", visible=False))
 
     @commands.command(name='countdown', aliases=['preroll', 'cd', 'pr', 'св', 'зк'])
     async def countdown(self, ctx: Context):
@@ -696,12 +697,13 @@ class Bot(commands.Bot):
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
             await ctx.send("Использование: !bite <кого>")
+            return 
         defender = args[0].strip('@')
         last_bite = self.db.get(attacker, 31525200.0)
         now = datetime.datetime.now()
 
         last_bite = datetime.datetime.fromtimestamp(last_bite)
-        if (now - last_bite).seconds < 90 and attacker != 'iarspider':
+        if (now - last_bite).seconds < 15 and ctx.author.name != 'iarspider':
             await ctx.send("Не кусай так часто, @{0}! Дай моим челюстям отдохнуть!".format(attacker))
             return
 
@@ -725,10 +727,10 @@ class Bot(commands.Bot):
                 attacker))
             return
 
-        prefix = u"нежно " if random.randint(1, 2) == 1 else "ласково "
+        prefix = random.choice((u"нежно ", u"ласково "))
         target = ""
         if defender.lower() == "prayda_alpha":
-            target = u" за хвостик" if random.randint(1, 2) == 1 else " за ушко"
+            target = random.choice((u" за хвостик", u" за ушко"))
 
         if defender.lower() == "looputaps":
             target = u" за лапку в тапке"
@@ -739,10 +741,18 @@ class Bot(commands.Bot):
             prefix = ""
             target = ", ибо Тигру кусать нельзя!"
 
-        if defender.lower() != "thetestmod":
-            await ctx.send("По поручению {0} {1} кусаю @{2}{3}".format(attacker, prefix, defender, target))
+        if defender.lower() in ("kaiden_moreil", "kochetov2000"):
+            old_defender = defender
+            defender = attacker
+            attacker = 'arachnobot'
+            prefix = ""
+            with_ = random.choice(("некроёжиком с тентаклями вместо колючек", "зомбокувалдой", "некочайником"))
+            target = " {0}, ибо {1} кусать нельзя!".format(with_, old_defender)
+
+        if defender.lower() == "thetestmod":
+            await ctx.send("По поручению {0} {1} потрогал @{2} фирменным паучьим трогом".format(attacker, prefix, defender, target))            
         else:
-            await ctx.send("По поручению {0} {1} потрогал @{2}".format(attacker, prefix, defender, target))
+            await ctx.send("По поручению {0} {1} кусаю @{2}{3}".format(attacker, prefix, defender, target))
 
     @commands.command(name='bugs', aliases=['баги'])
     async def bugs(self, ctx: Context):
@@ -893,6 +903,8 @@ class Bot(commands.Bot):
                 self.switch_to('Game')
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
 
+            self.ws.call(obsws_requests.SetSceneItemProperties(scene_name="Paused", item="ужин", visible=False))
+            
         try:
             res = await self.my_get_stream(self.user_id)
             viewers = numeral.get_plural(res['viewer_count'], ('зритель', 'зрителя', 'зрителей'))
@@ -903,6 +915,30 @@ class Bot(commands.Bot):
             asyncio.ensure_future(ctx.send('Перепись населения не удалась :('))
             logger.error(str(exc))
 
+    @commands.command(name='ужин')
+    async def dinner(self, ctx: Context):
+        if not self.check_sender(ctx, 'iarspider'):
+            asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
+            return
+
+        self.ws.call(obsws_requests.SetSceneItemProperties(scene_name="Paused", item="ужин", visible=True))
+        ###
+        self.get_player()
+        if self.player is not None:
+            self.player.type_keys('+%P', set_foreground=False)  # Pause
+
+        if self.ws is not None:
+            self.switch_to('Paused')
+            if self.vr:
+                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), True))
+            else:
+                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), True))
+
+        # self.get_chatters()
+        asyncio.ensure_future(ctx.send('Начать перепись населения!'))
+        asyncio.ensure_future(self.my_run_commercial(self.user_id, 60))
+
+        
     def write_plusch(self):
         with codecs.open("plusch.txt", "w", "utf8") as f:
             f.write("Кого-то поплющило {0}...".format(numeral.get_plural(self.plusches, ('раз', 'раза', 'раз'))))
