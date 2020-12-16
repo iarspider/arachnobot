@@ -405,12 +405,13 @@ class Bot(commands.Bot):
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
             await ctx.send("Использование: !bite <кого>")
+            return
         defender = args[0].strip('@')
         last_bite = self.db.get(attacker, 31525200.0)
         now = datetime.datetime.now()
 
         last_bite = datetime.datetime.fromtimestamp(last_bite)
-        if (now - last_bite).seconds < 90 and attacker != 'iarspider':
+        if (now - last_bite).seconds < 15 and ctx.author.name != 'iarspider':
             await ctx.send("Не кусай так часто, @{0}! Дай моим челюстям отдохнуть!".format(attacker))
             return
 
@@ -434,10 +435,10 @@ class Bot(commands.Bot):
                 attacker))
             return
 
-        prefix = u"нежно " if random.randint(1, 2) == 1 else "ласково "
+        prefix = random.choice((u"нежно ", u"ласково "))
         target = ""
         if defender.lower() == "prayda_alpha":
-            target = u" за хвостик" if random.randint(1, 2) == 1 else " за ушко"
+            target = random.choice((u" за хвостик", u" за ушко"))
 
         if defender.lower() == "looputaps":
             target = u" за лапку в тапке"
@@ -448,10 +449,20 @@ class Bot(commands.Bot):
             prefix = ""
             target = ", ибо Тигру кусать нельзя!"
 
-        if defender.lower() != "thetestmod":
-            await ctx.send("По поручению {0} {1} кусаю @{2}{3}".format(attacker, prefix, defender, target))
+        if defender.lower() in ("kaiden_moreil", "kochetov2000"):
+            old_defender = defender
+            defender = attacker
+            attacker = 'стримлера'
+            prefix = ""
+            with_ = random.choice(("некроёжиком с тентаклями вместо колючек", "зомбокувалдой", "некочайником"))
+            target = " {0}, ибо {1} кусать нельзя!".format(with_, old_defender)
+
+        if defender.lower() == "thetestmod":
+            await ctx.send(
+                "По поручению {0} {1} потрогал @{2} фирменным паучьим трогом".format(attacker, prefix, defender,
+                                                                                     target))
         else:
-            await ctx.send("По поручению {0} {1} потрогал @{2}".format(attacker, prefix, defender, target))
+            await ctx.send("По поручению {0} {1} кусаю @{2}{3}".format(attacker, prefix, defender, target))
 
     @staticmethod
     def my_get_users(user_name):
@@ -509,7 +520,7 @@ class Bot(commands.Bot):
     @commands.command(name='help', aliases=('помощь', 'справка'))
     async def help(self, ctx: Context):
         # asyncio.ensure_future(ctx.send(f"Никто тебе не поможет, {ctx.author.display_name}!"))
-        asyncio.ensure_future(ctx.send(f"@{ctx.author.display_name} Справка по командам бота тут: "))
+        asyncio.ensure_future(ctx.send(f"@{ctx.author.display_name} Справка по командам ботика: https://iarspider.github.io/arachnobot/help"))
 
 
 twitch_bot: Optional[Bot] = None
@@ -562,10 +573,10 @@ if __name__ == '__main__':
     async def dashboard_loop():
         try:
             item = twitch_bot.queue.get_nowait()
-            logger.info(f"send item {item}")
+            logger.debug(f"send item {item}")
             # await websocket.send(simplejson.dumps(item))
             await sio_server.emit(item['action'], item['value'])
-            logger.info("sent")
+            logger.debug("sent")
         except asyncio.QueueEmpty:
             # logger.info("get item failed")
             return

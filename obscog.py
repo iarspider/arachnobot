@@ -59,10 +59,10 @@ class OBSCog:
         if not pywinauto:
             return
         try:
-            self.player = pywinauto.Application().connect(title="Pretzel").top_window().wrapper_object()
+            self.player = pywinauto.Application().connect(title="Pretzel Rocks").top_window().wrapper_object()
         except (pywinauto.findwindows.ElementNotFoundError, RuntimeError):
-            self.logger.warning('Could not find PretzelRocks window')
-
+            logger.warning('Could not find PretzelRocks window')
+            
     @commands.command(name='setup')
     async def setup(self, ctx: Context):
         if not self.bot.check_sender(ctx, 'iarspider'):
@@ -138,7 +138,7 @@ class OBSCog:
             self.player.type_keys('+%P', set_foreground=False)  # Pause
 
         asyncio.ensure_future(ctx.send('Начат обратный отсчёт до {0}!'.format(self.bot.countdown_to.strftime('%X'))))
-        asyncio.ensure_future(self.bot.my_run_commercial(self.user_id))
+        asyncio.ensure_future(self.bot.my_run_commercial(self.bot.user_id))
 
         discord_bot = self.bot.get_cog('DiscordCog')
         if discord_bot:
@@ -201,7 +201,7 @@ class OBSCog:
 
         # self.get_chatters()
         asyncio.ensure_future(ctx.send('Начать перепись населения!'))
-        asyncio.ensure_future(self.bot.my_run_commercial(self.user_id, 60))
+        asyncio.ensure_future(self.bot.my_run_commercial(self.bot.user_id, 60))
 
     @commands.command(name='start')
     async def start_(self, ctx: Context):
@@ -250,7 +250,7 @@ class OBSCog:
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
 
         try:
-            res = await self.bot.my_get_stream(self.user_id)
+            res = await self.bot.my_get_stream(self.bot.user_id)
             viewers = numeral.get_plural(res['viewer_count'], ('зритель', 'зрителя', 'зрителей'))
             asyncio.ensure_future(
                 ctx.send(

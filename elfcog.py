@@ -11,8 +11,8 @@ class ElvenCog:
         self.bot = bot
         self.logger = bot.logger
 
-        s1 = "&qwertyuiop[]asdfghjkl;'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL;\"ZXCVBNM<>?`~"
-        s2 = "?йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,ёЁ"
+        s1 = "&qwertyuiop[]asdfghjkl;'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL:ZXCVBNM<>?`~" + '"'
+        s2 = "?йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЯЧСМИТЬБЮ,ёЁ" + 'Э'
         self.trans = str.maketrans(s1, s2)
 
     @commands.command(name='translit', aliases=('translate', 'tr'))
@@ -52,9 +52,14 @@ class ElvenCog:
         format_fields[1] = 'ее' if count == 1 else 'их'
         format_fields[2] = {1: 'е', 2: 'я', 3: 'я', 4: 'я'}.get(count, 'й')
 
-        for i in range(count):
-            message = messages[i].translate(self.trans)
-            res.append(f'{message}')
+        for message in messages[:count]:
+            # message = messages[i].translate(self.trans)
+            message_tr = []
+            for word in message.split(" "):
+                if not word.startswith('@'): # or any(x.isdigit() for x in word) or '_' in word):
+                    word = word.translate(self.trans)
+                message_tr.append(word)
+            res.append(f'{" ".join(message_tr)}')
 
         res.append("Перевожу {0}последн{1} сообщени{2} @{author}:".format(*format_fields, author=author))
 

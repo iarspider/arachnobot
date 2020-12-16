@@ -4,6 +4,7 @@ import datetime
 import requests
 import socketio.asyncio_client
 from twitchio import Context
+from requests.structures import CaseInsensitiveDict
 
 import streamlabs_api as api
 from twitchio.ext import commands
@@ -17,6 +18,7 @@ class SLClient(socketio.asyncio_client.AsyncClient):
         self.on('connect', self.sl_client_connected)
         self.on('disconnect', self.sl_client_disconnected)
         self.on('event', self.sl_client_event)
+        self.last_post = CaseInsensitiveDict()
 
     async def sl_client_connected(self):
         self.logger.info("SL client connected")
@@ -99,14 +101,15 @@ class SLCog:
 
     @commands.command(name='post', aliases=['почта'])
     async def post(self, ctx: Context):
-        last_post = self.last_post.get(ctx.author.name, None)
-        if last_post is not None:
-            delta = datetime.datetime.now() - last_post
+        lastpost = self.last_post.get(ctx.author.name, None)
+        now = datetime.datetime.now()
+        if lastpost is not None:
+            delta = now - lastpost
             if delta.seconds < 10 * 60:
                 asyncio.ensure_future(ctx.send("Не надо так часто отправлять почту!"))
                 return
 
-        if self.is_mod(ctx.author.name):
+        if self.bot.is_mod(ctx.author.name):
             price = self.post_price['mod']
         elif self.is_vip(ctx.author.name):
             price = self.post_price['vip']
@@ -120,16 +123,17 @@ class SLCog:
                                            f" {price}. Проверить баги: !баги"))
         else:
             res = api.sub_points(self.streamlabs_oauth, ctx.author.name, price)
+            self.last_post[ctx.author.name] = now
             self.logger.debug(res)
-            self.play_sound("pochta.mp3")
+            self.bot.play_sound("pochta.mp3")
 
     @commands.command(name='sos', aliases=['alarm'])
     async def sos(self, ctx: Context):
-        if not (self.is_mod(ctx.author.name) or ctx.author.name.lower() == 'iarspider'):
+        if not (self.bot.is_mod(ctx.author.name) or ctx.author.name.lower() == 'iarspider'):
             asyncio.ensure_future(ctx.send("Эта кнопочка - не для тебя. Руки убрал, ЖИВО!"))
             return
 
-        self.play_sound("matmatmat.mp3")
+        self.bot.play_sound("matmatmat.mp3")
 
     @commands.command(name='spin')
     async def spin(self, ctx: Context):
