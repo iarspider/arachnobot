@@ -1,5 +1,4 @@
 import asyncio
-import copy
 
 from twitchio import Context
 from twitchio.ext import commands
