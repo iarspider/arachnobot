@@ -35,15 +35,16 @@ class ElvenCog:
 
         # print(f"translit(): author {author}, count {count}")
 
-        if self.last_messages.get(author, None) is None:
+        if self.bot.last_messages.get(author, None) is None:
             asyncio.ensure_future(ctx.send(f"{author} ещё ничего не посылал!"))
             return
 
-        if len(self.last_messages[author]) < count:
-            count = len(self.last_messages[author])
+        if len(self.bot.last_messages[author]) < count:
+            count = len(self.bot.last_messages[author])
 
-        messages = copy.copy(self.last_messages[author])
+        messages = list(self.bot.last_messages[author])
         messages.reverse()
+        messages = messages[:count]
 
         res = ["Перевод окончен"]
 
@@ -52,7 +53,7 @@ class ElvenCog:
         format_fields[1] = 'ее' if count == 1 else 'их'
         format_fields[2] = {1: 'е', 2: 'я', 3: 'я', 4: 'я'}.get(count, 'й')
 
-        for message in messages[:count]:
+        for message in messages:
             # message = messages[i].translate(self.trans)
             message_tr = []
             for word in message.split(" "):
