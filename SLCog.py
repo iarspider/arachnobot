@@ -18,7 +18,6 @@ class SLClient(socketio.asyncio_client.AsyncClient):
         self.on('connect', self.sl_client_connected)
         self.on('disconnect', self.sl_client_disconnected)
         self.on('event', self.sl_client_event)
-        self.last_post = CaseInsensitiveDict()
 
     async def sl_client_connected(self):
         self.logger.info("SL client connected")
@@ -80,6 +79,7 @@ class SLCog:
 
         token = api.get_socket_token(self.streamlabs_oauth)
         asyncio.ensure_future(self.sl_client.connect(f'https://sockets.streamlabs.com?token={token}'))
+        self.last_post = CaseInsensitiveDict()
 
     @commands.command(name='bugs', aliases=['баги'])
     async def bugs(self, ctx: Context):

@@ -61,7 +61,7 @@ class OBSCog:
         try:
             self.player = pywinauto.Application().connect(title="Pretzel Rocks").top_window().wrapper_object()
         except (pywinauto.findwindows.ElementNotFoundError, RuntimeError):
-            logger.warning('Could not find PretzelRocks window')
+            self.logger.warning('Could not find PretzelRocks window')
             
     @commands.command(name='setup')
     async def setup(self, ctx: Context):
@@ -79,6 +79,7 @@ class OBSCog:
         asyncio.ensure_future(ctx.send('К стриму готов!'))
         self.ws.call(obsws_requests.SetCurrentProfile('Regular games'))
         self.ws.call(obsws_requests.SetCurrentSceneCollection('Twitch'))
+        self.ws.call(obsws_requests.SetSceneItemProperties(scene_name="Paused", item="ужин", visible=False))
 
     @commands.command(name='countdown', aliases=['preroll', 'cd', 'pr', 'св', 'зк'])
     async def countdown(self, ctx: Context):
