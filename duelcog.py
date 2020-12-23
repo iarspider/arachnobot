@@ -3,13 +3,14 @@ import random
 from collections import defaultdict
 from twitchio.dataclasses import Context, User
 from twitchio.ext import commands
+import logging
 
 
 @commands.core.cog()
 class DuelCog:
     def __init__(self, bot):
         self.bot = bot
-        self.logger = bot.logger
+        self.logger = logging.getLogger("arachnobot.duel")
         self.is_mod = bot.is_mod
 
         self.attacks = defaultdict(list)

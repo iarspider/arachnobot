@@ -1,2 +1,2 @@
 @echo off
-pipenv run python bot.py
+pipenv run python -X tracemalloc bot.py

@@ -5,20 +5,23 @@ from typing import Optional
 from pytils import numeral
 from twitchio import Context
 from twitchio.ext import commands
-
+import logging
 
 @commands.cog()
 class PluschCog:
     def __init__(self, bot):
         self.bot = bot
-        self.logger = bot.logger
+        self.logger = logging.getLogger("arachnobot.plu")
         self.plusches = 0
 
         self.write_plusch()
 
     def write_plusch(self):
         with codecs.open("plusch.txt", "w", "utf8") as f:
-            f.write("Кого-то поплющило {0}...".format(numeral.get_plural(self.plusches, ('раз', 'раза', 'раз'))))
+            if self.plusches == 0:
+                f.write("Пока что никого не плющило")
+            else:
+                f.write("Кого-то поплющило {0}...".format(numeral.get_plural(self.plusches, ('раз', 'раза', 'раз'))))
 
     @commands.command(name='plusch', aliases=['плющ'])
     async def plusch(self, ctx: Context):

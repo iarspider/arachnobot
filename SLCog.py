@@ -9,6 +9,7 @@ from requests.structures import CaseInsensitiveDict
 import streamlabs_api as api
 from twitchio.ext import commands
 from config import *
+import logging
 
 
 class SLClient(socketio.asyncio_client.AsyncClient):
@@ -72,7 +73,7 @@ class SLClient(socketio.asyncio_client.AsyncClient):
 class SLCog:
     def __init__(self, bot):
         self.bot = bot
-        self.logger = bot.logger
+        self.logger = logging.getLogger("arachnobot.sl")
         self.sl_client: SLClient = SLClient(logger=self.logger, bot=bot)
         self.streamlabs_oauth = api.get_streamlabs_session(streamlabs_client_id, streamlabs_client_secret,
                                                            streamlabs_redirect_uri)
@@ -80,6 +81,16 @@ class SLCog:
         token = api.get_socket_token(self.streamlabs_oauth)
         asyncio.ensure_future(self.sl_client.connect(f'https://sockets.streamlabs.com?token={token}'))
         self.last_post = CaseInsensitiveDict()
+        self.post_price = {'regular': 20, 'vip': 10, 'mod': 0}
+
+        # Forwarding functions from bot
+        self.is_vip = self.bot.is_vip
+        self.is_mod = self.bot.is_mod
+
+    def __getattr__(self, item):
+        if item != '__bases__':
+            self.logger.warning(f"[OBS] Failed to get attribute {item}, redirecting to self.bot!")
+        return self.bot.__getattribute__(item)
 
     @commands.command(name='bugs', aliases=['баги'])
     async def bugs(self, ctx: Context):

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from twitchio import Context
 from twitchio.ext import commands
@@ -8,7 +9,7 @@ from twitchio.ext import commands
 class ElvenCog:
     def __init__(self, bot):
         self.bot = bot
-        self.logger = bot.logger
+        self.logger = logging.getLogger("arachnobot.elf")
 
         s1 = "&qwertyuiop[]asdfghjkl;'zxcvbnm,./QWERTYUIOP{}ASDFGHJKL:ZXCVBNM<>?`~" + '"'
         s2 = "?йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЯЧСМИТЬБЮ,ёЁ" + 'Э'

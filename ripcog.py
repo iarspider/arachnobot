@@ -1,6 +1,7 @@
 import asyncio
 import codecs
 from typing import Optional
+import logging
 
 from twitchio import Context
 from twitchio.ext import commands
@@ -10,7 +11,7 @@ from twitchio.ext import commands
 class RIPCog:
     def __init__(self, bot):
         self.bot = bot
-        self.logger = bot.logger
+        self.logger = logging.getLogger("arachnobot.rip")
         self.deaths = {'today': 0, 'total': 0}
 
         self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv', 'wmuga', 'johnrico85']

@@ -34,38 +34,46 @@ sl_client: socketio.AsyncClient
 
 def setup_logging(logfile, debug, color, http_debug):
     global logger
-    logger = logging.getLogger("bot")
+    logger = logging.getLogger('arachnobot')
     logger.propagate = False
     ws_logger = logging.getLogger('websockets.server')
+    uvicorn_logger = logging.getLogger('uvicorn.error')
 
-    handler = logging.StreamHandler()
+    bot_handler = logging.StreamHandler()
     if color:
-        handler.setFormatter(
+        bot_handler.setFormatter(
             colorlog.ColoredFormatter(
                 '%(asctime)s %(log_color)s[%(name)s:%(levelname)s:%(lineno)s]%(reset)s %(message)s',
                 datefmt='%H:%M:%S'))
     else:
-        handler.setFormatter(logging.Formatter(fmt="%(asctime)s [%(name)s:%(levelname)s:%(lineno)s] %(message)s",
-                                               datefmt='%H:%M:%S'))
+        bot_handler.setFormatter(
+            logging.Formatter(fmt="%(asctime)s [%(name)s:%(levelname)s:%(lineno)s] %(message)s",
+                              datefmt='%H:%M:%S'))
 
     file_handler = logging.FileHandler(logfile, "w")
-    file_handler.setFormatter(logging.Formatter(fmt="%(asctime)s [%(name)s:%(levelname)s:%(lineno)s] %(message)s"))
+    file_handler.setFormatter(
+        logging.Formatter(fmt="%(asctime)s [%(name)s:%(levelname)s:%(lineno)s] %(message)s"))
 
-    logger.addHandler(handler)
+    logger.addHandler(bot_handler)
     logger.addHandler(file_handler)
 
-    ws_logger.addHandler(handler)
+    ws_logger.addHandler(bot_handler)
     ws_logger.addHandler(file_handler)
+
+    uvicorn_logger.addHandler(bot_handler)
+    uvicorn_logger.addHandler(file_handler)
 
     if not debug:
         logger.setLevel(logging.INFO)
         logging.getLogger('discord').setLevel(logging.INFO)
-        ws_logger.setLevel(logging.INFO)
+        ws_logger.setLevel(logging.WARN)
+        uvicorn_logger.setLevel(logging.WARN)
     else:
         logger.info("Debug logging is ON")
         logger.setLevel(logging.DEBUG)
         logging.getLogger('discord').setLevel(logging.DEBUG)
         ws_logger.setLevel(logging.DEBUG)
+        uvicorn_logger.setLevel(logging.DEBUG)
 
     if http_debug:
         http_client.HTTPConnection.debuglevel = 1
@@ -477,20 +485,25 @@ class Bot(commands.Bot):
     async def my_get_stream(user_id) -> dict:
         while True:
             logger.info("Attempting to get stream...")
+            res = requests.get('https://api.twitch.tv/helix/streams', params={'user_id': user_id},
+                               headers={'Accept': 'application/vnd.twitchtv.v5+json',
+                                        'Authorization': f'Bearer {twitch_chat_password}',
+                                        'Client-ID': twitch_client_id_alt})
+
             try:
-                res = requests.get('https://api.twitch.tv/helix/streams', params={'user_id': user_id},
-                                   headers={'Accept': 'application/vnd.twitchtv.v5+json',
-                                            'Authorization': f'Bearer {twitch_chat_password}',
-                                            'Client-ID': twitch_client_id_alt})
                 res.raise_for_status()
                 stream = res.json()['data'][0]
             except IndexError:
                 logger.info("Stream not detected yet")
                 pass
+            except requests.RequestException as e:
+                logger.error(f"Request to /helix/streams failed: {str(e)}")
             else:
                 logger.info("Got stream")
+                res.close()
                 return stream
 
+            res.close()
             await asyncio.sleep(60)
 
     @staticmethod
@@ -520,7 +533,8 @@ class Bot(commands.Bot):
     @commands.command(name='help', aliases=('помощь', 'справка'))
     async def help(self, ctx: Context):
         # asyncio.ensure_future(ctx.send(f"Никто тебе не поможет, {ctx.author.display_name}!"))
-        asyncio.ensure_future(ctx.send(f"@{ctx.author.display_name} Справка по командам ботика: https://iarspider.github.io/arachnobot/help"))
+        asyncio.ensure_future(ctx.send(
+            f"@{ctx.author.display_name} Справка по командам ботика: https://iarspider.github.io/arachnobot/help"))
 
 
 twitch_bot: Optional[Bot] = None

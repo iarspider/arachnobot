@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 from typing import Optional
+import logging
 import warnings
 
 import discord
@@ -13,7 +14,7 @@ from config import *
 class DiscordCog:
     def __init__(self, bot):
         self.bot = bot
-        self.logger = bot.logger
+        self.logger = logging.getLogger("arachnobot.dis")
         self.discord_bot: Optional[discord.Client] = None
         self.discord_channel: Optional[discord.TextChannel] = None
         self.discord_role: Optional[discord.Role] = None
@@ -43,18 +44,20 @@ class DiscordCog:
         if guild is None:
             raise RuntimeError(f"Failed to join Discord guild {discord_guild_name}!")
 
-        discord_channel = discord.utils.find(lambda c: c.name == discord_channel_name, guild.channels)
-        if discord_channel is None:
+        self.discord_channel = discord.utils.find(lambda c: c.name == discord_channel_name, guild.channels)
+        if self.discord_channel is None:
             raise RuntimeError(f"Failed to join Discord channel {discord_channel_name}!")
 
-        self.logger.info(f"Ready | {self.discord_bot.user} @ {guild.name}")
-
-        discord_role = discord.utils.find(lambda r: r.name == discord_role_name, guild.roles)
-        if discord_role is None:
+        self.discord_role = discord.utils.find(lambda r: r.name == discord_role_name, guild.roles)
+        if self.discord_role is None:
             raise RuntimeError(f"No role {discord_role_name} in guild {discord_guild_name}!")
 
+        self.logger.info(f"Ready | {self.discord_bot.user} @ {guild.name} # {self.discord_channel.name} | Ping @ {self.discord_role.name}")
+
     async def announce(self):
-        if self.discord_bot is not None and self.discord_channel is not None:
+        self.logger.info("Posting stream_alert")
+        if self.discord_bot is not None and self.discord_channel is not None and self.discord_role is not None:
+            self.logger.info("Can post alert")
             stream = await self.bot.my_get_stream(self.bot.user_id)
             game = self.bot.my_get_game(stream['game_id'])
             delta = self.bot.countdown_to - datetime.datetime.now()
@@ -65,4 +68,10 @@ class DiscordCog:
                            " открыть стрим - <https://twitch.tv/iarspider>!"
             await self.discord_channel.send(announcement)
             self.logger.info("Discord notification sent!")
-
+        else:
+            if self.discord_bot is None:
+                self.logger.warning("self.discord_bot is None!")
+            if self.discord_channel is None:
+                self.logger.warning("self.discord_channel is None!")
+            if self.discord_role is None:
+                self.logger.warning("self.discord_role is None!")
