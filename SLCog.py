@@ -81,11 +81,11 @@ class SLCog:
         token = api.get_socket_token(self.streamlabs_oauth)
         asyncio.ensure_future(self.sl_client.connect(f'https://sockets.streamlabs.com?token={token}'))
         self.last_post = CaseInsensitiveDict()
+        self.post_timeout = 10 * 60
         self.post_price = {'regular': 20, 'vip': 10, 'mod': 0}
 
-        # Forwarding functions from bot
+        # Forwarding function from bot
         self.is_vip = self.bot.is_vip
-        self.is_mod = self.bot.is_mod
 
     def __getattr__(self, item):
         if item != '__bases__':
@@ -120,9 +120,9 @@ class SLCog:
                 asyncio.ensure_future(ctx.send("Не надо так часто отправлять почту!"))
                 return
 
-        if self.bot.is_mod(ctx.author.name):
+        if ctx.author.is_mod:
             price = self.post_price['mod']
-        elif self.is_vip(ctx.author.name):
+        elif self.is_vip(ctx.author):
             price = self.post_price['vip']
         else:
             price = self.post_price['regular']
@@ -140,7 +140,7 @@ class SLCog:
 
     @commands.command(name='sos', aliases=['alarm'])
     async def sos(self, ctx: Context):
-        if not (self.bot.is_mod(ctx.author.name) or ctx.author.name.lower() == 'iarspider'):
+        if not (ctx.author.is_mod or ctx.author.name.lower() == 'iarspider'):
             asyncio.ensure_future(ctx.send("Эта кнопочка - не для тебя. Руки убрал, ЖИВО!"))
             return
 

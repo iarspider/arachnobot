@@ -132,10 +132,12 @@ class OBSCog:
             self.logger.error('Already streaming!')
             return
 
-        asyncio.ensure_future(ctx.send('К стриму готов!'))
+        self.aud_sources = self.ws.call(obsws_requests.GetSpecialSources())
         self.ws.call(obsws_requests.SetCurrentProfile('Regular games'))
         self.ws.call(obsws_requests.SetCurrentSceneCollection('Twitch'))
         self.ws.call(obsws_requests.SetSceneItemProperties(scene_name="Paused", item="ужин", visible=False))
+
+        asyncio.ensure_future(ctx.send('К стриму готов!'))
 
     @commands.command(name='countdown', aliases=['preroll', 'cd', 'pr', 'св', 'зк'])
     async def countdown(self, ctx: Context):

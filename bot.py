@@ -108,18 +108,11 @@ class Bot(commands.Bot):
 
         self.logger = logger
 
-        self.mods = set()
-        self.subs = set()
-        self.viewers = set()
-        self.vips = set()
+        self.viewers = CaseInsensitiveDict()
 
         self.db = {}
 
         self.user_id = -1
-
-        self.last_post = CaseInsensitiveDict()
-        self.post_timeout = 10 * 60
-        self.post_price = {'regular': 20, 'vip': 10, 'mod': 0}
 
         self.vmod = None
         self.vmod_active = False
@@ -135,6 +128,19 @@ class Bot(commands.Bot):
 
         self.setup_mixer()
         self.started = False
+
+    # noinspection PyMethodMayBeStatic
+    def is_vip(self, user: User):
+        return user.badges.get('vip', 0) == 1
+
+    def add_user(self, user: User):
+        name = user.name.lower()
+        display_name = user.display_name.lower()
+        if name not in self.viewers:
+            self.viewers[name] = user
+
+        if display_name not in self.viewers:
+            self.viewers[display_name] = user
 
     async def start(self):
         self.logger.info("Starting bot!")
@@ -173,15 +179,16 @@ class Bot(commands.Bot):
         await self.send_viewer_joined(message.author)
 
         self.logger.debug("JOIN sent")
-
-        self.viewers.add(message.author.name.lower())
-        if message.author.is_mod:
-            self.mods.add(message.author.name.lower())
-        if message.author.is_subscriber:
-            self.subs.add(message.author.name.lower())
-
-        if message.author.badges.get('vip', 0) == 1:
-            self.vips.add(message.author.name.lower())
+        #
+        # self.viewers.add(message.author.name.lower())
+        # if message.author.is_mod:
+        #     self.mods.add(message.author.name.lower())
+        # if message.author.is_subscriber:
+        #     self.subs.add(message.author.name.lower())
+        #
+        # if message.author.badges.get('vip', 0) == 1:
+        #     self.vips.add(message.author.name.lower())
+        self.add_user(message.author)
 
         if message.author.name not in self.last_messages:
             self.last_messages[message.author.name] = deque(maxlen=10)
@@ -217,17 +224,12 @@ class Bot(commands.Bot):
             await asyncio.ensure_future(self.send_viewer_left(user))
 
         try:
-            self.viewers.remove(user.name.lower())
+            del self.viewers[user.name.lower()]
         except KeyError:
             pass
 
         try:
-            self.mods.remove(user.name.lower())
-        except KeyError:
-            pass
-
-        try:
-            self.subs.remove(user.name.lower())
+            del self.viewers[user.display_name.lower()]
         except KeyError:
             pass
 
@@ -314,16 +316,6 @@ class Bot(commands.Bot):
         pygame.mixer.music.load(str(soundfile))
         pygame.mixer.music.play()
 
-    def is_online(self, nick: str):
-        nick = nick.lower()
-        return nick in self.viewers  # or online_bot
-
-    def is_mod(self, nick: str):
-        return nick.lower() in self.mods  # or is_mod_by_prefix
-
-    def is_vip(self, nick: str):
-        return nick.lower() in self.vips
-
     async def send_viewer_joined(self, user: User):
         if user.name.lower() in self.bots:
             return
@@ -409,7 +401,7 @@ class Bot(commands.Bot):
 
     @commands.command(name='bite', aliases=['кусь'])
     async def bite(self, ctx: Context):
-        attacker = ctx.author.display_name
+        attacker = ctx.author.name.lower()
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
             await ctx.send("Использование: !bite <кого>")
@@ -419,28 +411,30 @@ class Bot(commands.Bot):
         now = datetime.datetime.now()
 
         last_bite = datetime.datetime.fromtimestamp(last_bite)
-        if (now - last_bite).seconds < 15 and ctx.author.name != 'iarspider':
+        if (now - last_bite).seconds < 15 and attacker != 'iarspider':
             await ctx.send("Не кусай так часто, @{0}! Дай моим челюстям отдохнуть!".format(attacker))
             return
 
-        if not self.is_online(defender):
+        if defender not in self.viewers:
             await ctx.send('Кто такой или такая @' + defender + '? Я не буду кусать кого попало!')
             return
+
+        defender_name = self.viewers[defender].display_name
 
         self.db[attacker] = now.timestamp()
 
         if defender.lower() in self.bots:
             await ctx.timeout(ctx.author.name, 300, 'поКУСЬился на ботика')
-            await ctx.send('@' + attacker + ' попытался укусить ботика. @' + attacker + ' SMOrc')
+            await ctx.send(f'@{ctx.author.display_name} попытался укусить ботика. @{ctx.author.display_name} SMOrc')
             return
 
         if defender.lower() == 'кусь':
             await ctx.timeout(ctx.author.name, 1)
-            await ctx.send('@' + attacker + ' попытался сломать систему, но не смог BabyRage')
+            await ctx.send(f'@{ctx.author.display_name} попытался сломать систему, но не смог BabyRage')
 
         if attacker.lower() == defender.lower():
-            await ctx.send('@{0} укусил сам себя за жопь. Как, а главное - зачем он это сделал? Загадка...'.format(
-                attacker))
+            await ctx.send(f'@{ctx.author.display_name} укусил сам себя за жопь. Как, а главное - зачем он это сделал? '
+                           f'Загадка...')
             return
 
         prefix = random.choice((u"нежно ", u"ласково "))
@@ -467,10 +461,11 @@ class Bot(commands.Bot):
 
         if defender.lower() == "thetestmod":
             await ctx.send(
-                "По поручению {0} {1} потрогал @{2} фирменным паучьим трогом".format(attacker, prefix, defender,
+                "По поручению {0} {1} потрогал @{2} фирменным паучьим трогом".format(ctx.author.display_name, prefix,
+                                                                                     defender_name,
                                                                                      target))
         else:
-            await ctx.send("По поручению {0} {1} кусаю @{2}{3}".format(attacker, prefix, defender, target))
+            await ctx.send("По поручению {0} {1} кусаю @{2}{3}".format(attacker, prefix, defender_name, target))
 
     @staticmethod
     def my_get_users(user_name):
@@ -479,7 +474,9 @@ class Bot(commands.Bot):
                                     'Authorization': f'Bearer {twitch_chat_password}',
                                     'Client-ID': twitch_client_id_alt})
         res.raise_for_status()
-        return res.json()['data'][0]
+        ress = res.json()['data'][0]
+        res.close()
+        return ress
 
     @staticmethod
     async def my_get_stream(user_id) -> dict:
@@ -513,7 +510,9 @@ class Bot(commands.Bot):
                                     'Authorization': f'Bearer {twitch_chat_password}',
                                     'Client-ID': twitch_client_id_alt})
 
-        return res.json()['data'][0]
+        ress = res.json()['data'][0]
+        res.close()
+        return ress
 
     async def my_run_commercial(self, user_id, length=90):
         await self.my_get_stream(self.user_id)
@@ -523,6 +522,7 @@ class Bot(commands.Bot):
                         headers={'Client-ID': twitch_client_id})
         try:
             res.raise_for_status()
+            res.close()
         except requests.HTTPError:
             logger.error("Failed to run commercial:", res.json())
 

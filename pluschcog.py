@@ -1,11 +1,11 @@
 import asyncio
 import codecs
-from typing import Optional
 
 from pytils import numeral
 from twitchio import Context
 from twitchio.ext import commands
 import logging
+
 
 @commands.cog()
 class PluschCog:
@@ -25,10 +25,6 @@ class PluschCog:
 
     @commands.command(name='plusch', aliases=['плющ'])
     async def plusch(self, ctx: Context):
-        # if not self.is_mod(ctx.author.name) and ctx.author.name != 'iarspider':
-        #     asyncio.ensure_future(ctx.send("No effect? I'm gonna need a bigger sword! (c)"))
-        #     return
-
         who = " ".join(ctx.message.content.split()[1:])
         asyncio.ensure_future(ctx.send("Эк {0} поплющило...".format(who)))
         self.plusches += 1

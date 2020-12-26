@@ -12,6 +12,11 @@ class RIPCog:
     def __init__(self, bot):
         self.bot = bot
         self.logger = logging.getLogger("arachnobot.rip")
+
+        # Forwarding functions from bot
+        self.is_vip = self.bot.is_vip
+        self.check_sender = self.bot.check_sender
+
         self.deaths = {'today': 0, 'total': 0}
 
         self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv', 'wmuga', 'johnrico85']
@@ -31,8 +36,7 @@ class RIPCog:
             f.write(str(self.deaths['total']))
 
     async def do_rip(self, ctx: Context, reason: Optional[str] = None):
-        if not (self.is_mod(ctx.author.name) or self.is_vip(
-                ctx.author.name) or ctx.author.name.lower() in self.rippers):
+        if not (ctx.author.is_mod or self.is_vip(ctx.author) or ctx.author.name.lower() in self.rippers):
             asyncio.ensure_future(ctx.send("Эту кнопку не трожь!"))
             return
 
@@ -43,7 +47,7 @@ class RIPCog:
         if reason:
             await ctx.send(reason)
 
-        asyncio.ensure_future(ctx.send("riPepperonis {0}".format(*self.deaths)))
+        asyncio.ensure_future(ctx.send("riPepperonis {today}".format(**self.deaths)))
 
     @commands.command(name='rip', aliases=("смерть",))
     async def rip(self, ctx: Context):

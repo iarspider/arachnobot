@@ -11,7 +11,6 @@ class DuelCog:
     def __init__(self, bot):
         self.bot = bot
         self.logger = logging.getLogger("arachnobot.duel")
-        self.is_mod = bot.is_mod
 
         self.attacks = defaultdict(list)
         self.bots = bot.bots
@@ -71,27 +70,25 @@ class DuelCog:
             await ctx.send("Использование: !attack <кого>")
             return
 
-        defender = args[0].strip('@')
+        defender = self.bot.viewers.get(args[0].strip('@'), None)
+        if defender is None:
+            await ctx.send(f"{defender} сейчас не на стриме и не может быть вызван на дуэль")
+            return
 
-        if self.is_mod(attacker):
+        if ctx.author.is_mod:
             await ctx.send("Модерам не нужны кубики, чтобы кого-то забанить :)")
             return
 
-        if self.is_mod(defender):
+        if defender.is_mod:
             await ctx.send(f"А вот модеров не трожь, @{attacker}!")
             return
 
-        # if not self.is_online(defender):
-        #     await ctx.send(
-        #         f"Эй, @{attacker}, ты не можешь напасть на {defender} - он(а) сейчас не в сети!")
-        #     return
-
-        if defender.lower() == attacker.lower():
+        if defender.display_name.lower() == attacker.lower():
             await ctx.send("РКН на тебя нет, негодяй!")
             await ctx.timeout(defender, 120)
             return
 
-        if defender.lower() in self.bots:
+        if defender.display_name.lower() in self.bots:
             await ctx.send("Ботика не трожь!")
             return
 
@@ -100,5 +97,5 @@ class DuelCog:
                                        f", чтобы отказаться - !deny {attacker}."))
 
         attacker = attacker.lower()
-        defender = defender.lower()
+        defender = defender.display_name.lower()
         self.attacks[defender].append(attacker)
