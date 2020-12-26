@@ -320,13 +320,13 @@ class Bot(commands.Bot):
         if user.name.lower() in self.bots:
             return
 
-        femme = (user.name.lower() in twitch_ladies)
+        femme = (user.name.lower() in twitch_ladies or user.display_name.lower() in twitch_ladies)
 
-        if user.badges.get('subscriber', 0):
+        if user.is_subscriber:
             status = 'spider'
-        elif user.badges.get('moderator', 0):
+        elif user.is_mod:
             status = 'hammer'
-        elif user.badges.get('vip', 0):
+        elif self.is_vip(user):
             status = 'award'
         else:
             status = 'eye'
