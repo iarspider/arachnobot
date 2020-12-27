@@ -465,7 +465,7 @@ class Bot(commands.Bot):
                                                                                      defender_name,
                                                                                      target))
         else:
-            await ctx.send("По поручению {0} {1} кусаю @{2}{3}".format(attacker, prefix, defender_name, target))
+            await ctx.send("По поручению {0} {1} кусаю @{2}{3}".format(ctx.author.display_name, prefix, defender_name, target))
 
     @staticmethod
     def my_get_users(user_name):
