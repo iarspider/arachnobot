@@ -19,6 +19,7 @@ from requests.structures import CaseInsensitiveDict
 from twitchio.dataclasses import Context, User
 from twitchio.ext import commands
 
+
 import twitch_api
 from config import *
 
@@ -415,14 +416,6 @@ class Bot(commands.Bot):
             await ctx.send("Не кусай так часто, @{0}! Дай моим челюстям отдохнуть!".format(attacker))
             return
 
-        if defender not in self.viewers:
-            await ctx.send('Кто такой или такая @' + defender + '? Я не буду кусать кого попало!')
-            return
-
-        defender_name = self.viewers[defender].display_name
-
-        self.db[attacker] = now.timestamp()
-
         if defender.lower() in self.bots:
             await ctx.timeout(ctx.author.name, 300, 'поКУСЬился на ботика')
             await ctx.send(f'@{ctx.author.display_name} попытался укусить ботика. @{ctx.author.display_name} SMOrc')
@@ -436,6 +429,14 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.display_name} укусил сам себя за жопь. Как, а главное - зачем он это сделал? '
                            f'Загадка...')
             return
+
+        if defender not in self.viewers:
+            await ctx.send('Кто такой или такая @' + defender + '? Я не буду кусать кого попало!')
+            return
+
+        defender_name = self.viewers[defender].display_name
+
+        self.db[attacker] = now.timestamp()
 
         prefix = random.choice((u"нежно ", u"ласково "))
         target = ""
@@ -451,7 +452,7 @@ class Bot(commands.Bot):
             prefix = ""
             target = ", ибо Тигру кусать нельзя!"
 
-        if defender.lower() in ("kaiden_moreil", "kochetov2000"):
+        if defender.lower() in ("kaiden_moreil", "kochetov2000", "kaiden__moreil"):
             old_defender = defender
             defender = attacker
             attacker = 'стримлера'

@@ -18,6 +18,7 @@ from obswebsocket import requests as obsws_requests
 
 from bot import Bot
 from config import *
+# from lxml import etree
 
 
 @commands.core.cog()
@@ -95,22 +96,35 @@ class OBSCog:
         elif self.mplayer:
             self.logger.info("Toggling mplayer")
             # self.mplayer.type_keys('{VK_PLAY}', set_foreground=False)
-            r = self.session.get('http://localhost:13579/controls.html')
+            # r = self.session.get('http://localhost:13579/controls.html')
+            # if not r.ok:
+            #     self.logger.error("Request to mplayer failed!")
+            #     self.logger.debug("%s: %s", (r.status_code, r.text))
+            #     return
+            #
+            # htmlparser = etree.HTMLParser()
+            # tree = etree.fromstring(r.text, htmlparser)
+            # try:
+            #     status = tree.xpath("/html/body/table[1]/tr[2]/td[1]/text()")[0].strip()
+            # except IndexError:
+            #     self.logger.error("Can't find player status!")
+            #     return
+            #
+            # self.logger.info(f"Play status: {status}")
+            #
+            # if status == 'Status: Playing':
+            #     self.logger.debug('Sending STOP...')
+            #     r = self.session.post("http://localhost:13579/command.html", data="wm_command=890&null=0")
+            #     if not r.ok:
+            #         self.logger.error(f"Sending STOP to player failed: {r.status_code}, {r.text}")
+            # else:
+            #     print('Sending PLAY...')
+            #     r = self.session.post("http://localhost:13579/command.html", data="wm_command=887&null=0")
+            #     if not r.ok:
+            #         self.logger.debug(f"Sending PLAY to player failed: {r.status_code}, {r.text}")
+            r = self.session.post("http://localhost:13579/command.html", data="wm_command=909&null=0")
             if not r.ok:
-                self.logger.error("Request to mplayer failed!")
-                self.logger.debug("%s: %s", (r.status_code, r.text))
-                return
-
-            if 'Status: playing' in r.text:
-                print('Sending STOP...')
-                r = self.session.post("http://localhost:13579/command.html", data="wm_command=890&null=0")
-                if not r.ok:
-                    self.logger.error(f"Sending STOP to player failed: {r.status_code}, {r.text}")
-            else:
-                print('Sending PLAY...')
-                r = self.session.post("http://localhost:13579/command.html", data="wm_command=887&null=0")
-                if not r.ok:
-                    self.logger.info(f"Sending PLAY to player failed: {r.status_code}, {r.text}")
+                self.logger.debug(f"Sending MUTE to player failed: {r.status_code}, {r.text}")
 
     @commands.command(name='play')
     async def play(self, ctx: Context):
