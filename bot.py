@@ -450,15 +450,14 @@ class Bot(commands.Bot):
         if defender.lower() == "looputaps":
             target = u" за лапку в тапке"
 
-        if defender.lower() == "babytigeronthesunflower":
-            defender = attacker
-            attacker_name = 'iarspider'
-            prefix = ""
-            target = ", ибо Тигру кусать нельзя!"
+        if defender.lower() in ("kaiden_moreil", "kochetov2000", "kaiden__moreil", "babytigeronthesunflower"):
+            if defender.lower() == 'babytigeronthesunflower':
+                old_defender = 'Тигру'
+            else:
+                old_defender = defender
 
-        if defender.lower() in ("kaiden_moreil", "kochetov2000", "kaiden__moreil"):
-            old_defender = defender
             defender_name = self.viewers[attacker].display_name
+
             attacker_name = 'стримлера'
             prefix = ""
             with_ = random.choice(("некроёжиком с тентаклями вместо колючек", "зомбокувалдой", "некочайником"))
@@ -586,7 +585,7 @@ if __name__ == '__main__':
         if twitch_bot.dashboard == sid:
             logger.warning(f'Dashboard disconnected!')
             twitch_bot.dashboard = None
-            timer.cancel()
+            dashboard_timer.cancel()
 
 
     async def dashboard_loop():
