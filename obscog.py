@@ -62,6 +62,10 @@ class OBSCog:
         if not pywinauto:
             return
 
+        if self.mplayer or self.pretzel:
+            logging.info("Player already detected")
+            return
+
         if kind is None or kind == 'pretzel':
             self.get_pretzel()
 
@@ -136,9 +140,11 @@ class OBSCog:
     @commands.command(name='setup')
     async def setup(self, ctx: Context):
         if not self.bot.check_sender(ctx, 'iarspider'):
+            self.logger.info('Wrong sender!')
             return
 
         if not self.ws:
+            self.logger.info('OBS not connected!')
             return
 
         res: obsws_requests.GetStreamingStatus = self.ws.call(obsws_requests.GetStreamingStatus())
@@ -305,7 +311,9 @@ class OBSCog:
             asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
             return
 
+        self.logger.info("get_player()")
         self.get_player()
+        self.logger.info("player_play_pause()")
         self.player_play_pause()
 
         if self.ws is not None:
@@ -313,14 +321,20 @@ class OBSCog:
                 self.switch_to('VR Game')
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), False))
             else:
+                self.logger.info("switch to game")
                 self.switch_to('Game')
+                self.logger.info("unmute mic")
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
 
         try:
+            self.logger.info("get stream")
             res = await self.bot.my_get_stream(self.bot.user_id)
+            self.logger.info("got stream")
             viewers = numeral.get_plural(res['viewer_count'], ('зритель', 'зрителя', 'зрителей'))
+            self.logger.info("prepared message")
             asyncio.ensure_future(ctx.send('Перепись населения завершена успешно! '
                                            f'Население стрима составляет {viewers}'))
+            self.logger.info("sent message")
         except (KeyError, TypeError) as exc:
             asyncio.ensure_future(ctx.send('Перепись населения не удалась :('))
             self.logger.error(str(exc))

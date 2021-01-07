@@ -19,14 +19,15 @@ class RIPCog:
 
         self.deaths = {'today': 0, 'total': 0}
 
-        self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv', 'wmuga', 'johnrico85']
-        self.write_rip()
+        self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv', 'wmuga', 'johnrico85']        
 
         try:
             with open('rip.txt') as f:
                 self.deaths['total'] = int(f.read().strip())
         except (FileNotFoundError, TypeError, ValueError):
             pass
+            
+        self.write_rip()
 
     def write_rip(self):
         with codecs.open('rip_display.txt', 'w', 'utf8') as f:

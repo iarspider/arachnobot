@@ -403,6 +403,7 @@ class Bot(commands.Bot):
     @commands.command(name='bite', aliases=['кусь'])
     async def bite(self, ctx: Context):
         attacker = ctx.author.name.lower()
+        attacker_name = ctx.author.display_name
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
             await ctx.send("Использование: !bite <кого>")
@@ -434,7 +435,10 @@ class Bot(commands.Bot):
             await ctx.send('Кто такой или такая @' + defender + '? Я не буду кусать кого попало!')
             return
 
-        defender_name = self.viewers[defender].display_name
+        try:
+            defender_name = self.viewers[defender].display_name
+        except KeyError:
+            defender_name = defender
 
         self.db[attacker] = now.timestamp()
 
@@ -448,14 +452,14 @@ class Bot(commands.Bot):
 
         if defender.lower() == "babytigeronthesunflower":
             defender = attacker
-            attacker = 'iarspider'
+            attacker_name = 'iarspider'
             prefix = ""
             target = ", ибо Тигру кусать нельзя!"
 
         if defender.lower() in ("kaiden_moreil", "kochetov2000", "kaiden__moreil"):
             old_defender = defender
-            defender = attacker
-            attacker = 'стримлера'
+            defender_name = self.viewers[attacker].display_name
+            attacker_name = 'стримлера'
             prefix = ""
             with_ = random.choice(("некроёжиком с тентаклями вместо колючек", "зомбокувалдой", "некочайником"))
             target = " {0}, ибо {1} кусать нельзя!".format(with_, old_defender)
@@ -466,7 +470,7 @@ class Bot(commands.Bot):
                                                                                      defender_name,
                                                                                      target))
         else:
-            await ctx.send("По поручению {0} {1} кусаю @{2}{3}".format(ctx.author.display_name, prefix, defender_name, target))
+            await ctx.send("По поручению {0} {1} кусаю @{2}{3}".format(attacker_name, prefix, defender_name, target))
 
     @staticmethod
     def my_get_users(user_name):
