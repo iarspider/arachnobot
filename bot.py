@@ -218,7 +218,7 @@ class Bot(commands.Bot):
     # async def event_join(self, user):
     #     if user.name.lower() not in self.viewers:
     #         # await self.send_viewer_joined(user.name)
-    #         # self.viewers.add(user.name.lower())
+    #         # self.viewers.add(user:wq.name.lower())
     #         logger.info(f"User {user.name} joined! tags {user.tags}, badges {user.badges}")
 
     async def event_part(self, user: User):
@@ -451,7 +451,7 @@ class Bot(commands.Bot):
         if defender.lower() == "looputaps":
             target = u" за лапку в тапке"
 
-        if defender.lower() in ("kaiden_moreil", "kochetov2000", "kaiden__moreil", "babytigeronthesunflower"):
+        if defender.lower() in twitch_no_bite:
             if defender.lower() == 'babytigeronthesunflower':
                 old_defender = 'Тигру'
             else:
