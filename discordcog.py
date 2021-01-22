@@ -52,9 +52,12 @@ class DiscordCog:
         if self.discord_role is None:
             raise RuntimeError(f"No role {discord_role_name} in guild {discord_guild_name}!")
 
-        self.logger.info(f"Ready | {self.discord_bot.user} @ {guild.name} # {self.discord_channel.name} | Ping @ {self.discord_role.name}")
+        self.logger.info(f"Ready | {self.discord_bot.user} @ {guild.name} # {self.discord_channel.name} " +
+                         f"| Ping @ {self.discord_role.name}")
 
     async def announce(self):
+        # FIX#ME:
+        # return
         self.logger.info("Posting stream_alert")
         if self.discord_bot is not None and self.discord_channel is not None and self.discord_role is not None:
             self.logger.info("Can post alert")

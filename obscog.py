@@ -2,12 +2,14 @@ import asyncio
 import codecs
 import datetime
 import logging
+import time
+import typing
 
-try:
-    import pywinauto
-except ImportError as e:
-    print('Failed to load pywinauto: {0}'.format(e))
-    pywinauto = None
+# try:
+#     import pywinauto
+# except ImportError as e:
+#     print('Failed to load pywinauto: {0}'.format(e))
+#     pywinauto = None
 
 import requests
 from pytils import numeral
@@ -15,9 +17,13 @@ from twitchio import Context
 from twitchio.ext import commands
 from obswebsocket import obsws
 from obswebsocket import requests as obsws_requests
+from obswebsocket import events as obsws_events
 
+from aio_timer import Timer
 from bot import Bot
 from config import *
+
+
 # from lxml import etree
 
 
@@ -31,6 +37,11 @@ class OBSCog:
         self.mplayer = None
         self.htmlfile = r'e:\__Stream\web\example.html'
         self.session = requests.Session()
+        self.obsws_shutdown_timer: typing.Optional[Timer] = None
+
+        self.ws: typing.Optional[obsws] = None
+
+        self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
 
         try:
             # noinspection PyStatementEffect
@@ -49,93 +60,92 @@ class OBSCog:
             self.ws = obsws(obsws_address, int(obsws_port), obsws_password)
             self.ws.connect()
             self.aud_sources = self.ws.call(obsws_requests.GetSpecialSources())
+            # self.ws.register(self.obs_on_scene_switch, obsws_events.SwitchScenes)
+            self.ws.register(self.obs_on_start_stream, obsws_events.StreamStarted)
+            self.ws.register(self.obs_on_stop_stream, obsws_events.StreamStopped)
 
-        if pywinauto:
-            self.get_player()
+        # if pywinauto:
+        #     self.get_player()
+
+        asyncio.get_event_loop()
 
     def __getattr__(self, item):
         if item != '__bases__':
             self.logger.warning(f"[OBS] Failed to get attribute {item}, redirecting to self.bot!")
         return self.bot.__getattribute__(item)
 
-    def get_player(self, kind: str = None):
-        if not pywinauto:
-            return
 
-        if self.mplayer or self.pretzel:
-            logging.info("Player already detected")
-            return
+    def obs_on_start_stream(self, message: obsws_events.StreamStarted):
+        self.logger.info("Stream started!")
+        if self.obsws_shutdown_timer is not None:
+            self.obsws_shutdown_timer.cancel()
+            self.obsws_shutdown_timer = None
 
-        if kind is None or kind == 'pretzel':
-            self.get_pretzel()
+    async def obsws_shutdown(self):
+        self.logger.info("Disconnecting from OBS")
+        self.ws.disconnect()
+        self.obsws_shutdown_timer.cancel()
+        self.obsws_shutdown_timer = None
 
-        if (kind is None and self.pretzel is None) or kind == 'mplayer':
-            self.get_mplayer()
+    def obs_on_stop_stream(self, message: obsws_events.StreamStopped):
+        if self.obsws_shutdown_timer is not None:
+            self.obsws_shutdown_timer.cancel()
 
-    def get_mplayer(self):
-        if not pywinauto:
-            return
+        self.logger.info("Stream stopped, preparing to disconnect from OBS")
+        self.obsws_shutdown_timer = Timer(60, self.obsws_shutdown, self.loop)
 
-        try:
-            self.mplayer = pywinauto.Application().connect(
-                title="rock_128 - MPC-BE 1.5.5 x64").top_window().wrapper_object()
-        except (pywinauto.findwindows.ElementNotFoundError, RuntimeError):
-            self.logger.warning('Could not find MPC-BE window')
-        else:
-            self.session.get('http://localhost:13579/controls.html')
-            self.logger.info(f"Got MPC, session cookies are {str(dict(self.session.cookies))}")
+    # def get_player(self, kind: str = None):
+    #     if not pywinauto:
+    #         return
+    #
+    #     if self.mplayer or self.pretzel:
+    #         logging.info("Player already detected")
+    #         return
+    #
+    #     if kind is None or kind == 'pretzel':
+    #         self.get_pretzel()
+    #
+    #     if (kind is None and self.pretzel is None) or kind == 'mplayer':
+    #         self.get_mplayer()
+    #
+    # def get_mplayer(self):
+    #     if not pywinauto:
+    #         return
+    #
+    #     try:
+    #         self.mplayer = pywinauto.Application().connect(
+    #             title="rock_128 - MPC-BE 1.5.5 x64").top_window().wrapper_object()
+    #     except (pywinauto.findwindows.ElementNotFoundError, RuntimeError):
+    #         self.logger.warning('Could not find MPC-BE window')
+    #     else:
+    #         self.session.get('http://localhost:13579/controls.html')
+    #         self.logger.info(f"Got MPC, session cookies are {str(dict(self.session.cookies))}")
+    #
+    # def get_pretzel(self):
+    #     if not pywinauto:
+    #         return
+    #     try:
+    #         self.pretzel = pywinauto.Application().connect(title="Pretzel Rocks").top_window().wrapper_object()
+    #     except (pywinauto.findwindows.ElementNotFoundError, RuntimeError):
+    #         self.logger.warning('Could not find PretzelRocks window')
 
-    def get_pretzel(self):
-        if not pywinauto:
-            return
-        try:
-            self.pretzel = pywinauto.Application().connect(title="Pretzel Rocks").top_window().wrapper_object()
-        except (pywinauto.findwindows.ElementNotFoundError, RuntimeError):
-            self.logger.warning('Could not find PretzelRocks window')
-
-    def player_play_pause(self):
-        if self.pretzel:
-            self.logger.info("Toggling Pretzel")
-            self.pretzel.type_keys('+%P', set_foreground=False)  # Pause
-        elif self.mplayer:
-            self.logger.info("Toggling mplayer")
-            # self.mplayer.type_keys('{VK_PLAY}', set_foreground=False)
-            # r = self.session.get('http://localhost:13579/controls.html')
-            # if not r.ok:
-            #     self.logger.error("Request to mplayer failed!")
-            #     self.logger.debug("%s: %s", (r.status_code, r.text))
-            #     return
-            #
-            # htmlparser = etree.HTMLParser()
-            # tree = etree.fromstring(r.text, htmlparser)
-            # try:
-            #     status = tree.xpath("/html/body/table[1]/tr[2]/td[1]/text()")[0].strip()
-            # except IndexError:
-            #     self.logger.error("Can't find player status!")
-            #     return
-            #
-            # self.logger.info(f"Play status: {status}")
-            #
-            # if status == 'Status: Playing':
-            #     self.logger.debug('Sending STOP...')
-            #     r = self.session.post("http://localhost:13579/command.html", data="wm_command=890&null=0")
-            #     if not r.ok:
-            #         self.logger.error(f"Sending STOP to player failed: {r.status_code}, {r.text}")
-            # else:
-            #     print('Sending PLAY...')
-            #     r = self.session.post("http://localhost:13579/command.html", data="wm_command=887&null=0")
-            #     if not r.ok:
-            #         self.logger.debug(f"Sending PLAY to player failed: {r.status_code}, {r.text}")
-            r = self.session.post("http://localhost:13579/command.html", data="wm_command=909&null=0")
-            if not r.ok:
-                self.logger.debug(f"Sending MUTE to player failed: {r.status_code}, {r.text}")
-
-    @commands.command(name='play')
-    async def play(self, ctx: Context):
-        if not self.bot.check_sender(ctx, 'iarspider'):
-            return
-
-        self.player_play_pause()
+    # def player_play_pause(self):
+    #     if self.pretzel:
+    #         self.logger.info("Toggling Pretzel")
+    #         self.pretzel.type_keys('+%P', set_foreground=False)  # Pause
+    #     elif self.mplayer:
+    #         self.logger.info("Toggling mplayer")
+    #         # self.mplayer.type_keys('{VK_PLAY}', set_foreground=False)
+    #         r = self.session.post("http://localhost:13579/command.html", data="wm_command=909&null=0")
+    #         if not r.ok:
+    #             self.logger.debug(f"Sending MUTE to player failed: {r.status_code}, {r.text}")
+    #
+    # @commands.command(name='play')
+    # async def play(self, ctx: Context):
+    #     if not self.bot.check_sender(ctx, 'iarspider'):
+    #         return
+    #
+    #     self.player_play_pause()
 
     @commands.command(name='setup')
     async def setup(self, ctx: Context):
@@ -144,8 +154,10 @@ class OBSCog:
             return
 
         if not self.ws:
-            self.logger.info('OBS not connected!')
+            self.logger.info('OBS not present!')
             return
+
+        self.ws.reconnect()
 
         res: obsws_requests.GetStreamingStatus = self.ws.call(obsws_requests.GetStreamingStatus())
         if res.getStreaming():
@@ -213,8 +225,10 @@ class OBSCog:
         self.ws.call(obsws_requests.EnableStudioMode())
 
         self.ws.call(obsws_requests.StartStopStreaming())
-        self.get_player()
-        self.player_play_pause()
+        time.sleep(1)
+        self.ws.call(obsws_requests.PauseRecording())
+        # self.get_player()
+        # self.player_play_pause()
 
         asyncio.ensure_future(ctx.send('Начат обратный отсчёт до {0}!'.format(self.bot.countdown_to.strftime('%X'))))
         asyncio.ensure_future(self.bot.my_run_commercial(self.bot.user_id))
@@ -263,10 +277,11 @@ class OBSCog:
         self.ws.call(obsws_requests.DisableStudioMode())
 
     def do_pause(self, ctx: Context, is_dinner: bool):
-        self.get_player()
-        self.player_play_pause()
+        # self.get_player()
+        # self.player_play_pause()
 
         if self.ws is not None:
+            self.ws.call(obsws_requests.PauseRecording())
             self.ws.call(obsws_requests.SetSceneItemProperties(scene_name="Paused", item="ужин", visible=is_dinner))
             self.switch_to('Paused')
             if self.vr:
@@ -289,8 +304,8 @@ class OBSCog:
             asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
             return
 
-        self.get_player()
-        self.player_play_pause()
+        # self.get_player()
+        # self.player_play_pause()
 
         if self.ws is not None:
             if self.vr:
@@ -299,6 +314,8 @@ class OBSCog:
             else:
                 self.switch_to('Game')
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
+
+        self.ws.call(obsws_requests.ResumeRecording())
 
     @commands.command(name='resume')
     async def resume(self, ctx: Context):
@@ -311,10 +328,10 @@ class OBSCog:
             asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
             return
 
-        self.logger.info("get_player()")
-        self.get_player()
-        self.logger.info("player_play_pause()")
-        self.player_play_pause()
+        # self.logger.info("get_player()")
+        # self.get_player()
+        # self.logger.info("player_play_pause()")
+        # self.player_play_pause()
 
         if self.ws is not None:
             if self.vr:
@@ -325,6 +342,8 @@ class OBSCog:
                 self.switch_to('Game')
                 self.logger.info("unmute mic")
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
+
+            self.ws.call(obsws_requests.ResumeRecording())
 
         try:
             self.logger.info("get stream")

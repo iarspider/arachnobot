@@ -19,17 +19,18 @@ from requests.structures import CaseInsensitiveDict
 from twitchio.dataclasses import Context, User
 from twitchio.ext import commands
 
-
 import twitch_api
+from aio_timer import Timer
 from config import *
 
 import logging
 import http.client as http_client
 
+
 httpclient_logger = logging.getLogger("http.client")
 logger: logging.Logger
 proc: Process
-timer: asyncio.Task
+dashboard_timer: Timer
 sl_client: socketio.AsyncClient
 
 
@@ -39,6 +40,7 @@ def setup_logging(logfile, debug, color, http_debug):
     logger.propagate = False
     ws_logger = logging.getLogger('websockets.server')
     uvicorn_logger = logging.getLogger('uvicorn.error')
+    obsws_logger = logging.getLogger('obswebsocket.core')
 
     bot_handler = logging.StreamHandler()
     if color:
@@ -64,17 +66,22 @@ def setup_logging(logfile, debug, color, http_debug):
     uvicorn_logger.addHandler(bot_handler)
     uvicorn_logger.addHandler(file_handler)
 
+    obsws_logger.addHandler(bot_handler)
+    obsws_logger.addHandler(file_handler)
+
     if not debug:
         logger.setLevel(logging.INFO)
         logging.getLogger('discord').setLevel(logging.INFO)
         ws_logger.setLevel(logging.WARN)
         uvicorn_logger.setLevel(logging.WARN)
+        obsws_logger.setLevel(logging.WARN)
     else:
         logger.info("Debug logging is ON")
         logger.setLevel(logging.DEBUG)
         logging.getLogger('discord').setLevel(logging.DEBUG)
         ws_logger.setLevel(logging.DEBUG)
         uvicorn_logger.setLevel(logging.DEBUG)
+        obsws_logger.setLevel(logging.DEBUG)
 
     if http_debug:
         http_client.HTTPConnection.debuglevel = 1
@@ -91,12 +98,6 @@ def httpclient_logging_patch(level=logging.DEBUG):
     http_client.print = httpclient_log
     # enable debugging
     http_client.HTTPConnection.debuglevel = 1
-
-
-async def create_timer(timeout, stuff):
-    while True:
-        await asyncio.sleep(timeout)
-        await stuff()
 
 
 class Bot(commands.Bot):
@@ -530,6 +531,13 @@ class Bot(commands.Bot):
         except requests.HTTPError:
             logger.error("Failed to run commercial:", res.json())
 
+    @commands.command(name='ping', aliases=['зштп'])
+    async def cmd_ping(self, ctx: Context):
+        if not self.check_sender(ctx, 'iarspider'):
+            return
+
+        await ctx.send('Yeth, Mathter?')
+
     @commands.command(name='bomb', aliases=['man', 'manual', 'руководство'])
     async def man(self, ctx: Context):
         await ctx.send("Руководство тут - https://bombmanual.com/ru/web/index.html")
@@ -573,15 +581,15 @@ if __name__ == '__main__':
 
     @sio_server.on('connect')
     async def on_ws_connected(sid, _):
-        global twitch_bot, timer
+        global twitch_bot, dashboard_timer
         twitch_bot.dashboard = sid
         logger.info(f"Dashboard connected with id f{sid}")
-        timer = asyncio.ensure_future(create_timer(1, dashboard_loop))
+        dashboard_timer = Timer(1, dashboard_loop)
 
 
     @sio_server.on('disconnect')
     async def on_ws_disconnected(sid):
-        global timer, twitch_bot
+        global dashboard_timer, twitch_bot
         if twitch_bot.dashboard == sid:
             logger.warning(f'Dashboard disconnected!')
             twitch_bot.dashboard = None

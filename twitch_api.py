@@ -86,6 +86,8 @@ def main():
 
     oauth = get_session(config.twitch_client_id, config.twitch_client_secret, 'https://iarazumov.com/oauth/twitch')
     validate(oauth)
+    print(my_get_users(oauth, 'cwelth'))
+    print(my_get_users(oauth, 'twitch'))
 
 
 if __name__ == '__main__':
