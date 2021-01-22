@@ -8,22 +8,23 @@ verify_ssl = true
 [packages]
 twitchio = "*"
 requests-oauthlib = "*"
-python-vlc = "*"
 simplejson = "*"
 websocket-client = "*"
 pywinauto = "*"
 obs-websocket-py = "*"
 py-dateutil = "*"
+pygame = {path = "./pygame-1.9.6-cp39-cp39-win_amd64.whl"}
 discord-py = "*"
 python-dotenv = "*"
-python-socketio = "*"
+python-engineio = "==3.14.2"
+python-socketio = "==4.6.1"
 colorlog = "*"
 pytils = "*"
-watchdog = "*"
 uvicorn = "*"
-youtube-dl = "*"
-pywin32 = {path = "./pywin32-228-cp39-cp39-win_amd64.whl"}
-pygame = {path = "./pygame-1.9.6-cp39-cp39-win_amd64.whl"}
+aiohttp = "*"
+chardet = "*"
+multidict = "*"
+comtypes = "==1.1.7"
 
 [requires]
 python_version = "3.9"
