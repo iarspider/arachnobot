@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import pathlib
 import random
+import string
 from collections import defaultdict, deque
 from multiprocessing import Process
 from typing import Union, Iterable, Optional
@@ -20,17 +21,16 @@ from twitchio.dataclasses import Context, User
 from twitchio.ext import commands
 
 import twitch_api
-from aio_timer import Timer
+from aio_timer import Periodic
 from config import *
 
 import logging
 import http.client as http_client
 
-
 httpclient_logger = logging.getLogger("http.client")
 logger: logging.Logger
 proc: Process
-dashboard_timer: Timer
+# dashboard_timer: Periodic
 sl_client: socketio.AsyncClient
 
 
@@ -101,7 +101,7 @@ def httpclient_logging_patch(level=logging.DEBUG):
 
 
 class Bot(commands.Bot):
-    def __init__(self, loop: asyncio.AbstractEventLoop = None):
+    def __init__(self, loop: asyncio.BaseEventLoop = None):
         super().__init__(irc_token='oauth:' + twitch_chat_password,
                          client_id=twitch_client_id, nick='arachnobot',
                          prefix='!',
@@ -113,6 +113,7 @@ class Bot(commands.Bot):
         self.viewers = CaseInsensitiveDict()
 
         self.db = {}
+        self.pearls = []
 
         self.user_id = -1
 
@@ -126,11 +127,15 @@ class Bot(commands.Bot):
         self.last_messages = CaseInsensitiveDict()  # ! keep this here !
 
         self.dashboard = None
-        self.queue = asyncio.Queue()
+        # self.queue = asyncio.Queue()
 
         self.setup_mixer()
         self.started = False
+        self.sio_server = sio_server
+        self.timer = None
 
+        self.load_pearls()
+        
     # noinspection PyMethodMayBeStatic
     def is_vip(self, user: User):
         return user.badges.get('vip', 0) == 1
@@ -165,6 +170,11 @@ class Bot(commands.Bot):
     async def event_pubsub(self, data):
         pass
 
+    async def set_ws_server(self):
+        if sio_server is not None and self.sio_server is None:
+            self.sio_server = sio_server
+            self.timer.cancel()
+
     async def event_ready(self):
         self.logger.info(f'Ready | {self.nick}')
         self.user_id = self.my_get_users(self.initial_channels[0].lstrip('#'))['id']
@@ -174,8 +184,9 @@ class Bot(commands.Bot):
         # socket_token = api.get_socket_token(self.streamlabs_oauth)
         # self.streamlabs_socket.on('message', self.sl_event)
         # self.streamlabs_socket.on('connect', self.sl_connected)
-        #
-
+        self.timer = Periodic('ws_server', 1, self.set_ws_server(), self.loop)
+        await self.timer.start()
+        
     async def event_message(self, message):
         # if message.author.name.lower() not in self.viewers:
         await self.send_viewer_joined(message.author)
@@ -264,17 +275,22 @@ class Bot(commands.Bot):
             vmod = self.get_cog('VMcog')
             asyncio.ensure_future(vmod.activate_voicemod())
 
+        item = None
+
         if reward_key == "Обнять стримера".replace(' ', ''):
             self.logger.debug(f"Queued redepmtion: hugs, {requestor}")
-            await self.queue.put({'action': 'event', 'value': {'type': 'hugs', 'from': requestor}})
+            item = {'action': 'event', 'value': {'type': 'hugs', 'from': requestor}}
 
         if reward_key == "Стримлер! Не горбись!".replace(' ', ''):
             self.logger.debug(f"Queued redepmtion: sit, {requestor}")
-            await self.queue.put({'action': 'event', 'value': {'type': 'sit', 'from': requestor}})
+            item = {'action': 'event', 'value': {'type': 'sit', 'from': requestor}}
 
         if reward_key == "Добавить упорину".replace(' ', ''):
             self.logger.debug(f"Queued redepmtion: fun, {requestor}")
-            await self.queue.put({'action': 'event', 'value': {'type': 'fun', 'from': requestor}})
+            item = {'action': 'event', 'value': {'type': 'fun', 'from': requestor}}
+
+        if item and (self.sio_server is not None):
+            await sio_server.emit(item['action'], item['value'])
 
     async def event_pubsub_response(self, data):
         if data['nonce'] == self.pubsub_nonce and self.pubsub_nonce != '':
@@ -319,6 +335,8 @@ class Bot(commands.Bot):
         pygame.mixer.music.play()
 
     async def send_viewer_joined(self, user: User):
+        # DEBUG
+        # return
         if user.name.lower() in self.bots:
             return
 
@@ -339,14 +357,24 @@ class Bot(commands.Bot):
         logger.debug(f"Badges: {user.badges}")
         logger.debug(f"Send user {user.display_name} with status {status} and color {color}")
 
-        await self.queue.put({'action': 'add', 'value': {'name': user.display_name, 'status': status,
-                                                         'color': color, 'femme': femme}})
+        item = {'action': 'add', 'value': {'name': user.display_name, 'status': status,
+                                           'color': color, 'femme': femme}}
+        if self.sio_server is not None:
+            await sio_server.emit(item['action'], item['value'])
+        else:
+            logger.warning("send_viewer_joined: sio_server is none!")
 
     async def send_viewer_left(self, user: User):
+        # DEBUG
+        # return
         if user.name.lower() in self.bots:
             return
 
-        await self.queue.put({'action': 'remove', 'value': user.display_name})
+        item = {'action': 'remove', 'value': user.display_name}
+        if self.sio_server is not None:
+            await sio_server.emit(item['action'], item['value'])
+        else:
+            logger.warning("send_viewer_joined: sio_server is none!")
 
     @staticmethod
     def check_sender(ctx: Context, users: Union[str, Iterable[str]]):
@@ -423,16 +451,20 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.display_name} попытался укусить ботика. @{ctx.author.display_name} SMOrc')
             return
 
-        if defender.lower() == 'кусь':
+        if defender.lower() == 'кусь' or defender.lower() == 'bite':
             await ctx.timeout(ctx.author.name, 1)
             await ctx.send(f'@{ctx.author.display_name} попытался сломать систему, но не смог BabyRage')
+            return
+
+        what = random.choice(twitch_extra_bite.get(defender.lower(), (None, )))
 
         if attacker.lower() == defender.lower():
-            await ctx.send(f'@{ctx.author.display_name} укусил сам себя за жопь. Как, а главное - зачем он это сделал? '
+            what = what or " за жопь"
+            await ctx.send(f'@{ctx.author.display_name} укусил сам себя{what}. Как, а главное - зачем он это сделал? '
                            f'Загадка...')
             return
 
-        if defender not in self.viewers:
+        if defender not in self.viewers and attacker != 'iarspider':
             await ctx.send('Кто такой или такая @' + defender + '? Я не буду кусать кого попало!')
             return
 
@@ -444,12 +476,7 @@ class Bot(commands.Bot):
         self.db[attacker] = now.timestamp()
 
         prefix = random.choice((u"нежно ", u"ласково "))
-        target = ""
-        if defender.lower() == "prayda_alpha":
-            target = random.choice((u" за хвостик", u" за ушко"))
-
-        if defender.lower() == "looputaps":
-            target = u" за лапку в тапке"
+        target = what or ""
 
         if defender.lower() in twitch_no_bite:
             if defender.lower() == 'babytigeronthesunflower':
@@ -467,8 +494,7 @@ class Bot(commands.Bot):
         if defender.lower() == "thetestmod":
             await ctx.send(
                 "По поручению {0} {1} потрогал @{2} фирменным паучьим трогом".format(ctx.author.display_name, prefix,
-                                                                                     defender_name,
-                                                                                     target))
+                                                                                     defender_name))
         else:
             await ctx.send("По поручению {0} {1} кусаю @{2}{3}".format(attacker_name, prefix, defender_name, target))
 
@@ -542,12 +568,81 @@ class Bot(commands.Bot):
     async def man(self, ctx: Context):
         await ctx.send("Руководство тут - https://bombmanual.com/ru/web/index.html")
 
-    @commands.command(name='help', aliases=('помощь', 'справка'))
+    @commands.command(name='help', aliases=('помощь', 'справка', 'хелп'))
     async def help(self, ctx: Context):
         # asyncio.ensure_future(ctx.send(f"Никто тебе не поможет, {ctx.author.display_name}!"))
         asyncio.ensure_future(ctx.send(
             f"@{ctx.author.display_name} Справка по командам ботика: https://iarspider.github.io/arachnobot/help"))
 
+    @commands.command(name='join')
+    async def test_join(self, ctx: Context):
+        if not self.check_sender(ctx, 'iarspider'):
+            return
+
+        display_name = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+        status = random.choice(random.choice(('spider', 'hammer', 'award', 'eye')))
+        color = '#FFFFFF'
+        femme = random.choice((True, False))
+        item = {'action': 'add', 'value': {'name': display_name, 'status': status,
+                                           'color': color, 'femme': femme}}
+        if self.sio_server is not None:
+            await sio_server.emit(item['action'], item['value'])
+        else:
+            logger.warning("send_viewer_joined: sio_server is none!")
+
+    @commands.command(name='leave')
+    async def test_leave(self, ctx: Context):
+        if not self.check_sender(ctx, 'iarspider'):
+            return
+
+        arg = ctx.message.content.split()[1]
+        item = {'action': 'remove', 'value': arg}
+        if self.sio_server is not None:
+            await sio_server.emit(item['action'], item['value'])
+        else:
+            logger.warning("send_viewer_joined: sio_server is none!")
+            
+    def load_pearls(self):
+        self.pearls = []
+        with open('pearls.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                self.pearls.append(line.strip())
+            
+    def write_pearls(self):
+        with open('pearls.txt', 'w', encoding='utf-8') as f:
+            for pearl in self.pearls:
+                print(pearl, file=f)
+            
+    @commands.command(name='perl', aliases=['перл', 'пёрл', 'pearl', 'зуфкд'])
+    async def pearl(self, ctx: Context):
+        try:
+            arg = ctx.message.content.split(None, 1)[1]
+        except IndexError:
+            arg = ''
+            
+        if arg.startswith('+'):
+            if not ctx.author.is_mod():
+                return
+            pearl = arg[1:].strip()
+            self.pearls.append(pearl)
+            self.write_pearls()
+            await ctx.send(f"ПаукоПёрл №{len(self.pearls)} сохранён")
+        elif arg.startswith('?'):
+            await ctx.send(f"Всего ПаукоПёрлов: {len(self.pearls)}")
+        else:
+            if arg:
+                try:
+                    pearl_id = int(arg)
+                    pearl = self.pearls[pearl_id]
+                except (IndexError, ValueError) as e:
+                    self.ctx.send("Ошибка: нет такого пёрла")
+                    self.logger.exception(e) 
+                    return
+            else:
+                pearl_id = random.randrange(len(self.pearls))
+                pearl = self.pearls[pearl_id]
+                
+            await ctx.send(f"ПаукоПёрл №{pearl_id}: {pearl}")
 
 twitch_bot: Optional[Bot] = None
 discord_bot: Optional[discord.Client] = None
@@ -561,11 +656,13 @@ if __name__ == '__main__':
     setup_logging("bot.log", color=True, debug=False, http_debug=False)
 
     # logger.setLevel(logging.DEBUG)
+    logging.getLogger("asyncio").setLevel(logging.DEBUG)
     # Run bot
     _loop = asyncio.get_event_loop()
-    twitch_bot = Bot()
+    # noinspection PyTypeChecker
+    twitch_bot = Bot(loop=_loop)
     for extension in ('discordcog', 'obscog', 'pluschcog', 'ripcog', 'SLCog',
-                      'vmodcog', 'elfcog', 'duelcog'):  # REMOVEME: 'eventcog'
+                      'vmodcog', 'elfcog', 'duelcog', 'musiccog'):
         twitch_bot.load_module(extension)
 
     invalid = list(twitchio.dataclasses.Messageable.__invalid__)
@@ -581,36 +678,41 @@ if __name__ == '__main__':
 
     @sio_server.on('connect')
     async def on_ws_connected(sid, _):
-        global twitch_bot, dashboard_timer
+        global twitch_bot  # , dashboard_timer
         twitch_bot.dashboard = sid
         logger.info(f"Dashboard connected with id f{sid}")
-        dashboard_timer = Timer(1, dashboard_loop)
+        # dashboard_timer = Periodic("ws", 1, dashboard_loop(), twitch_bot.loop)
+        # await dashboard_timer.start()
 
 
     @sio_server.on('disconnect')
     async def on_ws_disconnected(sid):
-        global dashboard_timer, twitch_bot
+        global twitch_bot  # , dashboard_timer
         if twitch_bot.dashboard == sid:
             logger.warning(f'Dashboard disconnected!')
             twitch_bot.dashboard = None
-            dashboard_timer.cancel()
+            # await dashboard_timer.stop()
 
 
-    async def dashboard_loop():
-        try:
-            item = twitch_bot.queue.get_nowait()
-            logger.debug(f"send item {item}")
-            # await websocket.send(simplejson.dumps(item))
-            await sio_server.emit(item['action'], item['value'])
-            logger.debug("sent")
-        except asyncio.QueueEmpty:
-            # logger.info("get item failed")
-            return
-        except (ValueError, Exception):
-            logger.exception(f'Emit failed!')
+    # async def dashboard_loop():
+    #     print("<< ws loop")
+    #     try:
+    #         print("<< ws loop 1")
+    #         item = twitch_bot.queue.get_nowait()
+    #         logger.info(f"send item {item}")
+    #         # await websocket.send(simplejson.dumps(item))
+    #         await sio_server.emit(item['action'], item['value'])
+    #         logger.info("sent")
+    #         twitch_bot.queue.task_done()
+    #         logger.info("done")
+    #     except asyncio.QueueEmpty:
+    #         logger.info("queue empty")
+    #     except (ValueError, Exception):
+    #         logger.exception(f'Emit failed!')
+    #
+    #     print("<< ws loop end")
 
-
-    asyncio.ensure_future(twitch_bot.start())
+    asyncio.ensure_future(twitch_bot.start(), loop=_loop)
     _loop.run_until_complete(server.serve())
     # _loop.run_until_complete(discord_bot.close())
     # _loop.stop()
