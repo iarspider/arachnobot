@@ -23,14 +23,14 @@ class PluschCog:
             else:
                 f.write("Кого-то поплющило {0}...".format(numeral.get_plural(self.plusches, ('раз', 'раза', 'раз'))))
 
-    @commands.command(name='plusch', aliases=['плющ'])
+    @commands.command(name='plusch', aliases=['плющ', 'вштырь'])
     async def plusch(self, ctx: Context):
         who = " ".join(ctx.message.content.split()[1:])
         asyncio.ensure_future(ctx.send("Эк {0} поплющило...".format(who)))
         self.plusches += 1
         self.write_plusch()
 
-    @commands.command(name='eplusch', aliases=['экипоплющило'])
+    @commands.command(name='eplusch', aliases=['экипоплющило', 'экивштырило'])
     async def eplusch(self, ctx: Context):
         asyncio.ensure_future(ctx.send("Эки кого-то поплющило..."))
         self.plusches += 1

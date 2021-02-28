@@ -37,9 +37,11 @@
             }
 
             on_remove = function(v) {
+                console.log("Remove viewer " + v.name);
                 var id = 'viewer_' + v.name;
                 var node = document.getElementById(id);
                 if (node !== null) {
+                    console.log("Node found, removing");
                     node.remove();
                     node = null;
                 }
@@ -84,6 +86,9 @@
                         break;
                     case 'fun':
                         res = {icon: 'fire', text: `${v.from} добавил упорину!`};
+                        break;
+                    case 'song':
+                        res = {icon: 'song', text: `${v.requestor} заказал песню ${v.song}`};
                         break;
                     default:
                         console.log(`Unknown event type ${v.type}`);

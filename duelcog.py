@@ -92,7 +92,7 @@ class DuelCog:
             await ctx.send("Ботика не трожь!")
             return
 
-        asyncio.ensure_future(ctx.send(f"@{defender}, тебя вызвал на дуэль {attacker}!"
+        asyncio.ensure_future(ctx.send(f"@{defender.display_name}, тебя вызвал на дуэль {attacker}!"
                                        f" Чтобы принять вызов пошли в чат !accept {attacker}"
                                        f", чтобы отказаться - !deny {attacker}."))
 

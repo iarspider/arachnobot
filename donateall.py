@@ -117,8 +117,8 @@ def login():
 
 
 async def get_current_song(token):
-    response = requests.get("https://www.donateall.online/public/api/v1/songs/queue",
-                            # "https://www.donateall.online/public/api/v1/songs/current",
+    response = requests.get(# "https://www.donateall.online/public/api/v1/songs/queue",
+                            "https://www.donateall.online/public/api/v1/songs/current",
                             headers={'Content-Type': 'application/json',
                                      'api_token': token['access_token']
                                      }
@@ -127,14 +127,15 @@ async def get_current_song(token):
 
 
 async def main():
-    setup_mixer()
-    # token = login()
+    # setup_mixer()
+    token = login()
+    await get_current_song(token)
     # p = Periodic(get_current_song(token), time=5)
     # await p.start()
     # await asyncio.sleep(600)
     # await p.stop()
-    play_sound('matmatmat.mp3')
-    await asyncio.sleep(600)
+    # play_sound('matmatmat.mp3')
+    # await asyncio.sleep(600)
 
 if __name__ == '__main__':
     asyncio.run(main())

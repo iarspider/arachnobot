@@ -66,7 +66,8 @@ class SLClient(socketio.asyncio_client.AsyncClient):
         else:
             copy_keys(data['message'], message['value'], pick_keys)
 
-        await self.bot.queue.put(message)
+        # await self.bot.queue.put(message)
+        # FIXME: send directly
 
 
 @commands.cog()

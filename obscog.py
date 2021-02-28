@@ -41,7 +41,6 @@ class OBSCog:
 
         self.ws: typing.Optional[obsws] = None
 
-        self.loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
 
         try:
             # noinspection PyStatementEffect
@@ -60,14 +59,12 @@ class OBSCog:
             self.ws = obsws(obsws_address, int(obsws_port), obsws_password)
             self.ws.connect()
             self.aud_sources = self.ws.call(obsws_requests.GetSpecialSources())
-            # self.ws.register(self.obs_on_scene_switch, obsws_events.SwitchScenes)
-            self.ws.register(self.obs_on_start_stream, obsws_events.StreamStarted)
-            self.ws.register(self.obs_on_stop_stream, obsws_events.StreamStopped)
+            # self.ws.register(self.obs_on_start_stream, obsws_events.StreamStarted)
+            # self.ws.register(self.obs_on_stop_stream, obsws_events.StreamStopped)
 
         # if pywinauto:
         #     self.get_player()
 
-        asyncio.get_event_loop()
 
     def __getattr__(self, item):
         if item != '__bases__':
@@ -75,11 +72,11 @@ class OBSCog:
         return self.bot.__getattribute__(item)
 
 
-    def obs_on_start_stream(self, message: obsws_events.StreamStarted):
-        self.logger.info("Stream started!")
-        if self.obsws_shutdown_timer is not None:
-            self.obsws_shutdown_timer.cancel()
-            self.obsws_shutdown_timer = None
+    # def obs_on_start_stream(self, message: obsws_events.StreamStarted):
+        # self.logger.info("Stream started!")
+        # if self.obsws_shutdown_timer is not None:
+            # self.obsws_shutdown_timer.cancel()
+            # self.obsws_shutdown_timer = None
 
     async def obsws_shutdown(self):
         self.logger.info("Disconnecting from OBS")
@@ -87,12 +84,12 @@ class OBSCog:
         self.obsws_shutdown_timer.cancel()
         self.obsws_shutdown_timer = None
 
-    def obs_on_stop_stream(self, message: obsws_events.StreamStopped):
-        if self.obsws_shutdown_timer is not None:
-            self.obsws_shutdown_timer.cancel()
+    # def obs_on_stop_stream(self, message: obsws_events.StreamStopped):
+        # if self.obsws_shutdown_timer is not None:
+        #     self.obsws_shutdown_timer.cancel()
 
-        self.logger.info("Stream stopped, preparing to disconnect from OBS")
-        self.obsws_shutdown_timer = Timer(60, self.obsws_shutdown, self.loop)
+        # self.logger.info("Stream stopped, preparing to disconnect from OBS")
+        # self.obsws_shutdown_timer = Timer(60, self.obsws_shutdown, self.bot.loop)
 
     # def get_player(self, kind: str = None):
     #     if not pywinauto:
@@ -315,7 +312,7 @@ class OBSCog:
                 self.switch_to('Game')
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
 
-        self.ws.call(obsws_requests.ResumeRecording())
+        self.ws.call(obsws_requests.StartRecording())
 
     @commands.command(name='resume')
     async def resume(self, ctx: Context):

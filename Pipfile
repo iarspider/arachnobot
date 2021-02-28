@@ -26,6 +26,7 @@ aiohttp = "*"
 chardet = "*"
 multidict = "*"
 comtypes = "==1.1.7"
+pika = "*"
 
 [requires]
 python_version = "3.9"
