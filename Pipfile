@@ -15,7 +15,6 @@ obs-websocket-py = "*"
 py-dateutil = "*"
 pygame = {path = "./pygame-1.9.6-cp39-cp39-win_amd64.whl"}
 pywin32 = {path = "./pywin32-228-cp39-cp39-win_amd64.whl"}
-discord-py = "*"
 python-dotenv = "*"
 python-engineio = "==3.14.2"
 python-socketio = "==4.6.1"

@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "14d8d85a752eef8b7cfcc3a75d74c16b48d2e4660e8b652e1c66431f203f200f"
+            "sha256": "49894f26633ab9d008b8bb30e4abf456e866d0ba2dbeb188b1ad217e04a717ea"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -120,14 +120,6 @@
             ],
             "index": "pypi",
             "version": "==1.1.7"
-        },
-        "discord-py": {
-            "hashes": [
-                "sha256:3df148daf6fbcc7ab5b11042368a3cd5f7b730b62f09fb5d3cbceff59bcfbb12",
-                "sha256:ba8be99ff1b8c616f7b6dcb700460d0222b29d4c11048e74366954c465fdd05f"
-            ],
-            "index": "pypi",
-            "version": "==1.6.0"
         },
         "h11": {
             "hashes": [
@@ -387,11 +379,11 @@
         },
         "twitchio": {
             "hashes": [
-                "sha256:03d8e8bc4a70df542374c0f7e4c015303a68754f1b5b744ecf10c7d7b0be89b5",
-                "sha256:a4a4bdf767f11dac540f3349de61e12bc3820295c0137d8938282874605863fd"
+                "sha256:7080907239c80fd2196600a88d2c0bd8a9a993743128c7d80ea41cdad75c692b",
+                "sha256:d2f95881dbe0d460e235bbde0676bac8f5b13ad012b85e6ab120dac19ba63fec"
             ],
             "index": "pypi",
-            "version": "==1.2.1"
+            "version": "==1.2.2"
         },
         "typing-extensions": {
             "hashes": [
@@ -419,11 +411,11 @@
         },
         "websocket-client": {
             "hashes": [
-                "sha256:0fc45c961324d79c781bab301359d5a1b00b13ad1b10415a4780229ef71a5549",
-                "sha256:d735b91d6d1692a6a181f2a8c9e0238e5f6373356f561bb9dc4c7af36f452010"
+                "sha256:44b5df8f08c74c3d82d28100fdc81f4536809ce98a17f0757557813275fbb663",
+                "sha256:63509b41d158ae5b7f67eb4ad20fecbb4eee99434e73e140354dc3ff8e09716f"
             ],
             "index": "pypi",
-            "version": "==0.57.0"
+            "version": "==0.58.0"
         },
         "websockets": {
             "hashes": [

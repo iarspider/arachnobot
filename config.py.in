@@ -8,10 +8,9 @@ streamlabs_client_id = ""
 streamlabs_client_secret = ""
 streamlabs_redirect_uri = ""
 
-discord_bot_token = ""
-discord_guild_name = ""
-discord_channel_name = ""
-discord_role_name = ""
+rabbit_url = ""
+discord_role = ""
+discord_channel = ""
 
 obsws_address = "127.0.0.1"
 obsws_password = "spider"
