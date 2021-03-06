@@ -36,13 +36,13 @@ class RIPCog:
         with open('rip.txt', 'w') as f:
             f.write(str(self.deaths['total']))
 
-    async def do_rip(self, ctx: Context, reason: Optional[str] = None):
+    async def do_rip(self, ctx: Context, reason: Optional[str] = None, n = 1):
         if not (ctx.author.is_mod or self.is_vip(ctx.author) or ctx.author.name.lower() in self.rippers):
             asyncio.ensure_future(ctx.send("Эту кнопку не трожь!"))
             return
 
-        self.deaths['today'] += 1
-        self.deaths['total'] += 1
+        self.deaths['today'] += n
+        self.deaths['total'] += n
 
         self.write_rip()
         if reason:
@@ -50,14 +50,23 @@ class RIPCog:
 
         asyncio.ensure_future(ctx.send("riPepperonis {today}".format(**self.deaths)))
 
-    @commands.command(name='rip', aliases=("смерть",))
+    @commands.command(name='rip', aliases=("смерть","кшз"))
     async def rip(self, ctx: Context):
         """
             Счётчик смертей
 
             %% rip
         """
-        await self.do_rip(ctx)
+        args = ctx.message.content.split()[1:]
+        if args and args[0].startswith('+'):
+            try:
+                n_rip = int(args[0])
+            except ValueError:
+                n_rip = 1
+        else:
+            n_rip = 1
+        
+        await self.do_rip(ctx, n = n_rip)
 
     @commands.command(name='unrip')
     async def unrip(self, ctx: Context):
@@ -85,7 +94,7 @@ class RIPCog:
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
             asyncio.ensure_future(ctx.send("Неправильный запрос"))
-        self.rippers.append(args[0])
+        self.rippers.append(args[0].lower())
 
         asyncio.ensure_future(ctx.send("{0} TwitchVotes ".format(args[0])))
 
