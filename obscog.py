@@ -226,6 +226,7 @@ class OBSCog:
         self.ws.call(obsws_requests.PauseRecording())
         # self.get_player()
         # self.player_play_pause()
+        self.ws.call(obsws_requests.SetMute(False, 'Радио'))
 
         asyncio.ensure_future(ctx.send('Начат обратный отсчёт до {0}!'.format(self.bot.countdown_to.strftime('%X'))))
         asyncio.ensure_future(self.bot.my_run_commercial(self.bot.user_id))
@@ -233,7 +234,7 @@ class OBSCog:
         self.logger.info("Getting Discord cog...")
         discord_bot = self.bot.get_cog('DiscordCog')
         if discord_bot:
-            self.logger.info("Got it, sending announce...")
+            self.logger.info("Got it, requesting announce...")
             asyncio.ensure_future(discord_bot.announce())
         else:
             self.logger.warning("Discord cog not found")
@@ -286,6 +287,7 @@ class OBSCog:
             else:
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), True))
 
+            self.ws.call(obsws_requests.SetMute(False, 'Радио'))
         # self.get_chatters()
         asyncio.ensure_future(ctx.send('Начать перепись населения!'))
         asyncio.ensure_future(self.bot.my_run_commercial(self.bot.user_id, 60))
@@ -311,6 +313,7 @@ class OBSCog:
             else:
                 self.switch_to('Game')
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
+            self.ws.call(obsws_requests.SetMute(True, 'Радио'))
 
         self.ws.call(obsws_requests.StartRecording())
 
@@ -340,6 +343,7 @@ class OBSCog:
                 self.logger.info("unmute mic")
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
 
+            self.ws.call(obsws_requests.SetMute(True, 'Радио'))
             self.ws.call(obsws_requests.ResumeRecording())
 
         try:

@@ -8,7 +8,7 @@ from multiprocessing import Process
 from typing import Union, Iterable, Optional
 
 import colorlog
-import discord
+# import discord
 import pygame
 import requests
 import simplejson
@@ -135,7 +135,7 @@ class Bot(commands.Bot):
         self.timer = None
 
         self.load_pearls()
-        
+
     # noinspection PyMethodMayBeStatic
     def is_vip(self, user: User):
         return user.badges.get('vip', 0) == 1
@@ -186,7 +186,10 @@ class Bot(commands.Bot):
         # self.streamlabs_socket.on('connect', self.sl_connected)
         self.timer = Periodic('ws_server', 1, self.set_ws_server(), self.loop)
         await self.timer.start()
-        
+
+        rip = self.get_cog('RIPCog')
+        rip.init()
+
     async def event_message(self, message):
         # if message.author.name.lower() not in self.viewers:
         await self.send_viewer_joined(message.author)
@@ -456,7 +459,7 @@ class Bot(commands.Bot):
             await ctx.send(f'@{ctx.author.display_name} попытался сломать систему, но не смог BabyRage')
             return
 
-        what = random.choice(twitch_extra_bite.get(defender.lower(), (None, )))
+        what = random.choice(twitch_extra_bite.get(defender.lower(), (None,)))
 
         if attacker.lower() == defender.lower():
             what = what or " за жопь"
@@ -601,27 +604,27 @@ class Bot(commands.Bot):
             await sio_server.emit(item['action'], item['value'])
         else:
             logger.warning("send_viewer_joined: sio_server is none!")
-            
+
     def load_pearls(self):
         self.pearls = []
         with open('pearls.txt', 'r', encoding='utf-8') as f:
             for line in f:
                 self.pearls.append(line.strip())
-            
+
     def write_pearls(self):
         with open('pearls.txt', 'w', encoding='utf-8') as f:
             for pearl in self.pearls:
                 print(pearl, file=f)
-            
-    @commands.command(name='perl', aliases=['перл', 'пёрл', 'pearl', 'зуфкд'])
+
+    @commands.command(name='perl', aliases=['перл', 'пёрл', 'pearl', 'зуфкд', 'quote', 'цитата', 'цытата', 'wbnfnf', 'wsnfnf'])
     async def pearl(self, ctx: Context):
         try:
             arg = ctx.message.content.split(None, 1)[1]
         except IndexError:
             arg = ''
-            
+
         if arg.startswith('+'):
-            if not ctx.author.is_mod():
+            if not ctx.author.is_mod:
                 return
             pearl = arg[1:].strip()
             self.pearls.append(pearl)
@@ -635,17 +638,18 @@ class Bot(commands.Bot):
                     pearl_id = int(arg)
                     pearl = self.pearls[pearl_id]
                 except (IndexError, ValueError) as e:
-                    self.ctx.send("Ошибка: нет такого пёрла")
-                    self.logger.exception(e) 
+                    ctx.send("Ошибка: нет такого пёрла")
+                    self.logger.exception(e)
                     return
             else:
                 pearl_id = random.randrange(len(self.pearls))
                 pearl = self.pearls[pearl_id]
-                
+
             await ctx.send(f"ПаукоПёрл №{pearl_id}: {pearl}")
 
+
 twitch_bot: Optional[Bot] = None
-discord_bot: Optional[discord.Client] = None
+# discord_bot: Optional[discord.Client] = None
 sio_client: Optional[socketio.AsyncClient] = None
 sio_server: Optional[socketio.AsyncServer] = None
 app: Optional[socketio.WSGIApp] = None

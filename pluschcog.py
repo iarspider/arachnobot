@@ -26,7 +26,11 @@ class PluschCog:
     @commands.command(name='plusch', aliases=['плющ', 'вштырь'])
     async def plusch(self, ctx: Context):
         who = " ".join(ctx.message.content.split()[1:])
-        asyncio.ensure_future(ctx.send("Эк {0} поплющило...".format(who)))
+        if who.strip():
+            asyncio.ensure_future(ctx.send("Эк {0} поплющило...".format(who)))
+        else:
+            asyncio.ensure_future(ctx.send("Эки кого-то поплющило..."))
+
         self.plusches += 1
         self.write_plusch()
 

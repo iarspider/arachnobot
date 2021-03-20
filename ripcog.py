@@ -3,6 +3,10 @@ import codecs
 from typing import Optional
 import logging
 
+import sqlite3
+from config import *
+
+import requests
 from twitchio import Context
 from twitchio.ext import commands
 
@@ -19,24 +23,72 @@ class RIPCog:
 
         self.deaths = {'today': 0, 'total': 0}
 
-        self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv', 'wmuga', 'johnrico85']        
+        self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv', 'wmuga', 'johnrico85']
+
+        self.game = None
 
         try:
             with open('rip.txt') as f:
                 self.deaths['total'] = int(f.read().strip())
         except (FileNotFoundError, TypeError, ValueError):
             pass
-            
-        self.write_rip()
 
-    def write_rip(self):
+    def init(self):
+        self.get_game_v5()
+        self.load_rip()
+
+    def get_game_v5(self):
+        r = requests.get(f'https://api.twitch.tv/kraken/channels/{self.bot.user_id}',
+                         headers={'Accept': 'application/vnd.twitchtv.v5+json',
+                                  'Client-ID': twitch_client_id_alt})
+
+        try:
+            r.raise_for_status()
+        except requests.RequestException as e:
+            self.logger.error("Request to Kraken API failed!" + str(e))
+            return None
+
+        if 'error' in r.json():
+            self.logger.error("Request to Kraken API failed!" + r.json()['message'])
+            return None
+
+        self.game = r.json()['game']
+        print(f"self.game is {self.game}")
+
+    def load_rip(self):
+        print(f"self.game is {self.game}")
+        if self.game is None:
+            self.deaths = {'today': 0, 'total': 0}
+        else:
+            db = sqlite3.connect('bot.db')
+            cur = db.cursor()
+            cur.execute('SELECT total FROM rip WHERE game=?;', (self.game,))
+            res = cur.fetchone()
+            if res is None:
+                print("Game not known, fixing")
+                cur.execute('INSERT INTO rip VALUES (?, 0);', (self.game,))
+                self.deaths['total'] = 0
+                self.deaths['today'] = 0
+            else:
+                print(f"Total deaths: {res[0]}")
+                self.deaths['total'] = res[0]
+
+            cur.close()
+            db.close()
+        self.display_rip()
+
+    def display_rip(self):
         with codecs.open('rip_display.txt', 'w', 'utf8') as f:
             f.write(u'☠: {today} (всего: {total})'.format(**self.deaths))
 
-        with open('rip.txt', 'w') as f:
-            f.write(str(self.deaths['total']))
+    def write_rip(self):
+        self.display_rip()
+        db = sqlite3.connect('bot.db')
+        with db:
+            db.execute("INSERT OR REPLACE INTO rip VALUES (?, ?);", (self.game, self.deaths['total']))
+        db.close()
 
-    async def do_rip(self, ctx: Context, reason: Optional[str] = None, n = 1):
+    async def do_rip(self, ctx: Context, reason: Optional[str] = None, n=1):
         if not (ctx.author.is_mod or self.is_vip(ctx.author) or ctx.author.name.lower() in self.rippers):
             asyncio.ensure_future(ctx.send("Эту кнопку не трожь!"))
             return
@@ -50,7 +102,7 @@ class RIPCog:
 
         asyncio.ensure_future(ctx.send("riPepperonis {today}".format(**self.deaths)))
 
-    @commands.command(name='rip', aliases=("смерть","кшз"))
+    @commands.command(name='rip', aliases=("смерть", "кшз"))
     async def rip(self, ctx: Context):
         """
             Счётчик смертей
@@ -65,8 +117,8 @@ class RIPCog:
                 n_rip = 1
         else:
             n_rip = 1
-        
-        await self.do_rip(ctx, n = n_rip)
+
+        await self.do_rip(ctx, n=n_rip)
 
     @commands.command(name='unrip')
     async def unrip(self, ctx: Context):
@@ -81,7 +133,7 @@ class RIPCog:
 
         self.write_rip()
 
-        asyncio.ensure_future(ctx.send("MercyWing1 PinkMercy MercyWing2".format(*self.deaths)))
+        asyncio.ensure_future(ctx.send("MercyWing1 PinkMercy MercyWing2"))
 
     @commands.command(name='enrip')
     async def enrip(self, ctx: Context):
@@ -98,15 +150,32 @@ class RIPCog:
 
         asyncio.ensure_future(ctx.send("{0} TwitchVotes ".format(args[0])))
 
-    # async def mc_rip(self):
-    #     try:
-    #         with open(r"e:\MultiMC\instances\InSphere Deeper 0.8.3\.minecraft\LP World v3_deathcounter.txt") as f:
-    #             self.deaths[0] = int(f.read())
-    #             self.deaths[1] = self.deaths[0]
-    #             self.write_rip()
-    #     except OSError:
-    #         return
-        
+    @commands.command(name='lrip')
+    async def lrip(self, ctx: Context):
+        """
+        Перезагружает счётчик смертей (в случае смены игры)
+        """
+        if not self.check_sender(ctx, 'iarspider'):
+            print("check_sender failed")
+            return
+
+        self.get_game_v5()
+        self.load_rip()
+
+    @commands.command(name='setrip')
+    async def setrip(self, ctx: Context):
+        """
+        Устанавливает значение счётчика смертей за сегодня
+        """
+        try:
+            arg = int(ctx.message.content.split()[1])
+        except (IndexError, ValueError):
+            await ctx.send("Usage: !setrip <N>")
+            return
+        else:
+            self.deaths['today'] = arg
+            self.display_rip()
+
     # @commands.command(name='ripz')
     # async def ripz(self, ctx: Context):
     #     """
