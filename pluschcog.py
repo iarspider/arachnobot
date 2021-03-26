@@ -23,19 +23,29 @@ class PluschCog:
             else:
                 f.write("Кого-то поплющило {0}...".format(numeral.get_plural(self.plusches, ('раз', 'раза', 'раз'))))
 
-    @commands.command(name='plusch', aliases=['плющ', 'вштырь'])
-    async def plusch(self, ctx: Context):
-        who = " ".join(ctx.message.content.split()[1:])
-        if who.strip():
+    def do_plusch(self, ctx: Context, who="", shtyr=False):
+        if not who.strip():
+            who = 'кого-то'
+
+        if not shtyr:
             asyncio.ensure_future(ctx.send("Эк {0} поплющило...".format(who)))
         else:
-            asyncio.ensure_future(ctx.send("Эки кого-то поплющило..."))
-
+            asyncio.ensure_future(ctx.send("Эк {0} вштырем поплющило...".format(who)))
+        
         self.plusches += 1
         self.write_plusch()
+        
+
+    @commands.command(name='plusch', aliases=['плющ', 'вштырь'])
+    async def plusch(self, ctx: Context):
+        command_ = ctx.message.content.split()[0]
+        who = ctx.message.content.split(None, 1)[1]
+        self.do_plusch(ctx, who, 'вштырь' in command_)
+
 
     @commands.command(name='eplusch', aliases=['экипоплющило', 'экивштырило'])
     async def eplusch(self, ctx: Context):
-        asyncio.ensure_future(ctx.send("Эки кого-то поплющило..."))
+        command_ = ctx.message.content.split()[0]
+        self.do_plusch(ctx, "", 'экивштырило' in command_)
         self.plusches += 1
         self.write_plusch()
