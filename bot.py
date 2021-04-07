@@ -638,7 +638,7 @@ class Bot(commands.Bot):
                     pearl_id = int(arg)
                     pearl = self.pearls[pearl_id]
                 except (IndexError, ValueError) as e:
-                    ctx.send("Ошибка: нет такого пёрла")
+                    await ctx.send("Ошибка: нет такого пёрла")
                     self.logger.exception(e)
                     return
             else:

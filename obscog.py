@@ -384,3 +384,6 @@ class OBSCog:
             return
 
         self.do_pause(ctx, True)
+
+    async def enable_rip(self, state):
+        self.ws.call(obsws_requests.SetSceneItemProperties(scene_name="Game", item="RIP", visible=state))

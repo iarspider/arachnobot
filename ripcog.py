@@ -23,9 +23,11 @@ class RIPCog:
 
         self.deaths = {'today': 0, 'total': 0}
 
-        self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv', 'wmuga', 'johnrico85']
+        self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv', 'wmuga', 'johnrico85', 'ved_s']
 
         self.game = None
+
+        self.obscog = None
 
         try:
             with open('rip.txt') as f:
@@ -35,6 +37,7 @@ class RIPCog:
 
     def init(self):
         self.get_game_v5()
+        self.obscog = self.bot.get_cog('OBSCog')
         self.load_rip()
 
     def get_game_v5(self):
@@ -62,20 +65,24 @@ class RIPCog:
         else:
             db = sqlite3.connect('bot.db')
             cur = db.cursor()
-            cur.execute('SELECT total FROM rip WHERE game=?;', (self.game,))
+            cur.execute('SELECT total,enabled FROM rip WHERE game=?;', (self.game,))
             res = cur.fetchone()
             if res is None:
                 print("Game not known, fixing")
-                cur.execute('INSERT INTO rip VALUES (?, 0);', (self.game,))
+                cur.execute('INSERT INTO rip VALUES (?, 0, 1);', (self.game,))
                 self.deaths['total'] = 0
                 self.deaths['today'] = 0
+                enabled = True
             else:
                 print(f"Total deaths: {res[0]}")
                 self.deaths['total'] = res[0]
+                enabled = bool(res[1])
 
             cur.close()
             db.close()
-        self.display_rip()
+        asyncio.ensure_future(self.obscog.enable_rip(enabled))
+        if enabled:
+            self.display_rip()
 
     def display_rip(self):
         with codecs.open('rip_display.txt', 'w', 'utf8') as f:
@@ -85,7 +92,7 @@ class RIPCog:
         self.display_rip()
         db = sqlite3.connect('bot.db')
         with db:
-            db.execute("INSERT OR REPLACE INTO rip VALUES (?, ?);", (self.game, self.deaths['total']))
+            db.execute("INSERT OR REPLACE INTO rip (game, total) VALUES (?, ?);", (self.game, self.deaths['total']))
         db.close()
 
     async def do_rip(self, ctx: Context, reason: Optional[str] = None, n=1):
@@ -175,6 +182,28 @@ class RIPCog:
         else:
             self.deaths['today'] = arg
             self.display_rip()
+
+    @commands.command(name='yesrip')
+    async def yesrip(self, ctx: Context):
+        """
+        Включает отображение смертей
+        """
+        db = sqlite3.connect('bot.db')
+        with db:
+            db.execute("INSERT OR REPLACE INTO rip (game, enabled) VALUES (?, 1);", (self.game, ))
+        db.close()
+        await self.obscog.enable_rip(True)
+    
+    @commands.command(name='norip')
+    async def norip(self, ctx: Context):
+        """
+        Включает отображение смертей
+        """
+        db = sqlite3.connect('bot.db')
+        with db:
+            db.execute("INSERT OR REPLACE INTO rip (game, enabled) VALUES (?, 0);", (self.game, ))
+        db.close()
+        await self.obscog.enable_rip(False)
 
     # @commands.command(name='ripz')
     # async def ripz(self, ctx: Context):
