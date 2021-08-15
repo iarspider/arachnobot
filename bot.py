@@ -3,6 +3,7 @@ import datetime
 import pathlib
 import random
 import string
+import time
 from collections import defaultdict, deque
 from multiprocessing import Process
 from typing import Union, Iterable, Optional
@@ -16,9 +17,11 @@ import socketio
 import twitchio
 import uvicorn
 from requests.structures import CaseInsensitiveDict
-# For typing
-from twitchio.dataclasses import Context, User
 from twitchio.ext import commands
+# For typing
+# from twitchio.dataclasses import Context, User, Message
+
+from twitchio import User, Message, Context
 
 import twitch_api
 from aio_timer import Periodic
@@ -102,7 +105,7 @@ def httpclient_logging_patch(level=logging.DEBUG):
 
 class Bot(commands.Bot):
     def __init__(self, loop: asyncio.BaseEventLoop = None):
-        super().__init__(irc_token='oauth:' + twitch_chat_password,
+        super().__init__(token='oauth:' + twitch_chat_password,
                          client_id=twitch_client_id, nick='arachnobot',
                          prefix='!',
                          initial_channels=['#iarspider'],
@@ -111,6 +114,7 @@ class Bot(commands.Bot):
         self.logger = logger
 
         self.viewers = CaseInsensitiveDict()
+        self.greeted = set()
 
         self.db = {}
         self.pearls = []
@@ -141,6 +145,7 @@ class Bot(commands.Bot):
         return user.badges.get('vip', 0) == 1
 
     def add_user(self, user: User):
+        new_user = False
         name = user.name.lower()
         display_name = user.display_name.lower()
         if name not in self.viewers:
@@ -149,14 +154,27 @@ class Bot(commands.Bot):
         if display_name not in self.viewers:
             self.viewers[display_name] = user
 
-    async def start(self):
-        self.logger.info("Starting bot!")
-        if self.started:
-            self.logger.error("Already started!")
-            raise RuntimeError()
+        if not (name in self.greeted or display_name in self.greeted
+                or name in self.bots or name == 'iarspider'):
+            self.greeted.add(name)
+            self.greeted.add(display_name)
+            if user.is_subscriber or user.badges.get('founder', -1) != -1:
+                i = 4
+            else:
+                i = random.randint(1, 3)
+            self.play_sound(f"sound\\TOWER_TITLES@GREETING_{i}@JES.mp3")
 
-        self.started = True
-        await super(Bot, self).start()
+    async def start(self):
+        try:
+            self.logger.info("Starting bot!")
+            if self.started:
+                self.logger.error("Already started!")
+                raise RuntimeError()
+
+            self.started = True
+            await super(Bot, self).start()
+        finally:
+            self.loop.shutdown_asyncgens()
 
     # Fill in missing stuff
     def get_cog(self, name):
@@ -170,7 +188,7 @@ class Bot(commands.Bot):
     async def event_pubsub(self, data):
         pass
 
-    async def set_ws_server(self):
+    def set_ws_server(self):
         if sio_server is not None and self.sio_server is None:
             self.sio_server = sio_server
             self.timer.cancel()
@@ -184,17 +202,19 @@ class Bot(commands.Bot):
         # socket_token = api.get_socket_token(self.streamlabs_oauth)
         # self.streamlabs_socket.on('message', self.sl_event)
         # self.streamlabs_socket.on('connect', self.sl_connected)
-        self.timer = Periodic('ws_server', 1, self.set_ws_server(), self.loop)
+        self.timer = Periodic('ws_server', 1, self.set_ws_server, self.loop)
         await self.timer.start()
 
         rip = self.get_cog('RIPCog')
         rip.init()
 
-    async def event_message(self, message):
-        # if message.author.name.lower() not in self.viewers:
-        await self.send_viewer_joined(message.author)
-
-        self.logger.debug("JOIN sent")
+    async def event_message(self, message: Message):
+        if message.author.name.lower() not in self.viewers:
+            # tags = ','.join(f'{k} = {v}' for k, v in message.tags.items())
+            # print(f"Message from {message.author}, tags: {tags}")
+            # print(f"Raw data: {message.raw_data}")
+            await self.send_viewer_joined(message.author)
+            self.logger.debug("JOIN sent")
         #
         # self.viewers.add(message.author.name.lower())
         # if message.author.is_mod:
@@ -249,10 +269,12 @@ class Bot(commands.Bot):
         except KeyError:
             pass
 
-    async def event_pubsub_message_channel_points_channel_v1(self, data):
+    async def event_pubsub_messagme_channel_points_channel_v1(self, data):
         # import pprint
         # pprint.pprint(data)
         d = datetime.datetime.now().timestamp()
+
+        # self.logger.info("Received pubsub event with type {0}".format(data.get('type', '')))
 
         if data.get('type', '') != 'reward-redeemed':
             return
@@ -284,13 +306,27 @@ class Bot(commands.Bot):
             self.logger.debug(f"Queued redepmtion: hugs, {requestor}")
             item = {'action': 'event', 'value': {'type': 'hugs', 'from': requestor}}
 
+        if reward_key == "Дизайнерское Ничего".replace(' ', ''):
+            self.logger.debug(f"Queued redepmtion: sit, {requestor}")
+            item = {'action': 'event', 'value': {'type': 'nihil', 'from': requestor}}
+
+        if reward_key == "Ничего".replace(' ', ''):
+            self.logger.debug(f"Queued redepmtion: fun, {requestor}")
+            item = {'action': 'event', 'value': {'type': 'nothing', 'from': requestor}}
+
         if reward_key == "Стримлер! Не горбись!".replace(' ', ''):
             self.logger.debug(f"Queued redepmtion: sit, {requestor}")
             item = {'action': 'event', 'value': {'type': 'sit', 'from': requestor}}
 
-        if reward_key == "Добавить упорину".replace(' ', ''):
+        if reward_key == "Распылить упорин".replace(' ', ''):
             self.logger.debug(f"Queued redepmtion: fun, {requestor}")
             item = {'action': 'event', 'value': {'type': 'fun', 'from': requestor}}
+            s = random.choice(['Nice01', 'Nice02', 'ThatWasFun01', 'ThatWasFun02', 'ThatWasFun03'])
+            self.play_sound(f'sound\\Minion General Speech@ignore@{s}.mp3')
+
+        if reward_key == "Гори!".replace(' ', ''):
+            snd = random.choice(['Goblin_Burn_1', 'Minion_BurnBurn', 'Minion_FireNoHurt'])
+            self.play_sound(f'sound\\Minion General Speech@ignore@{snd}.mp3')
 
         if item and (self.sio_server is not None):
             await sio_server.emit(item['action'], item['value'])
@@ -305,6 +341,7 @@ class Bot(commands.Bot):
     async def event_pubsub_message(self, data):
         data = data['data']
         topic = data['topic'].rsplit('.', 1)[0].replace('-', '_')
+        # self.logger.info(f"Got message with topic: {topic}")
         data['message'] = simplejson.loads(data['message'])
         handler = getattr(self, 'event_pubsub_message_' + topic, None)
         if handler:
@@ -328,14 +365,18 @@ class Bot(commands.Bot):
         FREQ, SIZE, CHAN = getmixerargs()
 
         pygame.mixer.init(FREQ, SIZE, CHAN, BUFFER)
+        # noinspection PyUnresolvedReferences
         pygame.init()
 
     @staticmethod
     def play_sound(sound: str):
-        soundfile = pathlib.Path(__file__).with_name(sound)
+        soundfile = pathlib.Path(__file__).parent / sound
         logger.debug("play sound %s", soundfile)
         pygame.mixer.music.load(str(soundfile))
         pygame.mixer.music.play()
+
+        if '@' in sound:
+            time.sleep(1)
 
     async def send_viewer_joined(self, user: User):
         # DEBUG
@@ -450,12 +491,11 @@ class Bot(commands.Bot):
             return
 
         if defender.lower() in self.bots:
-            await ctx.timeout(ctx.author.name, 300, 'поКУСЬился на ботика')
-            await ctx.send(f'@{ctx.author.display_name} попытался укусить ботика. @{ctx.author.display_name} SMOrc')
+            await ctx.send(f'С криком "Да здравствуют роботы!" @{ctx.author.display_name} поцеловал блестящий '
+                           f'металлический зад {defender}а')
             return
 
         if defender.lower() == 'кусь' or defender.lower() == 'bite':
-            await ctx.timeout(ctx.author.name, 1)
             await ctx.send(f'@{ctx.author.display_name} попытался сломать систему, но не смог BabyRage')
             return
 
@@ -616,7 +656,8 @@ class Bot(commands.Bot):
             for pearl in self.pearls:
                 print(pearl, file=f)
 
-    @commands.command(name='perl', aliases=['перл', 'пёрл', 'pearl', 'зуфкд', 'quote', 'цитата', 'цытата', 'wbnfnf', 'wsnfnf'])
+    @commands.command(name='perl',
+                      aliases=['перл', 'пёрл', 'pearl', 'зуфкд', 'quote', 'цитата', 'цытата', 'wbnfnf', 'wsnfnf'])
     async def pearl(self, ctx: Context):
         try:
             arg = ctx.message.content.split(None, 1)[1]
@@ -659,6 +700,8 @@ if __name__ == '__main__':
 
     setup_logging("bot.log", color=True, debug=False, http_debug=False)
 
+    random.seed()
+
     # logger.setLevel(logging.DEBUG)
     logging.getLogger("asyncio").setLevel(logging.DEBUG)
     # Run bot
@@ -666,7 +709,7 @@ if __name__ == '__main__':
     # noinspection PyTypeChecker
     twitch_bot = Bot(loop=_loop)
     for extension in ('discordcog', 'obscog', 'pluschcog', 'ripcog', 'SLCog',
-                      'vmodcog', 'elfcog', 'duelcog', 'musiccog'):
+                      'vmodcog', 'elfcog', 'duelcog', 'musiccog', 'raidcog'):
         twitch_bot.load_module(extension)
 
     invalid = list(twitchio.dataclasses.Messageable.__invalid__)
@@ -716,7 +759,8 @@ if __name__ == '__main__':
     #
     #     print("<< ws loop end")
 
-    asyncio.ensure_future(twitch_bot.start(), loop=_loop)
-    _loop.run_until_complete(server.serve())
+    # asyncio.get_event_loop(). run_until_complete(main())
+    asyncio.get_event_loop().run_until_complete(asyncio.gather(twitch_bot.start(), loop=_loop))
+    # _loop.run_until_complete(server.serve())
     # _loop.run_until_complete(discord_bot.close())
     # _loop.stop()

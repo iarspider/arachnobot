@@ -23,7 +23,8 @@ class RIPCog:
 
         self.deaths = {'today': 0, 'total': 0}
 
-        self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv', 'wmuga', 'johnrico85', 'ved_s']
+        self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv', 'wmuga', 'johnrico85',
+                        'ved_s', 'owlsforever', 'antaryo']
 
         self.game = None
 
@@ -41,27 +42,28 @@ class RIPCog:
         self.load_rip()
 
     def get_game_v5(self):
-        r = requests.get(f'https://api.twitch.tv/kraken/channels/{self.bot.user_id}',
-                         headers={'Accept': 'application/vnd.twitchtv.v5+json',
+        r = requests.get(f'https://api.twitch.tv/helix/channels?broadcaster_id={self.bot.user_id}',
+                         headers={'Authorization': f'Bearer {twitch_chat_password}',
                                   'Client-ID': twitch_client_id_alt})
 
         try:
             r.raise_for_status()
         except requests.RequestException as e:
-            self.logger.error("Request to Kraken API failed!" + str(e))
+            self.logger.error("Request to Helix API failed!" + str(e))
             return None
 
         if 'error' in r.json():
-            self.logger.error("Request to Kraken API failed!" + r.json()['message'])
+            self.logger.error("Request to Helix API failed!" + r.json()['message'])
             return None
 
-        self.game = r.json()['game']
+        self.game = r.json()['data'][0]['game_name']
         print(f"self.game is {self.game}")
 
     def load_rip(self):
         print(f"self.game is {self.game}")
         if self.game is None:
             self.deaths = {'today': 0, 'total': 0}
+            enabled = False
         else:
             db = sqlite3.connect('bot.db')
             cur = db.cursor()
@@ -168,6 +170,7 @@ class RIPCog:
 
         self.get_game_v5()
         self.load_rip()
+        await ctx.send('Счётчик смертей обновлён')
 
     @commands.command(name='setrip')
     async def setrip(self, ctx: Context):
@@ -190,10 +193,11 @@ class RIPCog:
         """
         db = sqlite3.connect('bot.db')
         with db:
-            db.execute("INSERT OR REPLACE INTO rip (game, enabled) VALUES (?, 1);", (self.game, ))
+            db.execute("INSERT OR REPLACE INTO rip (game, enabled) VALUES (?, 1);", (self.game,))
         db.close()
         await self.obscog.enable_rip(True)
-    
+        await ctx.send('Счётчик смертей активирован')
+
     @commands.command(name='norip')
     async def norip(self, ctx: Context):
         """
@@ -201,9 +205,10 @@ class RIPCog:
         """
         db = sqlite3.connect('bot.db')
         with db:
-            db.execute("INSERT OR REPLACE INTO rip (game, enabled) VALUES (?, 0);", (self.game, ))
+            db.execute("INSERT OR REPLACE INTO rip (game, enabled) VALUES (?, 0);", (self.game,))
         db.close()
         await self.obscog.enable_rip(False)
+        await ctx.send('Счётчик смертей отключён')
 
     # @commands.command(name='ripz')
     # async def ripz(self, ctx: Context):

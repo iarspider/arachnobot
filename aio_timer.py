@@ -47,6 +47,7 @@ class Periodic:
         while True:
             await asyncio.sleep(self.time)
             print(f">> exec {self.name} <<")
-            await self.func
+            # await self.func
+            self.func()
             print(f">> sleep {self.name} <<")
 

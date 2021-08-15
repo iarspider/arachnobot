@@ -5,26 +5,16 @@ import logging
 import time
 import typing
 
-# try:
-#     import pywinauto
-# except ImportError as e:
-#     print('Failed to load pywinauto: {0}'.format(e))
-#     pywinauto = None
-
 import requests
+from obswebsocket import obsws
+from obswebsocket import requests as obsws_requests
 from pytils import numeral
 from twitchio import Context
 from twitchio.ext import commands
-from obswebsocket import obsws
-from obswebsocket import requests as obsws_requests
-from obswebsocket import events as obsws_events
 
 from aio_timer import Timer
 from bot import Bot
 from config import *
-
-
-# from lxml import etree
 
 
 @commands.core.cog()
@@ -41,6 +31,8 @@ class OBSCog:
 
         self.ws: typing.Optional[obsws] = None
 
+        self.game = None
+        self.title = None
 
         try:
             # noinspection PyStatementEffect
@@ -65,18 +57,36 @@ class OBSCog:
         # if pywinauto:
         #     self.get_player()
 
-
     def __getattr__(self, item):
         if item != '__bases__':
             self.logger.warning(f"[OBS] Failed to get attribute {item}, redirecting to self.bot!")
         return self.bot.__getattribute__(item)
 
+    # TODO: create TwitchCog and move there (also remove from ripcog)
+    def get_game_v5(self):
+        r = requests.get(f'https://api.twitch.tv/helix/channels?broadcaster_id={self.bot.user_id}',
+                         headers={'Authorization': f'Bearer {twitch_chat_password}',
+                                  'Client-ID': twitch_client_id_alt})
+
+        try:
+            r.raise_for_status()
+        except requests.RequestException as e:
+            self.logger.error("Request to Helix API failed!" + str(e))
+            return None
+
+        if 'error' in r.json():
+            self.logger.error("Request to Helix API failed!" + r.json()['message'])
+            return None
+
+        self.game = r.json()['data'][0]['game_name']
+        self.title = r.json()['data'][0]['title']
+        print(f"self.game is {self.game}")
 
     # def obs_on_start_stream(self, message: obsws_events.StreamStarted):
-        # self.logger.info("Stream started!")
-        # if self.obsws_shutdown_timer is not None:
-            # self.obsws_shutdown_timer.cancel()
-            # self.obsws_shutdown_timer = None
+    #   self.logger.info("Stream started!")
+    #   if self.obsws_shutdown_timer is not None:
+    #     self.obsws_shutdown_timer.cancel()
+    #     self.obsws_shutdown_timer = None
 
     async def obsws_shutdown(self):
         self.logger.info("Disconnecting from OBS")
@@ -85,11 +95,11 @@ class OBSCog:
         self.obsws_shutdown_timer = None
 
     # def obs_on_stop_stream(self, message: obsws_events.StreamStopped):
-        # if self.obsws_shutdown_timer is not None:
-        #     self.obsws_shutdown_timer.cancel()
+    #   if self.obsws_shutdown_timer is not None:
+    #     self.obsws_shutdown_timer.cancel()
 
-        # self.logger.info("Stream stopped, preparing to disconnect from OBS")
-        # self.obsws_shutdown_timer = Timer(60, self.obsws_shutdown, self.bot.loop)
+    #     self.logger.info("Stream stopped, preparing to disconnect from OBS")
+    #     self.obsws_shutdown_timer = Timer(60, self.obsws_shutdown, self.bot.loop)
 
     # def get_player(self, kind: str = None):
     #     if not pywinauto:
@@ -166,7 +176,8 @@ class OBSCog:
         self.ws.call(obsws_requests.SetCurrentSceneCollection('Twitch'))
         self.ws.call(obsws_requests.SetSceneItemProperties(scene_name="Paused", item="ужин", visible=False))
 
-        asyncio.ensure_future(ctx.send('К стриму готов!'))
+        self.get_game_v5()
+        asyncio.ensure_future(ctx.send('К стриму готов! | {0}... | {1}'.format(self.title.split()[0], self.game)))
 
     @commands.command(name='countdown', aliases=['preroll', 'cd', 'pr', 'св', 'зк'])
     async def countdown(self, ctx: Context):
@@ -226,7 +237,7 @@ class OBSCog:
         self.ws.call(obsws_requests.PauseRecording())
         # self.get_player()
         # self.player_play_pause()
-        self.ws.call(obsws_requests.SetMute(False, 'Радио'))
+        self.ws.call(obsws_requests.SetMute('Радио', False))
 
         asyncio.ensure_future(ctx.send('Начат обратный отсчёт до {0}!'.format(self.bot.countdown_to.strftime('%X'))))
         asyncio.ensure_future(self.bot.my_run_commercial(self.bot.user_id))
@@ -287,7 +298,7 @@ class OBSCog:
             else:
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), True))
 
-            self.ws.call(obsws_requests.SetMute(False, 'Радио'))
+            self.ws.call(obsws_requests.SetMute('Радио', False))
         # self.get_chatters()
         asyncio.ensure_future(ctx.send('Начать перепись населения!'))
         asyncio.ensure_future(self.bot.my_run_commercial(self.bot.user_id, 60))
@@ -313,7 +324,7 @@ class OBSCog:
             else:
                 self.switch_to('Game')
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
-            self.ws.call(obsws_requests.SetMute(True, 'Радио'))
+            self.ws.call(obsws_requests.SetMute('Радио', True))
 
         self.ws.call(obsws_requests.StartRecording())
 
@@ -334,6 +345,8 @@ class OBSCog:
         # self.player_play_pause()
 
         if self.ws is not None:
+            old_screne = self.ws.call(obsws_requests.GetCurrentScene())
+
             if self.vr:
                 self.switch_to('VR Game')
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), False))
@@ -343,18 +356,21 @@ class OBSCog:
                 self.logger.info("unmute mic")
                 self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
 
-            self.ws.call(obsws_requests.SetMute(True, 'Радио'))
+            self.ws.call(obsws_requests.SetMute('Радио', True))
             self.ws.call(obsws_requests.ResumeRecording())
 
+            if old_screne.name == 'Battle':
+                return
+
         try:
-            self.logger.info("get stream")
+            self.logger.debug("get stream")
             res = await self.bot.my_get_stream(self.bot.user_id)
-            self.logger.info("got stream")
+            self.logger.debug("got stream")
             viewers = numeral.get_plural(res['viewer_count'], ('зритель', 'зрителя', 'зрителей'))
-            self.logger.info("prepared message")
+            self.logger.debug("prepared message")
             asyncio.ensure_future(ctx.send('Перепись населения завершена успешно! '
                                            f'Население стрима составляет {viewers}'))
-            self.logger.info("sent message")
+            self.logger.debug("sent message")
         except (KeyError, TypeError) as exc:
             asyncio.ensure_future(ctx.send('Перепись населения не удалась :('))
             self.logger.error(str(exc))
@@ -384,6 +400,21 @@ class OBSCog:
             return
 
         self.do_pause(ctx, True)
+
+    @commands.command(name='go')
+    async def go(self, ctx: Context):
+        """
+            Особый тип перерыва - на битву (StreamRaiders)
+           
+            %%go
+        """
+        if not self.bot.check_sender(ctx, 'iarspider'):
+            asyncio.ensure_future(ctx.send('/timeout ' + ctx.author.name + ' 1'))
+            return
+
+        if self.ws is not None:
+            self.ws.call(obsws_requests.PauseRecording())
+            self.switch_to('Battle')
 
     async def enable_rip(self, state):
         self.ws.call(obsws_requests.SetSceneItemProperties(scene_name="Game", item="RIP", visible=state))

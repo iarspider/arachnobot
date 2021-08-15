@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import random
 
 import requests
 import socketio.asyncio_client
@@ -27,8 +28,8 @@ class SLClient(socketio.asyncio_client.AsyncClient):
         self.logger.warning("SL client disconnected")
 
     async def sl_client_event(self, data):
-        self.logger.info(f'SL event: {data}')
         pick_keys = []
+        self.logger.info(f'SL event: {data["type"]}')
         if data['type'] == 'donation':
             pick_keys.extend(('from', 'message', 'formatted_amount'))
         elif data['type'] == 'follow':
@@ -45,10 +46,11 @@ class SLClient(socketio.asyncio_client.AsyncClient):
             pick_keys.extend(('name', 'amount', 'message'))
         elif data['type'] == 'raid':
             pick_keys.extend(('name', 'raiders'))
-        elif data['type'] == 'alertPlaying':
+        elif data['type'] in ('alertPlaying', 'streamlabels', 'streamlabels.underlying', 'subscription-playing'):
             return
         else:
-            self.logger.warning(f'Unknown SL event type: {data["type"]}')
+            self.logger.info(f'SL event: {data["type"]}')
+            self.logger.warning(f'Unknown SL event type: {data}')
             return
 
         def copy_keys(from_, to_, keys_):

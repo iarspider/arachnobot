@@ -90,6 +90,12 @@
                     case 'song':
                         res = {icon: 'song', text: `${v.requestor} заказал песню ${v.song}`};
                         break;
+                    case 'nothing':
+                        res = {icon: 'circle', text: `${v.requestor} получил ничего`};
+                        break;
+                    case 'nihil':
+                        res = {icon: 'stop circle', text: `${v.requestor} получил дизайнерское ничего`};
+                        break;
                     default:
                         console.log(`Unknown event type ${v.type}`);
                         return;
