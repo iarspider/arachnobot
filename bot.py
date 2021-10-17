@@ -105,7 +105,7 @@ def httpclient_logging_patch(level=logging.DEBUG):
 
 class Bot(commands.Bot):
     def __init__(self, loop: asyncio.BaseEventLoop = None):
-        super().__init__(token='oauth:' + twitch_chat_password,
+        super().__init__(irc_token='oauth:' + twitch_chat_password,
                          client_id=twitch_client_id, nick='arachnobot',
                          prefix='!',
                          initial_channels=['#iarspider'],
@@ -269,7 +269,7 @@ class Bot(commands.Bot):
         except KeyError:
             pass
 
-    async def event_pubsub_messagme_channel_points_channel_v1(self, data):
+    async def event_pubsub_message_channel_points_channel_v1(self, data):
         # import pprint
         # pprint.pprint(data)
         d = datetime.datetime.now().timestamp()
@@ -709,7 +709,7 @@ if __name__ == '__main__':
     # noinspection PyTypeChecker
     twitch_bot = Bot(loop=_loop)
     for extension in ('discordcog', 'obscog', 'pluschcog', 'ripcog', 'SLCog',
-                      'vmodcog', 'elfcog', 'duelcog', 'musiccog', 'raidcog'):
+                      'vmodcog', 'elfcog', 'duelcog'):  # 'musiccog', 'raidcog'
         twitch_bot.load_module(extension)
 
     invalid = list(twitchio.dataclasses.Messageable.__invalid__)

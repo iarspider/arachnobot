@@ -119,6 +119,9 @@ class RIPCog:
             %% rip
         """
         args = ctx.message.content.split()[1:]
+        if args and (args[0] == 'who' or args[0] == '?'):
+            ans = 'Счетоводы: ' + ', '.join(self.rippers)
+
         if args and args[0].startswith('+'):
             try:
                 n_rip = int(args[0])

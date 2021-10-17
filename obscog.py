@@ -224,11 +224,12 @@ class OBSCog:
         # Refresh countdown
         self.ws.call(obsws_requests.SetCurrentScene('Starting'))
 
-        try:
-            self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), True))
-        except KeyError:
-            self.logger.warning("[WARN] Can't mute mic-2, please check!")
-        self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), True))
+        # TODO
+        # try:
+        #     self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), True))
+        # except KeyError:
+        #     self.logger.warning("[WARN] Can't mute mic-2, please check!")
+        self.ws.call(obsws_requests.SetMute('Mic', True))
 
         self.ws.call(obsws_requests.EnableStudioMode())
 
@@ -293,10 +294,10 @@ class OBSCog:
             self.ws.call(obsws_requests.PauseRecording())
             self.ws.call(obsws_requests.SetSceneItemProperties(scene_name="Paused", item="ужин", visible=is_dinner))
             self.switch_to('Paused')
-            if self.vr:
-                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), True))
-            else:
-                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), True))
+            # if self.vr:
+            #     self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), True))
+            # else:
+            self.ws.call(obsws_requests.SetMute('Mic', True))
 
             self.ws.call(obsws_requests.SetMute('Радио', False))
         # self.get_chatters()
@@ -320,10 +321,10 @@ class OBSCog:
         if self.ws is not None:
             if self.vr:
                 self.switch_to('VR Game')
-                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), False))
+                # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), False))
             else:
                 self.switch_to('Game')
-                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
+                self.ws.call(obsws_requests.SetMute('Mic', False))
             self.ws.call(obsws_requests.SetMute('Радио', True))
 
         self.ws.call(obsws_requests.StartRecording())
@@ -349,12 +350,12 @@ class OBSCog:
 
             if self.vr:
                 self.switch_to('VR Game')
-                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), False))
+                # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), False))
             else:
                 self.logger.info("switch to game")
                 self.switch_to('Game')
                 self.logger.info("unmute mic")
-                self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic1(), False))
+                self.ws.call(obsws_requests.SetMute('Mic', False))
 
             self.ws.call(obsws_requests.SetMute('Радио', True))
             self.ws.call(obsws_requests.ResumeRecording())
