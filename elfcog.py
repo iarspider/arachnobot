@@ -53,11 +53,11 @@ class ElvenCog:
         format_fields[1] = 'ее' if count == 1 else 'их'
         format_fields[2] = {1: 'е', 2: 'я', 3: 'я', 4: 'я'}.get(count, 'й')
 
-        for message in messages:
+        for message, emotes in messages:
             # message = messages[i].translate(self.trans)
             message_tr = []
             for word in message.split(" "):
-                if not word.startswith('@'): # or any(x.isdigit() for x in word) or '_' in word):
+                if not (word.startswith('@') or word in emotes):
                     word = word.translate(self.trans)
                 message_tr.append(word)
             res.append(f'{" ".join(message_tr)}')

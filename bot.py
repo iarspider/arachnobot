@@ -7,6 +7,7 @@ import time
 from collections import defaultdict, deque
 from multiprocessing import Process
 from typing import Union, Iterable, Optional
+from urllib.request import localhost
 
 import colorlog
 # import discord
@@ -208,6 +209,19 @@ class Bot(commands.Bot):
         rip = self.get_cog('RIPCog')
         rip.init()
 
+    def get_emotes(self, tag, msg):
+        # example tag: '306267910:5-11,20-26/74409:13-18'
+        res = []
+        if tag:
+            emotes_list = (x.split(':')[1].split(',', 1)[0] for x in tag.split('/'))
+            for emote in emotes_list:
+                emote_range = emote.split('-')
+                start = int(emote_range[0])
+                end = int(emote_range[1]) + 1
+                res.append(msg[start:end])
+
+        return res
+
     async def event_message(self, message: Message):
         if message.author.name.lower() not in self.viewers:
             # tags = ','.join(f'{k} = {v}' for k, v in message.tags.items())
@@ -231,7 +245,8 @@ class Bot(commands.Bot):
 
         if message.author.name.lower() not in self.bots:
             if not message.content.startswith('!'):
-                self.last_messages[message.author.name].append(message.content)
+                emotes = self.get_emotes(message.tags['emotes'], message.content)
+                self.last_messages[message.author.name].append((message.content, emotes))
                 self.logger.debug(f"Updated last messages for {message.author.name}, " +
                                   f"will remember last {len(self.last_messages[message.author.name])}")
 
@@ -708,8 +723,11 @@ if __name__ == '__main__':
     _loop = asyncio.get_event_loop()
     # noinspection PyTypeChecker
     twitch_bot = Bot(loop=_loop)
-    for extension in ('discordcog', 'obscog', 'pluschcog', 'ripcog', 'SLCog',
-                      'vmodcog', 'elfcog', 'duelcog'):  # 'musiccog', 'raidcog'
+    if locals().get('obsws_address', None) is not None:
+        twitch_bot.load_module('obscog')
+
+    for extension in ('discordcog', 'pluschcog', 'ripcog', 'SLCog',
+                      'elfcog', 'duelcog'):  # 'musiccog', 'raidcog', 'vmodcog'
         twitch_bot.load_module(extension)
 
     invalid = list(twitchio.dataclasses.Messageable.__invalid__)
