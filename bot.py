@@ -7,7 +7,6 @@ import time
 from collections import defaultdict, deque
 from multiprocessing import Process
 from typing import Union, Iterable, Optional
-from urllib.request import localhost
 
 import colorlog
 # import discord
