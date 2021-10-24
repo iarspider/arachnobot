@@ -53,4 +53,4 @@ class PluschCog:
     @commands.command(name='splusch', aliases=['самоплющ', 'самовштырь'])
     async def splusch(self, ctx: Context):
         display_name = ctx.author.display_name
-        do_plusch(ctx, display_name, 'вштырь' in command_, True)
+        self.do_plusch(ctx, display_name, 'вштырь' in command_, True)
