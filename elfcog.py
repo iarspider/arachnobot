@@ -30,8 +30,13 @@ class ElvenCog:
                 author = params[0].lstrip('@')
                 count = 1
         else:
-            author = params[0]
-            count = int(params[1])
+            try:
+                author = params[0].lstrip('@')
+                count = int(params[1])
+            except ValueError:
+                author = params[1].lstrip('@')
+                count = int(params[0])
+            
 
         # print(f"translit(): author {author}, count {count}")
 
