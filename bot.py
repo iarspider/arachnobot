@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import os
 import pathlib
 import random
 import string
@@ -10,6 +11,7 @@ from typing import Union, Iterable, Optional
 
 import colorlog
 # import discord
+import eyed3
 import pygame
 import requests
 import simplejson
@@ -330,6 +332,7 @@ class Bot(commands.Bot):
 
         if reward_key == "Стримлер! Не горбись!".replace(' ', ''):
             self.logger.debug(f"Queued redepmtion: sit, {requestor}")
+            self.play_sound('StraightenUp.mp3', False)
             item = {'action': 'event', 'value': {'type': 'sit', 'from': requestor}}
 
         if reward_key == "Распылить упорин".replace(' ', ''):
@@ -382,15 +385,35 @@ class Bot(commands.Bot):
         # noinspection PyUnresolvedReferences
         pygame.init()
 
-    @staticmethod
-    def play_sound(sound: str):
-        soundfile = pathlib.Path(__file__).parent / sound
+    def play_sound(self, sound: str, is_temporary: bool = False):
+        if not is_temporary:
+            soundfile = pathlib.Path(__file__).parent / sound
+        else:
+            soundfile = sound
         logger.debug("play sound %s", soundfile)
         pygame.mixer.music.load(str(soundfile))
         pygame.mixer.music.play()
 
-        if '@' in sound:
-            time.sleep(1)
+        # if '@' in sound:
+        #     time.sleep(1)
+        duration = eyed3.load(soundfile).info.time_secs
+        time.sleep(duration)
+
+        # pygame.mixer.music.unload()
+        #
+        # if is_temporary:
+        #     count = 60
+        #     while count > 0:
+        #         try:
+        #             os.unlink(soundfile)
+        #         except PermissionError as e:
+        #             self.logger.warning(f"Failed to unlink tempfile {os.path.basename(soundfile)}: {str(e)}")
+        #             count -= 1
+        #             time.sleep(1)
+        #         else:
+        #             break
+        #     else:
+        #         self.logger.error(f"Giving up on file {soundfile}")
 
     async def send_viewer_joined(self, user: User):
         # DEBUG
@@ -679,7 +702,8 @@ class Bot(commands.Bot):
             arg = ''
 
         if arg.startswith('+'):
-            if not ctx.author.is_mod:
+            if not ctx.author.name.lower() in rippers:
+                await ctx.send('Недостаточно прав для выполнения этой команды')
                 return
             pearl = arg[1:].strip()
             self.pearls.append(pearl)
@@ -726,7 +750,8 @@ if __name__ == '__main__':
         twitch_bot.load_module('obscog')
 
     for extension in ('discordcog', 'pluschcog', 'ripcog', 'SLCog',
-                      'elfcog', 'duelcog'):  # 'musiccog', 'raidcog', 'vmodcog'
+                      'elfcog', 'duelcog', 'musiccog'):  # 'raidcog', 'vmodcog'
+        logger.info(f"Loading module {extension}")
         twitch_bot.load_module(extension)
 
     invalid = list(twitchio.dataclasses.Messageable.__invalid__)
