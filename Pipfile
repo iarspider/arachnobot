@@ -27,6 +27,7 @@ multidict = "*"
 comtypes = "==1.1.7"
 pika = "*"
 eyed3 = "*"
+beautifulsoup4 = "*"
 
 [requires]
 python_version = "3.9"
