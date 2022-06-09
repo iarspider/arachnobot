@@ -1,4 +1,5 @@
 import asyncio
+import json
 import pathlib
 from contextlib import suppress
 
@@ -56,7 +57,6 @@ def play_sound(sound: str):
     # logger.debug("play sound", soundfile)
     pygame.mixer.music.load(str(soundfile))
     pygame.mixer.music.play()
-
 
 def get_new_token():
     response = requests.post("https://www.donateall.online/public/api/v1/authenticate",
@@ -126,16 +126,46 @@ async def get_current_song(token):
     print(response.text)
 
 
+def set_music(enabled: bool):
+    r = requests.post('https://donateall.online/api/authenticate', json={'username': music_login, 'password':
+        music_password, 'rememberMe': True})
+    r.raise_for_status()
+    res = r.json()
+    token = res['id_token']
+
+    r = requests.get('https://donateall.online/api/account', headers={'Authorization': 'Bearer ' + token})
+    r.raise_for_status()
+    res = r.json()
+    if res.get('login', 'ERROR') == 'ERROR':
+        print("ERROR login failed {0}".format(res))
+
+    r = requests.get('https://donateall.online/api/user-chat-advance-settings',
+                     headers={'Authorization': 'Bearer ' + token})
+    r.raise_for_status()
+
+    res = r.json()[0]
+    id = res['id']
+
+    settings = json.loads(res['settings'])
+    settings['musicSettings']['isMusicEnabled'] = enabled
+
+    settings_s = json.dumps(settings)
+
+    r = requests.put('https://donateall.online/api/user-chat-advance-settings',
+                     headers={'Authorization': 'Bearer ' + token}, json={"id": id, "settings": settings_s})
+    r.raise_for_status()
+
 async def main():
     # setup_mixer()
-    token = login()
-    await get_current_song(token)
+    # token = login()
+    # await get_current_song(token)
     # p = Periodic(get_current_song(token), time=5)
     # await p.start()
     # await asyncio.sleep(600)
     # await p.stop()
     # play_sound('matmatmat.mp3')
     # await asyncio.sleep(600)
+    set_music(False)
 
 if __name__ == '__main__':
     asyncio.run(main())

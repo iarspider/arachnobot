@@ -6,9 +6,11 @@ from twitchio import Context
 from twitchio.ext import commands
 import logging
 
+from mycog import MyCog
+
 
 @commands.cog()
-class PluschCog:
+class PluschCog(MyCog):
     def __init__(self, bot):
         self.bot = bot
         self.logger = logging.getLogger("arachnobot.plu")
@@ -39,8 +41,12 @@ class PluschCog:
     @commands.command(name='plusch', aliases=['плющ', 'вштырь'])
     async def plusch(self, ctx: Context):
         command_ = ctx.message.content.split()[0]
-        who = ctx.message.content.split(None, 1)[1]
-        self.do_plusch(ctx, who, 'вштырь' in command_)
+        try:
+            who = ctx.message.content.split(None, 1)[1]
+            self.do_plusch(ctx, who, 'вштырь' in command_)
+        except IndexError:
+            self.do_plusch(ctx, "", 'вштырь' in command_)
+            pass
 
 
     @commands.command(name='eplusch', aliases=['экипоплющило', 'экивштырило'])
@@ -52,5 +58,6 @@ class PluschCog:
 
     @commands.command(name='splusch', aliases=['самоплющ', 'самовштырь'])
     async def splusch(self, ctx: Context):
+        command_ = ctx.message.content.split()[0]
         display_name = ctx.author.display_name
         self.do_plusch(ctx, display_name, 'вштырь' in command_, True)

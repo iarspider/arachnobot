@@ -31,3 +31,6 @@ twitch_ladies = (
     "elwinxx2", "miranight", "alexandra1987", "zmeyagorinovna", "dark_lady_alice", "nastyazaechik")
 
 twitch_no_bite = ("kaiden_moreil", "kochetov2000", "kaiden__moreil", "babytigeronthesunflower")
+
+trailer_root = ''
+database_file = ''

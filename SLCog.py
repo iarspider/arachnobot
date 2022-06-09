@@ -1,16 +1,19 @@
 import asyncio
 import datetime
-import random
+import logging
+import time
+from tempfile import NamedTemporaryFile
 
 import requests
 import socketio.asyncio_client
-from twitchio import Context
+from bs4 import BeautifulSoup
 from requests.structures import CaseInsensitiveDict
+from twitchio import Context
+from twitchio.ext import commands
 
 import streamlabs_api as api
-from twitchio.ext import commands
 from config import *
-import logging
+from mycog import MyCog
 
 
 class SLClient(socketio.asyncio_client.AsyncClient):
@@ -73,7 +76,7 @@ class SLClient(socketio.asyncio_client.AsyncClient):
 
 
 @commands.cog()
-class SLCog:
+class SLCog(MyCog):
     def __init__(self, bot):
         self.bot = bot
         self.logger = logging.getLogger("arachnobot.sl")
@@ -85,15 +88,89 @@ class SLCog:
         asyncio.ensure_future(self.sl_client.connect(f'https://sockets.streamlabs.com?token={token}'))
         self.last_post = CaseInsensitiveDict()
         self.post_timeout = 10 * 60
-        self.post_price = {'regular': 20, 'vip': 10, 'mod': 0}
+        self.post_price = {'regular': 50, 'vip': 25, 'mod': 25}
 
         # Forwarding function from bot
         self.is_vip = self.bot.is_vip
+
+        self.session = requests.Session()
+        try:
+            res = self.session.get('https://voxworker.com/ru')
+            res.raise_for_status()
+            soup = BeautifulSoup(res.text, 'html.parser')
+
+            textId = soup.select("input[name=textId]")
+            sessionId = soup.select("input[name=sessionId]")
+
+            self.logger.debug('Prepare session for VoxWorker')
+
+            self.voxdata = dict(textId=textId[0]['value'],
+                                sessionId=sessionId[0]['value'],
+                                voice='ya-omazh',
+                                speed='1.0',
+                                pitch='1.0',
+                                text='Вы можете менять ударение знаком плюс. Например: хлоп+ок в ладоши или белый '
+                                     'хл+опок.'
+                                )
+            self.logger.debug('Session ready')
+        except requests.HTTPError as e:
+            self.logger.exception(msg="Failed to initialize voxworker session", exc_info=e)
+            self.voxdata = None
+        except (IndexError, KeyError) as e:
+            self.logger.exception("Failed to parse voxworker page")
+            self.voxdata = None
 
     def __getattr__(self, item):
         if item != '__bases__':
             self.logger.warning(f"[OBS] Failed to get attribute {item}, redirecting to self.bot!")
         return self.bot.__getattribute__(item)
+
+    def say(self, text):
+        if not self.voxdata:
+            self.logger.warning('VoxWorker not setup')
+            return False
+        self.voxdata['text'] = text
+        res = self.session.post('https://voxworker.com/ru/ajax/convert', data=self.voxdata)
+        if not res.ok:
+            self.logger.error(f"Initial request to VoxWorker failed: {res.status_code}")
+        resj = res.json()
+        self.logger.debug('Sent request to VoxWorker')
+
+        if resj['status'] == 'notify':
+            self.logger.error(f"Got status 'notify': {resj['error']}, {resj['errorText']}")
+            return False
+
+        statusAttemptCount = 0
+        while statusAttemptCount < 60 and resj['status'] == 'queue':
+            self.logger.debug(f'VoxWorker: request queued, count: {statusAttemptCount}')
+            res = self.session.get(f'https://voxworker.com/ru/ajax/status?id={resj["taskId"]}')
+            if not res.ok:
+                self.logger.error(f"Status request to VoxWorker failed: {res.status_code}")
+                return False
+            resj = res.json()
+            statusAttemptCount += 1
+            time.sleep(1)
+
+        if statusAttemptCount == 60:
+            self.logger.error('VoxWorker: Conversion error')
+            return False
+
+        if resj['status'] != 'ok':
+            self.logger.error(f"VoxWorker bad status '{resj['status']}': {resj['error']}, {resj['errorText']}")
+            return False
+        else:
+            self.logger.debug('Downloading file from VoxWorker')
+            self.voxdata['textId'] = resj.get('textId', '')
+            res = self.session.get(resj['downloadUrl'])
+            if not res.ok:
+                self.logger.error(f"Failed to download URL: {res.status_code}")
+            with NamedTemporaryFile(delete=False) as tempfile:
+                fname = tempfile.name
+                tempfile.write(res.content)
+
+            self.bot.play_sound("ding-sound-effect_1.mp3")
+            self.bot.play_sound(fname, True)
+            return True
 
     @commands.command(name='bugs', aliases=['баги'])
     async def bugs(self, ctx: Context):
@@ -115,6 +192,11 @@ class SLCog:
 
     @commands.command(name='post', aliases=['почта'])
     async def post(self, ctx: Context):
+        try:
+            post_message = ctx.message.content.split(None, 1)[1]
+        except IndexError:
+            return
+
         lastpost = self.last_post.get(ctx.author.name, None)
         now = datetime.datetime.now()
         if lastpost is not None:
@@ -139,11 +221,12 @@ class SLCog:
             res = api.sub_points(self.streamlabs_oauth, ctx.author.name, price)
             self.last_post[ctx.author.name] = now
             self.logger.debug(res)
-            self.bot.play_sound("pochta.mp3")
+            if not self.say(post_message):
+                self.bot.play_sound("pochta.mp3")
 
     @commands.command(name='sos', aliases=['alarm'])
     async def sos(self, ctx: Context):
-        if not (ctx.author.is_mod or ctx.author.name.lower() == 'iarspider'):
+        if not (ctx.author.is_mod or ctx.author.name.lower() == 'iarspider' or ctx.author.name in rippers):
             asyncio.ensure_future(ctx.send("Эта кнопочка - не для тебя. Руки убрал, ЖИВО!"))
             return
 

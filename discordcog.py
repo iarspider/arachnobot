@@ -1,26 +1,22 @@
 import datetime
+import json
 import logging
 
 import pika
-import simplejson
 from pytils import numeral
 from twitchio import Context
 from twitchio.ext import commands
 
 from config import *
+from mycog import MyCog
 
 
 @commands.core.cog()
-class DiscordCog:
+class DiscordCog(MyCog):
     def __init__(self, bot):
         self.bot = bot
         self.check_sender = self.bot.check_sender
         self.logger = logging.getLogger("arachnobot.dis")
-
-    def __getattr__(self, item):
-        if item != '__bases__':
-            self.logger.warning(f"[Discord] Failed to get attribute {item}, redirecting to self.bot!")
-        return self.bot.__getattribute__(item)
 
     @commands.command(name='announce')
     async def cmd_announce(self, ctx: Context):
@@ -48,7 +44,7 @@ class DiscordCog:
         channel.queue_declare(queue='discord')
         channel.basic_publish(exchange='',
                               routing_key='discord',
-                              body=simplejson.dumps({'action': 'send', 'message': announcement,
-                                                     'channel': discord_channel}))
+                              body=json.dumps({'action': 'send', 'message': announcement,
+                                               'channel': discord_channel}).encode('utf-8'))
         channel.close()
         connection.close()

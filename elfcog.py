@@ -4,9 +4,11 @@ import logging
 from twitchio import Context
 from twitchio.ext import commands
 
+from mycog import MyCog
+
 
 @commands.cog()
-class ElvenCog:
+class ElvenCog(MyCog):
     def __init__(self, bot):
         self.bot = bot
         self.logger = logging.getLogger("arachnobot.elf")

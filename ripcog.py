@@ -3,16 +3,18 @@ import codecs
 from typing import Optional
 import logging
 
-import sqlite3
 from config import *
 
 import requests
 from twitchio import Context
 from twitchio.ext import commands
 
+from bot import GameConfig
+from mycog import MyCog
+
 
 @commands.core.cog()
-class RIPCog:
+class RIPCog(MyCog):
     def __init__(self, bot):
         self.bot = bot
         self.logger = logging.getLogger("arachnobot.rip")
@@ -23,68 +25,16 @@ class RIPCog:
 
         self.deaths = {'today': 0, 'total': 0}
 
-        self.rippers = ['iarspider', 'twistr_game', 'luciustenebrysflamos', 'phoenix__tv', 'wmuga', 'johnrico85',
-                        'ved_s', 'owlsforever', 'antaryo']
-
-        self.game = None
-
         self.obscog = None
 
-        try:
-            with open('rip.txt') as f:
-                self.deaths['total'] = int(f.read().strip())
-        except (FileNotFoundError, TypeError, ValueError):
-            pass
-
-    def init(self):
-        self.get_game_v5()
+    def setup(self):
         self.obscog = self.bot.get_cog('OBSCog')
-        self.load_rip()
 
-    def get_game_v5(self):
-        r = requests.get(f'https://api.twitch.tv/helix/channels?broadcaster_id={self.bot.user_id}',
-                         headers={'Authorization': f'Bearer {twitch_chat_password}',
-                                  'Client-ID': twitch_client_id_alt})
-
-        try:
-            r.raise_for_status()
-        except requests.RequestException as e:
-            self.logger.error("Request to Helix API failed!" + str(e))
-            return None
-
-        if 'error' in r.json():
-            self.logger.error("Request to Helix API failed!" + r.json()['message'])
-            return None
-
-        self.game = r.json()['data'][0]['game_name']
-        print(f"self.game is {self.game}")
-
-    def load_rip(self):
-        print(f"self.game is {self.game}")
-        if self.game is None:
-            self.deaths = {'today': 0, 'total': 0}
-            enabled = False
-        else:
-            db = sqlite3.connect('bot.db')
-            cur = db.cursor()
-            cur.execute('SELECT total,enabled FROM rip WHERE game=?;', (self.game,))
-            res = cur.fetchone()
-            if res is None:
-                print("Game not known, fixing")
-                cur.execute('INSERT INTO rip VALUES (?, 0, 1);', (self.game,))
-                self.deaths['total'] = 0
-                self.deaths['today'] = 0
-                enabled = True
-            else:
-                print(f"Total deaths: {res[0]}")
-                self.deaths['total'] = res[0]
-                enabled = bool(res[1])
-
-            cur.close()
-            db.close()
+    def update(self):
+        self.deaths = {'today': 0, 'total': self.bot.game.rip_total}
+        enabled = self.bot.game.rip_enabled
         asyncio.ensure_future(self.obscog.enable_rip(enabled))
-        if enabled:
-            self.display_rip()
+        self.display_rip()
 
     def display_rip(self):
         with codecs.open('rip_display.txt', 'w', 'utf8') as f:
@@ -92,13 +42,11 @@ class RIPCog:
 
     def write_rip(self):
         self.display_rip()
-        db = sqlite3.connect('bot.db')
-        with db:
-            db.execute("INSERT OR REPLACE INTO rip (game, total) VALUES (?, ?);", (self.game, self.deaths['total']))
-        db.close()
+        self.game.rip_total = self.deaths['total']
+        self.game.save()
 
     async def do_rip(self, ctx: Context, reason: Optional[str] = None, n=1):
-        if not (ctx.author.is_mod or self.is_vip(ctx.author) or ctx.author.name.lower() in self.rippers):
+        if not (ctx.author.is_mod or self.is_vip(ctx.author) or ctx.author.name.lower() in rippers):
             asyncio.ensure_future(ctx.send("Эту кнопку не трожь!"))
             return
 
@@ -120,7 +68,7 @@ class RIPCog:
         """
         args = ctx.message.content.split()[1:]
         if args and (args[0] == 'who' or args[0] == '?'):
-            ans = 'Счетоводы: ' + ', '.join(self.rippers)
+            ans = 'Счетоводы: ' + ', '.join(rippers)
 
         if args and args[0].startswith('+'):
             try:
@@ -158,7 +106,7 @@ class RIPCog:
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
             asyncio.ensure_future(ctx.send("Неправильный запрос"))
-        self.rippers.append(args[0].lower())
+        rippers.append(args[0].lower())
 
         asyncio.ensure_future(ctx.send("{0} TwitchVotes ".format(args[0])))
 
@@ -168,11 +116,10 @@ class RIPCog:
         Перезагружает счётчик смертей (в случае смены игры)
         """
         if not self.check_sender(ctx, 'iarspider'):
-            print("check_sender failed")
+            self.logger.info("check_sender failed")
             return
 
         self.get_game_v5()
-        self.load_rip()
         await ctx.send('Счётчик смертей обновлён')
 
     @commands.command(name='setrip')
@@ -180,6 +127,10 @@ class RIPCog:
         """
         Устанавливает значение счётчика смертей за сегодня
         """
+        if not self.check_sender(ctx, 'iarspider'):
+            self.logger.info("check_sender failed")
+            return
+
         try:
             arg = int(ctx.message.content.split()[1])
         except (IndexError, ValueError):
@@ -187,6 +138,8 @@ class RIPCog:
             return
         else:
             self.deaths['today'] = arg
+            if self.deaths['total'] == 0:
+                self.deaths['total'] = arg
             self.display_rip()
 
     @commands.command(name='yesrip')
@@ -194,10 +147,13 @@ class RIPCog:
         """
         Включает отображение смертей
         """
-        db = sqlite3.connect('bot.db')
-        with db:
-            db.execute("INSERT OR REPLACE INTO rip (game, enabled) VALUES (?, 1);", (self.game,))
-        db.close()
+        if not self.check_sender(ctx, 'iarspider'):
+            self.logger.info("check_sender failed")
+            return
+
+        self.bot.game.rip_enabled = True
+        self.bot.game.save()
+
         await self.obscog.enable_rip(True)
         await ctx.send('Счётчик смертей активирован')
 
@@ -206,10 +162,13 @@ class RIPCog:
         """
         Включает отображение смертей
         """
-        db = sqlite3.connect('bot.db')
-        with db:
-            db.execute("INSERT OR REPLACE INTO rip (game, enabled) VALUES (?, 0);", (self.game,))
-        db.close()
+        if not self.check_sender(ctx, 'iarspider'):
+            self.logger.info("check_sender failed")
+            return
+
+        self.bot.game.rip_enabled = False
+        self.bot.game.save()
+
         await self.obscog.enable_rip(False)
         await ctx.send('Счётчик смертей отключён')
 
