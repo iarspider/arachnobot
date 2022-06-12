@@ -204,7 +204,7 @@ class Bot(commands.Bot):
 
     # noinspection PyMethodMayBeStatic
     def is_vip(self, user: User):
-        return user.badges.get('vip', 0) == 1
+        return int(user.badges.get('vip', 0)) == 1
 
     def add_user(self, user: User):
         new_user = False
@@ -765,6 +765,14 @@ class Bot(commands.Bot):
         with open('pearls.txt', 'w', encoding='utf-8') as f:
             for pearl in self.pearls:
                 print(pearl, file=f)
+
+    @commands.command(name='amivip')
+    async def amivip(self, ctx: Context):
+        self.logger.info("Badges: " + str(ctx.author.badges))
+        if self.is_vip(ctx.author):
+            await ctx.send("Да! 💎")
+        else:
+            await ctx.send("Нет! 🗿")
 
     @commands.command(name='perl',
                       aliases=['перл', 'пёрл', 'pearl', 'зуфкд', 'quote', 'цитата', 'цытата', 'wbnfnf', 'wsnfnf'])

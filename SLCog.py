@@ -87,7 +87,7 @@ class SLCog(MyCog):
         token = api.get_socket_token(self.streamlabs_oauth)
         asyncio.ensure_future(self.sl_client.connect(f'https://sockets.streamlabs.com?token={token}'))
         self.last_post = CaseInsensitiveDict()
-        self.post_timeout = 10 * 60
+        self.post_timeout = 1 * 60
         self.post_price = {'regular': 50, 'vip': 25, 'mod': 25}
 
         # Forwarding function from bot
