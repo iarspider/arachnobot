@@ -17,7 +17,7 @@ class ElvenCog(MyCog):
         s2 = "?йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЯЧСМИТЬБЮ,ёЁ" + 'Э'
         self.trans = str.maketrans(s1, s2)
 
-    @commands.command(name='translit', aliases=('translate', 'tr'))
+    @commands.command(name='translit', aliases=('translate', 'tr', 'trans', 'перевод', 'переведи', 'эльф'))
     async def translit(self, ctx: Context):
         params = ctx.message.content.split()[1:]
         # print("translit(): ", params)

@@ -831,7 +831,7 @@ if __name__ == '__main__':
         twitch_bot.load_module('obscog')
 
     for extension in ('discordcog', 'pluschcog', 'ripcog', 'SLCog',
-                      'elfcog', 'duelcog', 'musiccog'):  # 'raidcog', 'vmodcog'
+                      'elfcog', 'duelcog'):  # 'raidcog', 'vmodcog', 'musiccog'
         # noinspection PyUnboundLocalVariable
         logger.info(f"Loading module {extension}")
         twitch_bot.load_module(extension)

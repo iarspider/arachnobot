@@ -78,6 +78,7 @@ class RIPCog(MyCog):
         else:
             n_rip = 1
 
+        n_rip = min(1, n_rip)
         await self.do_rip(ctx, n=n_rip)
 
     @commands.command(name='unrip')

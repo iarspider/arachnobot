@@ -48,6 +48,10 @@ class PluschCog(MyCog):
             self.do_plusch(ctx, "", 'вштырь' in command_)
             pass
 
+    @commands.command(name='plushch', aliases=['плющь', 'вштыр'])
+    async def plushch(self, ctx: Context):
+        await ctx.send(f"/me стукнул {ctx.author.display_name} по голове учебником Розенталя")
+        
 
     @commands.command(name='eplusch', aliases=['экипоплющило', 'экивштырило'])
     async def eplusch(self, ctx: Context):
