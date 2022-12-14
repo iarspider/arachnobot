@@ -40,21 +40,17 @@ class RIPCog(MyCog):
         self.game.rip_total = self.deaths["total"]
         self.game.save()
 
-    async def do_rip(self, ctx: commands.Context, reason: Optional[str] = None, n=1):
-        if not (
-            ctx.author.is_mod or ctx.author.is_vip or ctx.author.name.lower() in rippers
-        ):
-            asyncio.ensure_future(ctx.send("Эту кнопку не трожь!"))
-            return
-
+    async def do_rip(self, n=1):
         self.deaths["today"] += n
         self.deaths["total"] += n
 
         self.write_rip()
-        if reason:
-            await ctx.send(reason)
 
-        asyncio.ensure_future(ctx.send("riPepperonis {today}".format(**self.deaths)))
+        return (
+            "riPepperonis {today}".format(**self.deaths)
+            if n > 0
+            else "MercyWing1 PinkMercy MercyWing2"
+        )
 
     @commands.command(name="rip", aliases=("смерть", "кшз"))
     async def rip(self, ctx: commands.Context):
@@ -66,6 +62,14 @@ class RIPCog(MyCog):
         args = ctx.message.content.split()[1:]
         if args and (args[0] == "who" or args[0] == "?"):
             ans = "Счетоводы: " + ", ".join(rippers)
+            asyncio.ensure_future(ctx.send(ans))
+            return
+
+        if not (
+            ctx.author.is_mod or ctx.author.is_vip or ctx.author.name.lower() in rippers
+        ):
+            asyncio.ensure_future(ctx.send("Эту кнопку не трожь!"))
+            return
 
         if args and args[0].startswith("+"):
             try:
@@ -76,7 +80,8 @@ class RIPCog(MyCog):
             n_rip = 1
 
         n_rip = max(1, n_rip)
-        await self.do_rip(ctx, n=n_rip)
+        ans = await self.do_rip(n=n_rip)
+        asyncio.ensure_future(ctx.send(ans))
 
     @commands.command(name="unrip")
     async def unrip(self, ctx: commands.Context):
@@ -86,12 +91,9 @@ class RIPCog(MyCog):
         if not self.check_sender(ctx, "iarspider"):
             return
 
-        self.deaths["today"] -= 1
-        self.deaths["total"] -= 1
+        msg = await self.do_rip(n=-1)
 
-        self.write_rip()
-
-        asyncio.ensure_future(ctx.send("MercyWing1 PinkMercy MercyWing2"))
+        asyncio.ensure_future(ctx.send(msg))
 
     @commands.command(name="enrip")
     async def enrip(self, ctx: commands.Context):

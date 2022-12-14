@@ -187,6 +187,10 @@ class Bot(commands.Bot):
 
         self.load_pearls()
 
+    async def send_message(self, message):
+        channel: Channel = self.get_channel(self.initial_channels[0].lstrip("#"))
+        asyncio.ensure_future(channel.send(message))
+
     async def player_done(self):
         pass
 
@@ -406,9 +410,10 @@ class Bot(commands.Bot):
                 channel: Channel = self.get_channel(
                     self.initial_channels[0].lstrip("#")
                 )
-                asyncio.ensure_future(
-                    channel.send(f"{requestor} обнял стримера! Спасибо, {requestor}!")
+                await self.send_message(
+                    f"{requestor} обнял стримера! Спасибо, {requestor}!"
                 )
+
             case "Ничего":
                 self.logger.debug(f"Queued redepmtion: nothing, {requestor}")
                 self.play_sound("nothing0.mp3")
@@ -895,7 +900,7 @@ app: Optional[socketio.WSGIApp] = None
 
 
 async def main():
-    global client
+    global client, twitch_bot
     setup_logging("bot.log", color=True, debug=False, http_debug=False)
 
     random.seed()
@@ -903,7 +908,6 @@ async def main():
     # logger.setLevel(logging.DEBUG)
     logging.getLogger("asyncio").setLevel(logging.DEBUG)
     # Run bot
-    # noinspection PyTypeChecker
     twitch_bot = Bot()
 
     if globals().get("obsws_address", None) is not None:
@@ -963,8 +967,37 @@ async def main():
             twitch_bot.dashboard = None
 
     @sio_server.on("rip")
-    async def on_ws_message(sid, data):
-        logger.info(f"Received message: {data}")
+    async def on_ws_rip(sid):
+        logger.info(f"Received message: rip")
+        ripcog: "RIPCog" = twitch_bot.get_cog("RIPCog")
+        msg = await ripcog.do_rip(n=1)
+        await twitch_bot.send_message(msg)
+
+    @sio_server.on("unrip")
+    async def on_ws_unrip(sid):
+        logger.info(f"Received message: unrip")
+        ripcog: "RIPCog" = twitch_bot.get_cog("RIPCog")
+        msg = await ripcog.do_rip(n=-1)
+        await twitch_bot.send_message(msg)
+
+    @sio_server.on("break")
+    async def on_ws_break(sid):
+        logger.info(f"Received message: break")
+        cog: "OBSCog" = twitch_bot.get_cog("OBSCog")
+        cog.do_pause(None, False)
+        await twitch_bot.send_message("Начать перепись населения!")
+
+    @sio_server.on("resume")
+    async def on_ws_resume(sid):
+        logger.info(f"Received message: resume")
+        cog: "OBSCog" = twitch_bot.get_cog("OBSCog")
+        msg = await cog.do_resume(None)
+        await twitch_bot.send_message(msg)
+
+    @sio_server.on("*")
+    def catch_all(event, sid, data):
+        logger.warning(f"Unhandled event {event} (data {data})")
+        pass
 
     async with asyncio.TaskGroup() as tg:
         task1 = tg.create_task(twitch_bot.start())

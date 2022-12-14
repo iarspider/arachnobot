@@ -140,7 +140,8 @@ class OBSCog(MyCog):
         stats = res.getStats()
         asyncio.ensure_future(
             ctx.send(
-                f"FPS: {round(stats['fps'], 2)}, Skipped {stats['output-skipped-frames']} "
+                f"FPS: {round(stats['fps'], 2)}, Skipped "
+                f"{stats['output-skipped-frames']} "
                 f"/ "
                 f"{stats['output-total-frames']}, CPU {round(stats['cpu-usage'], 2)}"
             )
@@ -401,7 +402,7 @@ class OBSCog(MyCog):
 
         self.ws.call(obsws_requests.DisableStudioMode())
 
-    def do_pause(self, ctx: commands.Context, is_dinner: bool):
+    def do_pause(self, ctx: typing.Optional[commands.Context], is_dinner: bool):
         # self.get_player()
         # self.player_play_pause()
 
@@ -420,7 +421,9 @@ class OBSCog(MyCog):
 
             self.ws.call(obsws_requests.SetMute("Радио", False))
         # self.get_chatters()
-        asyncio.ensure_future(ctx.send("Начать перепись населения!"))
+        if ctx:
+            asyncio.ensure_future(ctx.send("Начать перепись населения!"))
+
         asyncio.ensure_future(self.bot.my_run_commercial(self.bot.streamer_id, 60))
 
     @commands.command(name="start")
@@ -449,22 +452,7 @@ class OBSCog(MyCog):
 
         self.ws.call(obsws_requests.StartRecording())
 
-    @commands.command(name="resume")
-    async def resume(self, ctx: commands.Context):
-        """
-        Отменяет перерыв
-
-        %%resume
-        """
-        if not self.bot.check_sender(ctx, "iarspider"):
-            asyncio.ensure_future(ctx.send("/timeout " + ctx.author.name + " 1"))
-            return
-
-        # self.logger.info("get_player()")
-        # self.get_player()
-        # self.logger.info("player_play_pause()")
-        # self.player_play_pause()
-
+    async def do_resume(self, ctx: typing.Optional[commands.Context]):
         if self.ws is not None:
             old_screne = self.ws.call(obsws_requests.GetCurrentScene())
 
@@ -492,16 +480,40 @@ class OBSCog(MyCog):
                 res["viewer_count"], ("зритель", "зрителя", "зрителей")
             )
             self.logger.debug("prepared message")
+            msg = (
+                f"Перепись населения завершена успешно! Население стрима "
+                f"составляет {viewers}"
+            )
+
+            if ctx:
+                asyncio.ensure_future(ctx.send(msg))
+
+            self.logger.debug("sent message")
+            return msg
+        except (KeyError, TypeError) as exc:
+            msg = "Перепись населения не удалась :("
+            if ctx:
+                asyncio.ensure_future(ctx.send(msg))
+            self.logger.error(str(exc))
+            return msg
+
+    @commands.command(name="resume")
+    async def resume(self, ctx: commands.Context):
+        """
+        Отменяет перерыв
+
+        %%resume
+        """
+        if not self.bot.check_sender(ctx, "iarspider"):
             asyncio.ensure_future(
                 ctx.send(
-                    "Перепись населения завершена успешно! "
-                    f"Население стрима составляет {viewers}"
+                    "@" + ctx.author.name + ", у тебя нет прав на выполнение этой "
+                    "команды!"
                 )
             )
-            self.logger.debug("sent message")
-        except (KeyError, TypeError) as exc:
-            asyncio.ensure_future(ctx.send("Перепись населения не удалась :("))
-            self.logger.error(str(exc))
+            return
+
+        await self.do_resume(ctx)
 
     @commands.command(name="pause", aliases=("break",))
     async def pause(self, ctx: commands.Context):
