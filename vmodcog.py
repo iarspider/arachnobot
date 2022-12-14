@@ -1,21 +1,23 @@
 import asyncio
 
-from twitchio import Context
 from twitchio.ext import commands
 
 import warnings
 
+from musiccog import MusicCog
+from mycog import MyCog
+
 warnings.simplefilter("ignore", UserWarning)
 try:
     import pywinauto
+
     warnings.resetwarnings()
 except ImportError as e:
-    print('Failed to import pywinauto: {0}'.format(e))
+    print("Failed to import pywinauto: {0}".format(e))
     pywinauto = None
 
 
-@commands.cog()
-class VMcog:
+class VMcog(MyCog):
     def __init__(self, bot):
         self.bot = bot
         self.logger = bot.logger
@@ -31,23 +33,23 @@ class VMcog:
         # self.get_discord()
         if self.vmod is not None:
             self.vmod_active = False
-            self.vmod.type_keys('%{VK_DIVIDE}', set_foreground=False)  # no voice
+            self.vmod.type_keys("%{VK_DIVIDE}", set_foreground=False)  # no voice
 
             # if self.get_discord() is not None:
-            self.vmod.type_keys('%{VK_NUMPAD0}', set_foreground=False)  # unmute
+            self.vmod.type_keys("%{VK_NUMPAD0}", set_foreground=False)  # unmute
 
     async def activate_voicemod(self):
         while self.vmod_active:
             await asyncio.sleep(5)
 
-        self.bot.play_sound('vmod.mp3')
+        self.bot.play_sound("vmod.mp3")
 
         self.get_voicemod()
 
         if self.vmod is not None:
-            self.vmod.type_keys('%{VK_NUMPAD0}', set_foreground=False)  # mute
+            self.vmod.type_keys("%{VK_NUMPAD0}", set_foreground=False)  # mute
             self.vmod_active = True
-            self.vmod.type_keys('%{VK_MULTIPLY}', set_foreground=False)  # random voice
+            self.vmod.type_keys("%{VK_MULTIPLY}", set_foreground=False)  # random voice
 
         asyncio.ensure_future(self.deactivate_voicemod())
 
@@ -55,13 +57,22 @@ class VMcog:
         if not pywinauto:
             return
         try:
-            self.vmod = pywinauto.Application().connect(title="Voicemod Desktop").top_window().wrapper_object()
+            self.vmod = (
+                pywinauto.Application()
+                .connect(title="Voicemod Desktop")
+                .top_window()
+                .wrapper_object()
+            )
         except (pywinauto.findwindows.ElementNotFoundError, RuntimeError):
-            self.logger.warning('Could not find VoiceMod Desktop window')
+            self.logger.warning("Could not find VoiceMod Desktop window")
 
-    @commands.command(name='vmod')
-    async def vmod(self, ctx: Context):
-        if ctx.author.name.lower() != 'iarspider':
+    @commands.command(name="vmod")
+    async def vmod(self, ctx: commands.Context):
+        if ctx.author.name.lower() != "iarspider":
             return
 
         await self.activate_voicemod()
+
+
+def prepare(bot: commands.Bot):
+    bot.add_cog(VMcog(bot))

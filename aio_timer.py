@@ -15,6 +15,7 @@ class Timer:
     def cancel(self):
         self._task.cancel()
 
+
 class Periodic:
     def __init__(self, name, timeout, callback, loop):
         self.func = callback
@@ -51,4 +52,3 @@ class Periodic:
             # await self.func
             self.func()
             # print(f">> sleep {self.name} <<")
-

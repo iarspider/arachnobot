@@ -2,14 +2,13 @@ import asyncio
 import codecs
 
 from pytils import numeral
-from twitchio import Context
+
 from twitchio.ext import commands
 import logging
 
 from mycog import MyCog
 
 
-@commands.cog()
 class PluschCog(MyCog):
     def __init__(self, bot):
         self.bot = bot
@@ -23,45 +22,59 @@ class PluschCog(MyCog):
             if self.plusches == 0:
                 f.write("Пока что никого не плющило")
             else:
-                f.write("Кого-то поплющило {0}...".format(numeral.get_plural(self.plusches, ('раз', 'раза', 'раз'))))
+                f.write(
+                    "Кого-то поплющило {0}...".format(
+                        numeral.get_plural(self.plusches, ("раз", "раза", "раз"))
+                    )
+                )
 
-    def do_plusch(self, ctx: Context, who="", shtyr=False, slf=False):
+    def do_plusch(self, ctx: commands.Context, who="", shtyr=False, slf=False):
         if not who.strip():
-            who = 'кого-то'
+            who = "кого-то"
 
         if not shtyr:
-            asyncio.ensure_future(ctx.send("Эк {0} {1}поплющило...".format(who, 'само' if slf else '')))
+            asyncio.ensure_future(
+                ctx.send("Эк {0} {1}поплющило...".format(who, "само" if slf else ""))
+            )
         else:
-            asyncio.ensure_future(ctx.send("Эк {0} вштырно {1}поплющило...".format(who, 'само' if slf else '')))
-        
+            asyncio.ensure_future(
+                ctx.send(
+                    "Эк {0} вштырно {1}поплющило...".format(who, "само" if slf else "")
+                )
+            )
+
         self.plusches += 1
         self.write_plusch()
-        
 
-    @commands.command(name='plusch', aliases=['плющ', 'вштырь'])
-    async def plusch(self, ctx: Context):
+    @commands.command(name="plusch", aliases=["плющ", "вштырь"])
+    async def plusch(self, ctx: commands.Context):
         command_ = ctx.message.content.split()[0]
         try:
             who = ctx.message.content.split(None, 1)[1]
-            self.do_plusch(ctx, who, 'вштырь' in command_)
+            self.do_plusch(ctx, who, "вштырь" in command_)
         except IndexError:
-            self.do_plusch(ctx, "", 'вштырь' in command_)
+            self.do_plusch(ctx, "", "вштырь" in command_)
             pass
 
-    @commands.command(name='plushch', aliases=['плющь', 'вштыр'])
-    async def plushch(self, ctx: Context):
-        await ctx.send(f"/me стукнул {ctx.author.display_name} по голове учебником Розенталя")
-        
+    @commands.command(name="plushch", aliases=["плющь", "вштыр"])
+    async def plushch(self, ctx: commands.Context):
+        await ctx.send(
+            f"/me стукнул {ctx.author.display_name} по голове учебником Розенталя"
+        )
 
-    @commands.command(name='eplusch', aliases=['экипоплющило', 'экивштырило'])
-    async def eplusch(self, ctx: Context):
+    @commands.command(name="eplusch", aliases=["экипоплющило", "экивштырило"])
+    async def eplusch(self, ctx: commands.Context):
         command_ = ctx.message.content.split()[0]
-        self.do_plusch(ctx, "", 'экивштырило' in command_)
+        self.do_plusch(ctx, "", "экивштырило" in command_)
         self.plusches += 1
         self.write_plusch()
 
-    @commands.command(name='splusch', aliases=['самоплющ', 'самовштырь'])
-    async def splusch(self, ctx: Context):
+    @commands.command(name="splusch", aliases=["самоплющ", "самовштырь"])
+    async def splusch(self, ctx: commands.Context):
         command_ = ctx.message.content.split()[0]
         display_name = ctx.author.display_name
-        self.do_plusch(ctx, display_name, 'вштырь' in command_, True)
+        self.do_plusch(ctx, display_name, "вштырь" in command_, True)
+
+
+def prepare(bot: commands.Bot):
+    bot.add_cog(PluschCog(bot))

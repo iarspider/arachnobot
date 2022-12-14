@@ -5,53 +5,50 @@ import logging
 
 from config import *
 
-import requests
-from twitchio import Context
 from twitchio.ext import commands
 
-from bot import GameConfig
 from mycog import MyCog
 
 
-@commands.core.cog()
 class RIPCog(MyCog):
     def __init__(self, bot):
         self.bot = bot
         self.logger = logging.getLogger("arachnobot.rip")
 
         # Forwarding functions from bot
-        self.is_vip = self.bot.is_vip
         self.check_sender = self.bot.check_sender
 
-        self.deaths = {'today': 0, 'total': 0}
+        self.deaths = {"today": 0, "total": 0}
 
         self.obscog = None
 
     def setup(self):
-        self.obscog = self.bot.get_cog('OBSCog')
+        self.obscog = self.bot.get_cog("OBSCog")
 
     def update(self):
-        self.deaths = {'today': 0, 'total': self.bot.game.rip_total}
+        self.deaths = {"today": 0, "total": self.bot.game.rip_total}
         enabled = self.bot.game.rip_enabled
         asyncio.ensure_future(self.obscog.enable_rip(enabled))
         self.display_rip()
 
     def display_rip(self):
-        with codecs.open('rip_display.txt', 'w', 'utf8') as f:
-            f.write(u'☠: {today} (всего: {total})'.format(**self.deaths))
+        with codecs.open("rip_display.txt", "w", "utf8") as f:
+            f.write("☠: {today} (всего: {total})".format(**self.deaths))
 
     def write_rip(self):
         self.display_rip()
-        self.game.rip_total = self.deaths['total']
+        self.game.rip_total = self.deaths["total"]
         self.game.save()
 
-    async def do_rip(self, ctx: Context, reason: Optional[str] = None, n=1):
-        if not (ctx.author.is_mod or self.is_vip(ctx.author) or ctx.author.name.lower() in rippers):
+    async def do_rip(self, ctx: commands.Context, reason: Optional[str] = None, n=1):
+        if not (
+            ctx.author.is_mod or ctx.author.is_vip or ctx.author.name.lower() in rippers
+        ):
             asyncio.ensure_future(ctx.send("Эту кнопку не трожь!"))
             return
 
-        self.deaths['today'] += n
-        self.deaths['total'] += n
+        self.deaths["today"] += n
+        self.deaths["total"] += n
 
         self.write_rip()
         if reason:
@@ -59,49 +56,49 @@ class RIPCog(MyCog):
 
         asyncio.ensure_future(ctx.send("riPepperonis {today}".format(**self.deaths)))
 
-    @commands.command(name='rip', aliases=("смерть", "кшз"))
-    async def rip(self, ctx: Context):
+    @commands.command(name="rip", aliases=("смерть", "кшз"))
+    async def rip(self, ctx: commands.Context):
         """
-            Счётчик смертей
+        Счётчик смертей
 
-            %% rip
+        %% rip
         """
         args = ctx.message.content.split()[1:]
-        if args and (args[0] == 'who' or args[0] == '?'):
-            ans = 'Счетоводы: ' + ', '.join(rippers)
+        if args and (args[0] == "who" or args[0] == "?"):
+            ans = "Счетоводы: " + ", ".join(rippers)
 
-        if args and args[0].startswith('+'):
+        if args and args[0].startswith("+"):
             try:
                 n_rip = int(args[0])
-            except ValueError:
+            except ValueError as e:
                 n_rip = 1
         else:
             n_rip = 1
 
-        n_rip = min(1, n_rip)
+        n_rip = max(1, n_rip)
         await self.do_rip(ctx, n=n_rip)
 
-    @commands.command(name='unrip')
-    async def unrip(self, ctx: Context):
+    @commands.command(name="unrip")
+    async def unrip(self, ctx: commands.Context):
         """
         Отмена смерти
         """
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.check_sender(ctx, "iarspider"):
             return
 
-        self.deaths['today'] -= 1
-        self.deaths['total'] -= 1
+        self.deaths["today"] -= 1
+        self.deaths["total"] -= 1
 
         self.write_rip()
 
         asyncio.ensure_future(ctx.send("MercyWing1 PinkMercy MercyWing2"))
 
-    @commands.command(name='enrip')
-    async def enrip(self, ctx: Context):
+    @commands.command(name="enrip")
+    async def enrip(self, ctx: commands.Context):
         """
         Временно (до перезапуска бота) добавляет пользователя в rip-список
         """
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.check_sender(ctx, "iarspider"):
             return
 
         args = ctx.message.content.split()[1:]
@@ -111,24 +108,24 @@ class RIPCog(MyCog):
 
         asyncio.ensure_future(ctx.send("{0} TwitchVotes ".format(args[0])))
 
-    @commands.command(name='lrip')
-    async def lrip(self, ctx: Context):
+    @commands.command(name="lrip")
+    async def lrip(self, ctx: commands.Context):
         """
         Перезагружает счётчик смертей (в случае смены игры)
         """
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.check_sender(ctx, "iarspider"):
             self.logger.info("check_sender failed")
             return
 
         self.get_game_v5()
-        await ctx.send('Счётчик смертей обновлён')
+        await ctx.send("Счётчик смертей обновлён")
 
-    @commands.command(name='setrip')
-    async def setrip(self, ctx: Context):
+    @commands.command(name="setrip")
+    async def setrip(self, ctx: commands.Context):
         """
         Устанавливает значение счётчика смертей за сегодня
         """
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.check_sender(ctx, "iarspider"):
             self.logger.info("check_sender failed")
             return
 
@@ -138,17 +135,17 @@ class RIPCog(MyCog):
             await ctx.send("Usage: !setrip <N>")
             return
         else:
-            self.deaths['today'] = arg
-            if self.deaths['total'] == 0:
-                self.deaths['total'] = arg
+            self.deaths["today"] = arg
+            if self.deaths["total"] == 0:
+                self.deaths["total"] = arg
             self.display_rip()
 
-    @commands.command(name='yesrip')
-    async def yesrip(self, ctx: Context):
+    @commands.command(name="yesrip")
+    async def yesrip(self, ctx: commands.Context):
         """
         Включает отображение смертей
         """
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.check_sender(ctx, "iarspider"):
             self.logger.info("check_sender failed")
             return
 
@@ -156,14 +153,14 @@ class RIPCog(MyCog):
         self.bot.game.save()
 
         await self.obscog.enable_rip(True)
-        await ctx.send('Счётчик смертей активирован')
+        await ctx.send("Счётчик смертей активирован")
 
-    @commands.command(name='norip')
-    async def norip(self, ctx: Context):
+    @commands.command(name="norip")
+    async def norip(self, ctx: commands.Context):
         """
         Включает отображение смертей
         """
-        if not self.check_sender(ctx, 'iarspider'):
+        if not self.check_sender(ctx, "iarspider"):
             self.logger.info("check_sender failed")
             return
 
@@ -171,10 +168,10 @@ class RIPCog(MyCog):
         self.bot.game.save()
 
         await self.obscog.enable_rip(False)
-        await ctx.send('Счётчик смертей отключён')
+        await ctx.send("Счётчик смертей отключён")
 
     # @commands.command(name='ripz')
-    # async def ripz(self, ctx: Context):
+    # async def ripz(self, ctx: commands.Context):
     #     """
     #         Счётчик смертей
     #
@@ -183,7 +180,7 @@ class RIPCog(MyCog):
     #     await self.do_rip(ctx, "#Отзомбячено!")
     #
     # @commands.command(name='riph')
-    # async def riph(self, ctx: Context):
+    # async def riph(self, ctx: commands.Context):
     #     """
     #         Счётчик смертей
     #
@@ -192,7 +189,7 @@ class RIPCog(MyCog):
     #     await self.do_rip(ctx, "#Захедкраблено")
     #
     # @commands.command(name='ripc')
-    # async def ripc(self, ctx: Context):
+    # async def ripc(self, ctx: commands.Context):
     #     """
     #         Счётчик смертей
     #
@@ -201,7 +198,7 @@ class RIPCog(MyCog):
     #     await self.do_rip(ctx, "#Укомбайнено")
     #
     # @commands.command(name='ripb')
-    # async def ripb(self, ctx: Context):
+    # async def ripb(self, ctx: commands.Context):
     #     """
     #         Счётчик смертей
     #
@@ -209,6 +206,11 @@ class RIPCog(MyCog):
     #     """
     #     await self.do_rip(ctx, "#Барнакнуто")
     #
-    # @commands.command(name='ripn', aliases=['nom', 'omnomnom', 'ном', 'ням', 'омномном'])
-    # async def nom(self, ctx: Context):
+    # @commands.command(name='ripn', aliases=['nom', 'omnomnom', 'ном', 'ням',
+    # 'омномном'])
+    # async def nom(self, ctx: commands.Context):
     #     await self.do_rip(ctx, 'Ом-ном-ном!')
+
+
+def prepare(bot: commands.Bot):
+    bot.add_cog(RIPCog(bot))
