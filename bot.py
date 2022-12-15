@@ -139,7 +139,7 @@ class DuelStats(peewee.Model):
 
 
 class Bot(commands.Bot):
-    def __init__(self, initial_channels=None):
+    def __init__(self, sio_server, initial_channels=None):
         super().__init__(
             token=twitch_chat_password,
             client_id=twitch_client_id,
@@ -245,10 +245,10 @@ class Bot(commands.Bot):
             self.viewers[display_name] = user
 
         if not (
-            name in self.greeted
-            or display_name in self.greeted
-            or name in self.bots
-            or name == "iarspider"
+                name in self.greeted
+                or display_name in self.greeted
+                or name in self.bots
+                or name == "iarspider"
         ):
             self.greeted.add(name)
             self.greeted.add(display_name)
@@ -273,7 +273,9 @@ class Bot(commands.Bot):
     #     pass
 
     def set_ws_server(self):
+        print("@@ set_ws_server @@")
         if sio_server is not None and self.sio_server is None:
+            print("@@ set sio_server @@")
             self.sio_server = sio_server
             self.timer.cancel()
 
@@ -290,8 +292,8 @@ class Bot(commands.Bot):
         await self.pubsub_client.pubsub.subscribe_topics(topics)
         await self.pubsub_client.connect()
 
-        self.timer = Periodic("ws_server", 1, self.set_ws_server, self.loop)
-        await self.timer.start()
+        # self.timer = Periodic("ws_server", 1, self.set_ws_server, self.loop)
+        # await self.timer.start()
 
         self.get_game_v5()
 
@@ -311,7 +313,7 @@ class Bot(commands.Bot):
     async def event_message(self, message: Message):
 
         if message.raw_data.startswith(
-            "> " ":arachnobot!arachnobot@arachnobot.tmi.twitch.tv"
+                "> " ":arachnobot!arachnobot@arachnobot.tmi.twitch.tv"
         ):
             return
 
@@ -352,7 +354,7 @@ class Bot(commands.Bot):
                 self.logger.debug(
                     f"Updated last messages for {message.author.name}, "
                     + f"will remember last "
-                    f"{len(self.last_messages[message.author.name])}"
+                      f"{len(self.last_messages[message.author.name])}"
                 )
 
         if message.content.startswith("!"):
@@ -391,7 +393,7 @@ class Bot(commands.Bot):
             pass
 
     async def event_pubsub_channel_points(
-        self, event: pubsub.PubSubChannelPointsMessage
+            self, event: pubsub.PubSubChannelPointsMessage
     ):
         user = await event.user.fetch()
         await self.do_reward(user, event.reward.title, event.input)
@@ -450,7 +452,7 @@ class Bot(commands.Bot):
                 self.play_sound("fail.mp3")
 
         if item and (self.sio_server is not None):
-            await sio_server.emit(item["action"], item["value"])
+            await self.sio_server.emit(item["action"], item["value"])
 
     def play_sound(self, sound: str, is_temporary: bool = False):
         if sound.startswith("sound") and random.randint(1, 20) == 1:
@@ -492,8 +494,8 @@ class Bot(commands.Bot):
             return
 
         femme = (
-            user.name.lower() in twitch_ladies
-            or user.display_name.lower() in twitch_ladies
+                user.name.lower() in twitch_ladies
+                or user.display_name.lower() in twitch_ladies
         )
 
         if user.is_subscriber:
@@ -523,7 +525,7 @@ class Bot(commands.Bot):
             },
         }
         if self.sio_server is not None:
-            await sio_server.emit(item["action"], item["value"])
+            await self.sio_server.emit(item["action"], item["value"])
         else:
             logger.warning("send_viewer_joined: sio_server is none!")
 
@@ -535,7 +537,7 @@ class Bot(commands.Bot):
 
         item = {"action": "remove", "value": user.display_name}
         if self.sio_server is not None:
-            await sio_server.emit(item["action"], item["value"])
+            await self.sio_server.emit(item["action"], item["value"])
         else:
             logger.warning("send_viewer_joined: sio_server is none!")
 
@@ -811,7 +813,7 @@ class Bot(commands.Bot):
             },
         }
         if self.sio_server is not None:
-            await sio_server.emit(item["action"], item["value"])
+            await self.sio_server.emit(item["action"], item["value"])
         else:
             logger.warning("send_viewer_joined: sio_server is none!")
 
@@ -823,7 +825,7 @@ class Bot(commands.Bot):
         arg = ctx.message.content.split()[1]
         item = {"action": "remove", "value": arg}
         if self.sio_server is not None:
-            await sio_server.emit(item["action"], item["value"])
+            await self.sio_server.emit(item["action"], item["value"])
         else:
             logger.warning("send_viewer_joined: sio_server is none!")
 
@@ -907,42 +909,6 @@ async def main():
 
     # logger.setLevel(logging.DEBUG)
     logging.getLogger("asyncio").setLevel(logging.DEBUG)
-    # Run bot
-    twitch_bot = Bot()
-
-    if globals().get("obsws_address", None) is not None:
-        logger.info("Loading module obscog")
-        twitch_bot.load_module("obscog")
-
-    for extension in (
-        "discordcog",
-        "pluschcog",
-        "ripcog",
-        "SLCog",
-        "elfcog",
-        "duelcog",
-    ):  # 'raidcog', 'vmodcog', 'musiccog'
-        # noinspection PyUnboundLocalVariable
-        logger.info(f"Loading module {extension}")
-        twitch_bot.load_module(extension)
-
-    twitch_bot.call_cogs("setup")
-    pubsub_sess = twitch_api.get_session(
-        twitch_client_id, twitch_client_secret, twitch_redirect_url
-    )
-    client = Client(
-        token=pubsub_sess.token["access_token"].replace("oauth2:", ""),
-        initial_channels=["#iarspider"],
-        client_secret=twitch_client_secret,
-    )
-
-    client.pubsub = pubsub.PubSubPool(client)
-    twitch_bot.pubsub_client = client
-
-    # Forward event to bot. DO NOT DELETE THIS!!!
-    @client.event()
-    async def event_pubsub_channel_points(event: pubsub.PubSubChannelPointsMessage):
-        await twitch_bot.event_pubsub_channel_points(event)
 
     sio_server = socketio.AsyncServer(
         async_mode="asgi",
@@ -999,6 +965,45 @@ async def main():
         logger.warning(f"Unhandled event {event} (data {data})")
         pass
 
+    # Run bot
+    if sio_server is None:
+        logger.warning("sio_server is none!")
+    twitch_bot = Bot(sio_server=sio_server)
+
+    if globals().get("obsws_address", None) is not None:
+        logger.info("Loading module obscog")
+        twitch_bot.load_module("obscog")
+
+    for extension in (
+            "discordcog",
+            "pluschcog",
+            "ripcog",
+            "SLCog",
+            "elfcog",
+            "duelcog",
+    ):  # 'raidcog', 'vmodcog', 'musiccog'
+        # noinspection PyUnboundLocalVariable
+        logger.info(f"Loading module {extension}")
+        twitch_bot.load_module(extension)
+
+    twitch_bot.call_cogs("setup")
+    pubsub_sess = twitch_api.get_session(
+        twitch_client_id, twitch_client_secret, twitch_redirect_url
+    )
+    client = Client(
+        token=pubsub_sess.token["access_token"].replace("oauth2:", ""),
+        initial_channels=["#iarspider"],
+        client_secret=twitch_client_secret,
+    )
+
+    client.pubsub = pubsub.PubSubPool(client)
+    twitch_bot.pubsub_client = client
+
+    # Forward event to bot. DO NOT DELETE THIS!!!
+    @client.event()
+    async def event_pubsub_channel_points(event: pubsub.PubSubChannelPointsMessage):
+        await twitch_bot.event_pubsub_channel_points(event)
+
     async with asyncio.TaskGroup() as tg:
         task1 = tg.create_task(twitch_bot.start())
         task2 = tg.create_task(server.serve())
@@ -1008,5 +1013,39 @@ async def main():
         await client.close()
 
 
+# Patched version of socketio.AsyncManager.emit,
+# see https://github.com/miguelgrinberg/python-socketio/pull/941
+# Can't update socketio/engineio because SL is using old socketio
+# version that is not supported in modern versions
+async def emit(self, event, data, namespace, room=None, skip_sid=None,
+               callback=None, **kwargs):
+    """Emit a message to a single client, a room, or all the clients
+    connected to the namespace.
+
+    Note: this method is a coroutine.
+    """
+    if namespace not in self.rooms or room not in self.rooms[namespace]:
+        return
+    tasks = []
+    if not isinstance(skip_sid, list):
+        skip_sid = [skip_sid]
+    for sid in self.get_participants(namespace, room):
+        if sid not in skip_sid:
+            if callback is not None:
+                id = self._generate_ack_id(sid, namespace, callback)
+            else:
+                id = None
+            tasks.append(asyncio.create_task(
+                self.server._emit_internal(sid, event, data, namespace, id)))
+    if tasks == []:  # pragma: no cover
+        return
+    await asyncio.wait(tasks)
+
+
+def patch_asyncio():
+    socketio.AsyncManager.emit = emit
+
+
 if __name__ == "__main__":
+    patch_asyncio()
     asyncio.run(main())
