@@ -1016,6 +1016,7 @@ async def main():
 # see https://github.com/miguelgrinberg/python-socketio/pull/941
 # Can't update socketio/engineio because SL is using old socketio
 # version that is not supported in modern versions
+# noinspection PyProtectedMember, PySimplifyBooleanCheck
 async def emit(self, event, data, namespace, room=None, skip_sid=None,
                callback=None, **kwargs):
     """Emit a message to a single client, a room, or all the clients
