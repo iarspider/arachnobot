@@ -25,6 +25,7 @@ peewee = "*"
 pipwin = "*"
 eyed3 = "*"
 pyaudio = "*"
+loguru = "*"
 
 [dev-packages]
 

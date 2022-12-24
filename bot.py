@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import http.client as http_client
+import json
 import logging
 import os
 import pathlib
@@ -24,8 +25,6 @@ from twitchio.ext import commands, sounds, pubsub
 import twitch_api
 from aio_timer import Periodic
 from config import *
-
-import json
 
 # For typing
 # from twitchio.dataclasses import Context, User, Message
