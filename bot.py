@@ -1003,6 +1003,14 @@ async def main():
     async def event_pubsub_channel_points(event: pubsub.PubSubChannelPointsMessage):
         await twitch_bot.event_pubsub_channel_points(event)
 
+    @client.event()
+    async def event_token_expired():
+        pubsub_sess = twitch_api.get_session(
+            twitch_client_id, twitch_client_secret, twitch_redirect_url
+        )
+
+        return pubsub_sess.token["access_token"].replace("oauth2:", "")
+
     async with asyncio.TaskGroup() as tg:
         task1 = tg.create_task(twitch_bot.start())
         task2 = tg.create_task(server.serve())
