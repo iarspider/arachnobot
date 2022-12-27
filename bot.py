@@ -20,7 +20,7 @@ import socketio
 import uvicorn
 from requests.structures import CaseInsensitiveDict
 from twitchio import User, Message, Channel, Chatter, Client
-from twitchio.ext import commands, sounds, pubsub
+from twitchio.ext import commands, sounds, pubsub, routines
 
 import twitch_api
 from aio_timer import Periodic

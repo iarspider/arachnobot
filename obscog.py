@@ -10,12 +10,11 @@ import requests
 from obswebsocket import obsws
 from obswebsocket import requests as obsws_requests
 from pytils import numeral
-from twitchio.ext import commands
+from twitchio.ext import commands, routines
 
 from aio_timer import Periodic
 from bot import Bot
 from config import *
-
 # from ripcog import RIPCog
 from mycog import MyCog
 
@@ -31,7 +30,6 @@ class OBSCog(MyCog):
         self.htmlfile = r"e:\__Stream\web\example.html"
         self.session = requests.Session()
         self.obsws_shutdown_timer: typing.Optional[Periodic] = None
-        self.countdown_timer: typing.Optional[Periodic] = None
 
         self.ws: typing.Optional[obsws] = None
 
@@ -239,18 +237,7 @@ class OBSCog(MyCog):
             )
         )
 
-    async def hide_zeroes(self):
-        self.ws.call(
-            obsws_requests.SetSceneItemProperties(
-                scene_name="Starting", item="Ожидание", visible=True
-            )
-        )
-        self.ws.call(
-            obsws_requests.SetSceneItemProperties(
-                scene_name="Starting", item="Countdown v3", visible=False
-            )
-        )
-        await self.countdown_timer.stop()
+
 
     @commands.command(name="countdown", aliases=["preroll", "cd", "pr", "св", "зк"])
     async def countdown(self, ctx: commands.Context):
@@ -287,16 +274,9 @@ class OBSCog(MyCog):
         if not self.ws:
             return
 
-        res: obsws_requests.GetStreamingStatus = self.ws.call(
-            obsws_requests.GetStreamingStatus()
-        )
-        # if res.getStreaming():
-        #     self.logger.error('Already streaming!')
-        #     return
-
         write_countdown_html()
 
-        # self.ws.call(obsws_requests.DisableStudioMode())
+        self.ws.call(obsws_requests.DisableStudioMode())
 
         # Refresh countdown
         self.ws.call(obsws_requests.SetCurrentScene("Starting"))
@@ -319,18 +299,6 @@ class OBSCog(MyCog):
         #     self.logger.warning("[WARN] Can't mute mic-2, please check!")
         self.ws.call(obsws_requests.SetMute("Mic", True))
 
-        # self.ws.call(obsws_requests.EnableStudioMode())
-
-        self.ws.call(obsws_requests.StartStopStreaming())
-        now = datetime.datetime.now()
-        dt = self.bot.countdown_to - now
-        self.countdown_timer = Periodic(
-            "countdown_to", dt.seconds, self.hide_zeroes, self.bot.loop
-        )
-        # time.sleep(1)
-        # self.ws.call(obsws_requests.PauseRecording())
-        # self.get_player()
-        # self.player_play_pause()
         self.ws.call(obsws_requests.SetMute("Радио", False))
 
         self.ws.call(
@@ -344,7 +312,7 @@ class OBSCog(MyCog):
             )
         )
 
-        self.ws.call(obsws_requests.TransitionToProgram())
+        self.ws.call(obsws_requests.StartStopStreaming())
 
         asyncio.ensure_future(
             ctx.send(
@@ -363,6 +331,28 @@ class OBSCog(MyCog):
             asyncio.ensure_future(discord_bot.announce())
         else:
             self.logger.warning("Discord cog not found")
+
+        now = datetime.datetime.now()
+        dt = self.bot.countdown_to - now
+        h, ms = divmod(dt.seconds, 3600)
+        m, s = divmod(ms, 60)
+
+        @routines.routine(seconds=s, minutes=m, hours=h, wait_first=True, iterations=1)
+        async def hide_zeroes(self):
+            if self.ws.call(obsws_requests.GetCurrentScene()).getName() != "Starting":
+                return
+
+            self.ws.call(
+                obsws_requests.SetSceneItemProperties(
+                    scene_name="Starting", item="Ожидание", visible=True
+                )
+            )
+            self.ws.call(
+                obsws_requests.SetSceneItemProperties(
+                    scene_name="Starting", item="Countdown v3", visible=False
+                )
+            )
+
 
     # noinspection PyUnusedLocal
     @commands.command(name="end", aliases=["fin", "конец", "credits"])
