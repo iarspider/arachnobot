@@ -26,6 +26,7 @@ pipwin = "*"
 eyed3 = "*"
 pyaudio = "*"
 loguru = "*"
+dotenv = "*"
 
 [dev-packages]
 

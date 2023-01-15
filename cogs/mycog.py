@@ -1,3 +1,4 @@
+from loguru import logger
 from twitchio.ext import commands
 
 
@@ -10,7 +11,7 @@ class MyCog(commands.Cog):
 
     def __getattr__(self, item):
         if item != "__bases__":
-            self.logger.warning(
+            logger.warning(
                 f"[{self.__class__}] Failed to get attribute {item}, redirecting to "
                 f"self.bot!"
             )

@@ -1,11 +1,10 @@
+import os
 import logging
 import webbrowser
 
 import json as simplejson
 import requests
 from requests_oauthlib import OAuth2Session
-
-import config
 
 scope = [
     "channel:moderate",
@@ -55,8 +54,8 @@ def validate(oauth: OAuth2Session, can_refresh=True):
             token = oauth.refresh_token(oauth.auto_refresh_url)
             token_saver(token)
             oauth_ = get_session(
-                config.twitch_client_id,
-                config.twitch_client_secret,
+                os.getenv('TWITCH_CLIENT_ID'),
+                os.getenv('TWITCH_CLIENT_SECRET'),
                 "https://iarazumov.com/oauth/twitch",
             )
             validate(oauth_, False)
@@ -91,7 +90,7 @@ def my_get_users(oauth, user_name):
     res = oauth.get(
         "https://api.twitch.tv/helix/users",
         params={"login": user_name},
-        headers={"Client-ID": config.twitch_client_id},
+        headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')},
     )
     try:
         res.raise_for_status()
@@ -113,13 +112,26 @@ def main():
     requests_log.propagate = True
 
     oauth = get_session(
-        config.twitch_client_id,
-        config.twitch_client_secret,
+        os.getenv('TWITCH_CLIENT_ID'),
+        os.getenv('TWITCH_CLIENT_SECRET'),
         "https://iarazumov.com/oauth/twitch",
     )
     validate(oauth)
-    print(my_get_users(oauth, "cwelth"))
-    print(my_get_users(oauth, "twitch"))
+    # print(my_get_users(oauth, "cwelth"))
+    # print(my_get_users(oauth, "twitch"))
+    my_id = my_get_users(oauth, "iarspider")["id"]
+    #        params={"login": user_name},
+    #        headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')},
+
+    res = oauth.get(
+        f"https://api.twitch.tv/helix/streams",
+        params={"user_login": "iarspider"},
+        headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')},
+    )
+    res.raise_for_status()
+    from pprint import pprint
+
+    pprint(res.json()["data"])
 
 
 if __name__ == "__main__":

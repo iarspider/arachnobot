@@ -1,3 +1,5 @@
+import dotenv
+
 import asyncio
 import datetime
 import http.client as http_client
@@ -7,17 +9,18 @@ import os
 import pathlib
 import random
 import string
+import sys
 import time
 from collections import defaultdict, deque
 from multiprocessing import Process
-from typing import Union, Iterable, Optional, List
+from typing import Union, Iterable, Optional, List, Dict
 
-import colorlog
 import eyed3 as eyed3
 import peewee
 import requests
 import socketio
 import uvicorn
+from loguru import logger
 from requests.structures import CaseInsensitiveDict
 from twitchio import User, Message, Channel, Chatter, Client
 from twitchio.ext import commands, sounds, pubsub
@@ -26,11 +29,7 @@ import twitch_api
 from aio_timer import Periodic
 from config import *
 
-# For typing
-# from twitchio.dataclasses import Context, User, Message
-
 httpclient_logger = logging.getLogger("http.client")
-logger: logging.Logger
 proc: Process
 dashboard_timer: Periodic
 sl_client: socketio.AsyncClient
@@ -39,59 +38,69 @@ database = peewee.SqliteDatabase(database_file)
 client: Optional[Client] = None
 
 
+class InterceptHandler(logging.Handler):
+    def emit(self, record):
+        # Get corresponding Loguru level if it exists
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        # Find caller from where originated the logged message
+        frame, depth = logging.currentframe(), 2
+        while frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+
+        logger.opt(depth=depth, exception=record.exc_info).log(
+            level, record.getMessage()
+        )
+
+
 def setup_logging(logfile, debug, color, http_debug):
-    global logger
-    logger = logging.getLogger("arachnobot")
-    logger.propagate = False
-    ws_logger = logging.getLogger("websockets.server")
-    uvicorn_logger = logging.getLogger("uvicorn.error")
-    obsws_logger = logging.getLogger("obswebsocket.core")
-
-    bot_handler = logging.StreamHandler()
-    if color:
-        bot_handler.setFormatter(
-            colorlog.ColoredFormatter(
-                "%(asctime)s %(log_color)s[%(name)s:%(levelname)s:%(lineno)s]%("
-                "reset)s %(message)s",
-                datefmt="%H:%M:%S",
-            )
-        )
-    else:
-        bot_handler.setFormatter(
-            logging.Formatter(
-                fmt="%(asctime)s [%(name)s:%(levelname)s:%(lineno)s] %(message)s",
-                datefmt="%H:%M:%S",
-            )
-        )
-
-    file_handler = logging.FileHandler(logfile, "w")
-    file_handler.setFormatter(
-        logging.Formatter(
-            fmt="%(asctime)s [%(name)s:%(levelname)s:%(lineno)s] %(message)s"
-        )
+    loglevel = logging.DEBUG if debug else logging.INFO
+    logger.remove()
+    logger.add(sys.stderr, level=loglevel, backtrace=True, diagnose=False,
+               colorize=color,
+               format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | "
+                      "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{"
+                      "line}</cyan> - <level>{message}</level>")
+    logger.add(
+        logfile,
+        level=loglevel,
+        rotation="12:00",
+        compression="zip",
+        retention="1 week",
+        backtrace=True,
+        diagnose=True,
     )
 
-    logger.addHandler(bot_handler)
-    logger.addHandler(file_handler)
+    handler = InterceptHandler()
+    # logging.basicConfig(handlers=[InterceptHandler()], level=0)
 
-    ws_logger.addHandler(bot_handler)
-    ws_logger.addHandler(file_handler)
+    if debug:
+        logger.info("Debug logging is ON")
 
-    uvicorn_logger.addHandler(bot_handler)
-    uvicorn_logger.addHandler(file_handler)
-
-    obsws_logger.addHandler(bot_handler)
-    obsws_logger.addHandler(file_handler)
+    # global logger
+    # logger = logging.getLogger("arachnobot")
+    # logger.propagate = False
+    ws_logger = logging.getLogger("websockets.server")
+    ws_logger.handlers.clear()
+    ws_logger.addHandler(handler)
+    uvicorn_logger = logging.getLogger("uvicorn.error")
+    uvicorn_logger.handlers.clear()
+    uvicorn_logger.addHandler(handler)
+    obsws_logger = logging.getLogger("obswebsocket.core")
+    obsws_logger.handlers.clear()
+    obsws_logger.addHandler(handler)
 
     if not debug:
-        logger.setLevel(logging.INFO)
         logging.getLogger("discord").setLevel(logging.INFO)
         ws_logger.setLevel(logging.WARN)
         uvicorn_logger.setLevel(logging.WARN)
         obsws_logger.setLevel(logging.WARN)
     else:
         logger.info("Debug logging is ON")
-        logger.setLevel(logging.DEBUG)
         logging.getLogger("discord").setLevel(logging.DEBUG)
         ws_logger.setLevel(logging.DEBUG)
         uvicorn_logger.setLevel(logging.DEBUG)
@@ -140,14 +149,13 @@ class DuelStats(peewee.Model):
 class Bot(commands.Bot):
     def __init__(self, sio_server, initial_channels=None):
         super().__init__(
-            token=twitch_chat_password,
-            client_id=twitch_client_id,
+            token=os.getenv("TWITCH_CHAT_PASSWORD"),
+            client_id=os.getenv("TWITCH_CLIENT_ID"),
             nick="arachnobot",
             prefix="!",
             initial_channels=initial_channels or ["#iarspider"],
         )
 
-        self.logger = logger
         self.initial_channels = initial_channels or ["#iarspider"]
 
         self.viewers = CaseInsensitiveDict()
@@ -174,7 +182,7 @@ class Bot(commands.Bot):
         self.countdown_to: Optional[datetime.datetime] = None  # ! keep this here !
         self.last_messages = CaseInsensitiveDict()  # ! keep this here !
 
-        self.dashboard = None
+        self.dashboard: List[int] = []
 
         self.player = sounds.AudioPlayer(callback=self.player_done)
         self.started = False
@@ -182,6 +190,7 @@ class Bot(commands.Bot):
         self.timer = None
         self.game: Optional[GameConfig] = None
         # self.duels: Optional[DuelStats] = None
+        self.pubsub_events: List[Dict] = []
         self.title = ""
 
         self.load_pearls()
@@ -203,20 +212,20 @@ class Bot(commands.Bot):
         r = requests.get(
             f"https://api.twitch.tv/helix/channels?broadcaster_id={self.streamer_id}&",
             headers={
-                "Authorization": f"Bearer {twitch_chat_password}",
-                "Client-ID": twitch_client_id_alt,
+                "Authorization": f"Bearer {os.getenv('TWITCH_CHAT_PASSWORD')}",
+                "Client-ID": os.getenv("TWITCH_CLIENT_ID_ALT"),
             },
         )
 
         try:
             r.raise_for_status()
         except requests.RequestException as e:
-            self.logger.error("Request to Helix API failed!" + str(e))
+            logger.error("Request to Helix API failed!" + str(e))
             self.game = GameConfig.create(game="")
             return
 
         if "error" in r.json():
-            self.logger.error("Request to Helix API failed!" + r.json()["message"])
+            logger.error("Request to Helix API failed!" + r.json()["message"])
             self.game = GameConfig.create(game="")
             return
 
@@ -279,7 +288,7 @@ class Bot(commands.Bot):
             self.timer.cancel()
 
     async def event_ready(self):
-        self.logger.info(f"Ready | {self.nick}")
+        logger.info(f"Ready | {self.nick}")
         c: Channel = self.connected_channels[0]
         u: List["User"] = await self.fetch_users(names=[c.name])
         uu: User = u[0]
@@ -329,7 +338,7 @@ class Bot(commands.Bot):
             # print(f"Message from {message.author}, tags: {tags}")
             # print(f"Raw data: {message.raw_data}")
             await self.send_viewer_joined(message.author)
-            self.logger.debug("JOIN sent")
+            logger.debug("JOIN sent")
         #
         # self.viewers.add(message.author.name.lower())
         # if message.author.is_mod:
@@ -350,7 +359,7 @@ class Bot(commands.Bot):
                 self.last_messages[message.author.name].append(
                     (message.content, emotes)
                 )
-                self.logger.debug(
+                logger.debug(
                     f"Updated last messages for {message.author.name}, "
                     + f"will remember last "
                       f"{len(self.last_messages[message.author.name])}"
@@ -366,9 +375,9 @@ class Bot(commands.Bot):
                 args = ""
             message.content = command.lower() + args
 
-        self.logger.debug("handle_command start: %s", message)
+        logger.debug("handle_command start: %s", message)
         await self.handle_commands(message)
-        self.logger.debug("handle_command end: %s", message)
+        logger.debug("handle_command end: %s", message)
 
     # async def event_join(self, user):
     #     if user.name.lower() not in self.viewers:
@@ -394,7 +403,8 @@ class Bot(commands.Bot):
     async def event_pubsub_channel_points(
             self, event: pubsub.PubSubChannelPointsMessage
     ):
-        user = await event.user.fetch()
+        user = await self.create_user(event.user.id, event.user.name).fetch()
+        # user = await event.user.fetch()
         await self.do_reward(user, event.reward.title, event.input)
 
     async def do_reward(self, user: User, title: str, prompt: str):
@@ -406,7 +416,7 @@ class Bot(commands.Bot):
                 # noinspection PyUnresolvedReferences
                 asyncio.ensure_future(vmod.activate_voicemod())
             case "Обнять стримера":
-                self.logger.debug(f"Queued redepmtion: hugs, {requestor}")
+                logger.debug(f"Queued redepmtion: hugs, {requestor}")
                 item = {"action": "event", "value": {"type": "hugs", "from": requestor}}
                 channel: Channel = self.get_channel(
                     self.initial_channels[0].lstrip("#")
@@ -416,25 +426,25 @@ class Bot(commands.Bot):
                 )
 
             case "Ничего":
-                self.logger.debug(f"Queued redepmtion: nothing, {requestor}")
-                self.play_sound("nothing0.mp3")
+                logger.debug(f"Queued redepmtion: nothing, {requestor}")
+                self.play_sound("my_sound\\nothing0.mp3")
                 item = {
                     "action": "event",
                     "value": {"type": "nothing", "from": requestor},
                 }
             case "Дизайнерское Ничего":
-                self.logger.debug(f"Queued redepmtion: designer nothing, {requestor}")
-                self.play_sound("designer_nothing0.mp3")
+                logger.debug(f"Queued redepmtion: designer nothing, {requestor}")
+                self.play_sound("my_sound\\designer_nothing0.mp3")
                 item = {
                     "action": "event",
                     "value": {"type": "nihil", "from": requestor},
                 }
             case "Стримлер! Не горбись!":
-                self.logger.debug(f"Queued redepmtion: sit, {requestor}")
-                self.play_sound("StraightenUp.mp3")
+                logger.debug(f"Queued redepmtion: sit, {requestor}")
+                self.play_sound("my_sound\\StraightenUp.mp3")
                 item = {"action": "event", "value": {"type": "sit", "from": requestor}}
             case "Распылить упорин":
-                self.logger.debug(f"Queued redepmtion: fun, {requestor}")
+                logger.debug(f"Queued redepmtion: fun, {requestor}")
                 item = {"action": "event", "value": {"type": "fun", "from": requestor}}
                 s = random.choice(
                     ["Nice01", "Nice02", "ThatWasFun01", "ThatWasFun02", "ThatWasFun03"]
@@ -446,11 +456,12 @@ class Bot(commands.Bot):
                 )
                 self.play_sound(f"sound\\Minion General Speech@ignore@{snd}.mp3")
             case "Лисо-Флешкино безумие":
-                self.play_sound("FoxFlashMadness.mp3")
+                self.play_sound("my_sound\\FoxFlashMadness.mp3")
             case "Ты всё испортил!":
-                self.play_sound("fail.mp3")
+                self.play_sound("my_sound\\fail.mp3")
 
         if item and (self.sio_server is not None):
+            self.pubsub_events.append(item)
             await self.sio_server.emit(item["action"], item["value"])
 
     def play_sound(self, sound: str, is_temporary: bool = False):
@@ -475,7 +486,7 @@ class Bot(commands.Bot):
                 try:
                     os.unlink(soundfile)
                 except PermissionError as e:
-                    self.logger.warning(
+                    logger.warning(
                         f"Failed to unlink tempfile "
                         f"{os.path.basename(soundfile)}: {str(e)}"
                     )
@@ -484,9 +495,9 @@ class Bot(commands.Bot):
                 else:
                     break
             else:
-                self.logger.error(f"Giving up on file {soundfile}")
+                logger.error(f"Giving up on file {soundfile}")
 
-    async def send_viewer_joined(self, user: Chatter):
+    async def send_viewer_joined(self, user: Chatter, sid: Optional[int] = None):
         # DEBUG
         # return
         if user.name.lower() in self.bots:
@@ -524,7 +535,7 @@ class Bot(commands.Bot):
             },
         }
         if self.sio_server is not None:
-            await self.sio_server.emit(item["action"], item["value"])
+            await self.sio_server.emit(item["action"], item["value"], to=sid)
         else:
             logger.warning("send_viewer_joined: sio_server is none!")
 
@@ -698,8 +709,8 @@ class Bot(commands.Bot):
             params={"login": user_name},
             headers={
                 "Accept": "application/vnd.twitchtv.v5+json",
-                "Authorization": f"Bearer {twitch_chat_password}",
-                "Client-ID": twitch_client_id_alt,
+                "Authorization": f"Bearer {os.getenv('TWITCH_CHAT_PASSWORD')}",
+                "Client-ID": os.getenv("TWITCH_CLIENT_ID_ALT"),
             },
         )
         res.raise_for_status()
@@ -716,8 +727,8 @@ class Bot(commands.Bot):
                 params={"user_id": user_id},
                 headers={
                     "Accept": "application/vnd.twitchtv.v5+json",
-                    "Authorization": f"Bearer " f"{twitch_chat_password}",
-                    "Client-ID": twitch_client_id_alt,
+                    "Authorization": f"Bearer " f"{os.getenv('TWITCH_CHAT_PASSWORD')}",
+                    "Client-ID": os.getenv('TWITCH_CLIENT_ID_ALT'),
                 },
             )
 
@@ -744,8 +755,8 @@ class Bot(commands.Bot):
             params={"id": game_id},
             headers={
                 "Accept": "application/vnd.twitchtv.v5+json",
-                "Authorization": f"Bearer {twitch_chat_password}",
-                "Client-ID": twitch_client_id_alt,
+                "Authorization": f"Bearer {os.getenv('TWITCH_CHAT_PASSWORD')}",
+                "Client-ID": os.getenv('TWITCH_CLIENT_ID_ALT'),
             },
         )
 
@@ -756,12 +767,13 @@ class Bot(commands.Bot):
     async def my_run_commercial(self, user_id, length=90):
         await self.my_get_stream(self.streamer_id)
         sess = twitch_api.get_session(
-            twitch_client_id, twitch_client_secret, twitch_redirect_url
+            os.getenv('TWITCH_CLIENT_ID'), os.getenv('TWITCH_CLIENT_SECRET'),
+            twitch_redirect_url
         )
         res = sess.post(
             "https://api.twitch.tv/helix/channels/commercial",
             data={"broadcaster_id": user_id, "length": length},
-            headers={"Client-ID": twitch_client_id},
+            headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')},
         )
         try:
             res.raise_for_status()
@@ -841,7 +853,7 @@ class Bot(commands.Bot):
 
     @commands.command(name="amivip")
     async def amivip(self, ctx: commands.Context):
-        self.logger.info("Badges: " + str(ctx.author.badges))
+        logger.info("Badges: " + str(ctx.author.badges))
         if ctx.author.is_vip:
             await ctx.send("Да! 💎")
         else:
@@ -884,13 +896,37 @@ class Bot(commands.Bot):
                     pearl = self.pearls[pearl_id]
                 except (IndexError, ValueError) as e:
                     await ctx.send("Ошибка: нет такого пёрла")
-                    self.logger.exception(e)
+                    logger.exception(e)
                     return
             else:
                 pearl_id = random.randrange(len(self.pearls))
                 pearl = self.pearls[pearl_id]
 
             await ctx.send(f"ПаукоПёрл №{pearl_id}: {pearl}")
+
+    async def on_dashboard_connected(self, sid):
+        if self.sio_server is None:
+            return
+
+        ids = set()
+
+        await self.sio_server.emit("reset", "", to=sid)
+
+        tasks = []
+
+        # type: viewer: Chatter
+        for viewer in self.viewers.values():
+            if viewer.id not in ids:
+                ids.add(viewer.id)
+                tasks.append(asyncio.create_task(self.send_viewer_joined(viewer)))
+
+        for item in self.pubsub_events:
+            tasks.append(asyncio.create_task(self.sio_server.emit(item["action"],
+                                                                  item["value"])))
+
+        # noinspection PySimplifyBooleanCheck
+        if tasks != []:
+            await asyncio.wait(tasks)
 
 
 twitch_bot: Optional[Bot] = None
@@ -900,6 +936,7 @@ sio_server: Optional[socketio.AsyncServer] = None
 app: Optional[socketio.WSGIApp] = None
 
 
+@logger.catch
 async def main():
     global client, twitch_bot
     setup_logging("bot.log", color=True, debug=False, http_debug=False)
@@ -921,15 +958,16 @@ async def main():
     @sio_server.on("connect")
     async def on_ws_connected(sid, _):
         global twitch_bot
-        twitch_bot.dashboard = sid
-        logger.info(f"Dashboard connected with id f{sid}")
+        twitch_bot.dashboard.append(sid)
+        asyncio.ensure_future(twitch_bot.on_dashboard_connected(sid))
+        logger.info(f"Dashboard connected with id {sid}")
 
     @sio_server.on("disconnect")
     async def on_ws_disconnected(sid):
         global twitch_bot
-        if twitch_bot.dashboard == sid:
-            logger.warning(f"Dashboard disconnected!")
-            twitch_bot.dashboard = None
+        if sid in twitch_bot.dashboard:
+            logger.warning(f"Dashboard {sid} disconnected!")
+            twitch_bot.dashboard.remove(sid)
 
     @sio_server.on("rip")
     async def on_ws_rip(sid):
@@ -969,9 +1007,9 @@ async def main():
         logger.warning("sio_server is none!")
     twitch_bot = Bot(sio_server=sio_server)
 
-    if globals().get("obsws_address", None) is not None:
+    if os.getenv("OBSWS_ADDRESS") is not None:
         logger.info("Loading module obscog")
-        twitch_bot.load_module("obscog")
+        twitch_bot.load_module("cogs.obscog")
 
     for extension in (
             "discordcog",
@@ -983,16 +1021,17 @@ async def main():
     ):  # 'raidcog', 'vmodcog', 'musiccog'
         # noinspection PyUnboundLocalVariable
         logger.info(f"Loading module {extension}")
-        twitch_bot.load_module(extension)
+        twitch_bot.load_module(f"cogs.{extension}")
 
     twitch_bot.call_cogs("setup")
     pubsub_sess = twitch_api.get_session(
-        twitch_client_id, twitch_client_secret, twitch_redirect_url
+        os.getenv('TWITCH_CLIENT_ID'), os.getenv('TWITCH_CLIENT_SECRET'),
+        twitch_redirect_url
     )
     client = Client(
         token=pubsub_sess.token["access_token"].replace("oauth2:", ""),
         initial_channels=["#iarspider"],
-        client_secret=twitch_client_secret,
+        client_secret=os.getenv('TWITCH_CLIENT_SECRET'),
     )
 
     client.pubsub = pubsub.PubSubPool(client)
@@ -1005,8 +1044,10 @@ async def main():
 
     @client.event()
     async def event_token_expired():
+        logger.info("Renewing token...")
         pubsub_sess = twitch_api.get_session(
-            twitch_client_id, twitch_client_secret, twitch_redirect_url
+            os.getenv('TWITCH_CLIENT_ID'), os.getenv('TWITCH_CLIENT_SECRET'),
+            twitch_redirect_url
         )
 
         return pubsub_sess.token["access_token"].replace("oauth2:", "")
@@ -1050,10 +1091,11 @@ async def emit(self, event, data, namespace, room=None, skip_sid=None,
     await asyncio.wait(tasks)
 
 
-def patch_asyncio():
+def patch_socketio():
     socketio.AsyncManager.emit = emit
 
 
 if __name__ == "__main__":
-    patch_asyncio()
+    dotenv.load_dotenv()
+    patch_socketio()
     asyncio.run(main())
