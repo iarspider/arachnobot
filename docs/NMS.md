@@ -21,7 +21,7 @@
 | [Pleasant Rescue Lifeform](https://www.nexusmods.com/nomanssky/mods/2174?tab=files) | Насколько я понял, увеличивет вероятность с одной попытки найти нужный компонент в миссиях Аномалии на спасение |
 | [shoemakers Flight Adjustments](https://www.nexusmods.com/nomanssky/mods/2344) | Быстрее летаем, лучше маневрируем, можем зависать в воздухе на планетах |
 | [shoemakers Gameplay Adjustments](https://www.nexusmods.com/nomanssky/mods/2474?tab=description) | В основном ускоряет сканирование (деревьев, растений, животных, минералов) |
-| [Shorter Arrival Messages](https://www.nexusmods.com/nomanssky/mods/1628) | Сокращает дилтельность системного сообщения при прибытии на станцию или планету |
+| [Shorter Arrival Messages](https://www.nexusmods.com/nomanssky/mods/1628) | Сокращает длительность системного сообщения при прибытии на станцию или планету |
 | [sProtect - No Tech Damage with Shield Up](https://www.nexusmods.com/nomanssky/mods/2584) | Компоненты (технологии) корабля не ломаются пока щит жив |
 | [Ultimate combat](https://www.nexusmods.com/nomanssky/mods/2539?tab=description) | Увеличивает урон от оружия |
 | [Ultimate Production](https://www.nexusmods.com/nomanssky/mods/2465?tab=description) | Ускоряет очиститель, фермы, даёт возможность собрать все фермы на грузовом звездолёте "в один клик" |
