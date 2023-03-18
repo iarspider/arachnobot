@@ -25,3 +25,5 @@
 | [sProtect - No Tech Damage with Shield Up](https://www.nexusmods.com/nomanssky/mods/2584) | Компоненты (технологии) корабля не ломаются пока щит жив |
 | [Ultimate combat](https://www.nexusmods.com/nomanssky/mods/2539?tab=description) | Увеличивает урон от оружия |
 | [Ultimate Production](https://www.nexusmods.com/nomanssky/mods/2465?tab=description) | Ускоряет очиститель, фермы, даёт возможность собрать все фермы на грузовом звездолёте "в один клик" |
+| [Freighter Room Teleporter Fix](https://www.nexusmods.com/nomanssky/mods/2389?tab=description) | Поворачивает телепорт на грузовом звездолёте так, чтобы он был параллелен стенам комнаты, а не по диагонали |
+| [Long Range Freighters 4.8](https://www.nexusmods.com/nomanssky/mods/2389?tab=description) | Увеличивает дальность гиперпрыжков гурзового звездолёта |
