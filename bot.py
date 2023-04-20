@@ -1,4 +1,4 @@
-import dotenv
+from dotenv import load_dotenv
 
 import asyncio
 import datetime
@@ -150,11 +150,14 @@ class Bot(commands.Bot):
     def __init__(self, sio_server, initial_channels=None):
         super().__init__(
             token=os.getenv("TWITCH_CHAT_PASSWORD"),
-            client_id=os.getenv("TWITCH_CLIENT_ID"),
+            client_id=os.getenv("TWITCH_CHAT_CLIENT_ID"),
             nick="arachnobot",
             prefix="!",
             initial_channels=initial_channels or ["#iarspider"],
         )
+
+        # hack
+        self._http._refresh_token = os.getenv("TWITCH_REFRESH_TOKEN")
 
         self.initial_channels = initial_channels or ["#iarspider"]
 
@@ -213,7 +216,7 @@ class Bot(commands.Bot):
             f"https://api.twitch.tv/helix/channels?broadcaster_id={self.streamer_id}&",
             headers={
                 "Authorization": f"Bearer {os.getenv('TWITCH_CHAT_PASSWORD')}",
-                "Client-ID": os.getenv("TWITCH_CLIENT_ID_ALT"),
+                "Client-ID": os.getenv("TWITCH_CHAT_CLIENT_ID"),
             },
         )
 
@@ -710,7 +713,7 @@ class Bot(commands.Bot):
             headers={
                 "Accept": "application/vnd.twitchtv.v5+json",
                 "Authorization": f"Bearer {os.getenv('TWITCH_CHAT_PASSWORD')}",
-                "Client-ID": os.getenv("TWITCH_CLIENT_ID_ALT"),
+                "Client-ID": os.getenv("TWITCH_CHAT_CLIENT_ID"),
             },
         )
         res.raise_for_status()
@@ -728,7 +731,7 @@ class Bot(commands.Bot):
                 headers={
                     "Accept": "application/vnd.twitchtv.v5+json",
                     "Authorization": f"Bearer " f"{os.getenv('TWITCH_CHAT_PASSWORD')}",
-                    "Client-ID": os.getenv('TWITCH_CLIENT_ID_ALT'),
+                    "Client-ID": os.getenv('TWITCH_CHAT_CLIENT_ID'),
                 },
             )
 
@@ -756,7 +759,7 @@ class Bot(commands.Bot):
             headers={
                 "Accept": "application/vnd.twitchtv.v5+json",
                 "Authorization": f"Bearer {os.getenv('TWITCH_CHAT_PASSWORD')}",
-                "Client-ID": os.getenv('TWITCH_CLIENT_ID_ALT'),
+                "Client-ID": os.getenv('TWITCH_CHAT_CLIENT_ID'),
             },
         )
 
@@ -1052,9 +1055,10 @@ async def main():
 
         return pubsub_sess.token["access_token"].replace("oauth2:", "")
 
-    async with asyncio.TaskGroup() as tg:
-        task1 = tg.create_task(twitch_bot.start())
-        task2 = tg.create_task(server.serve())
+    await twitch_bot.start()
+    # async with asyncio.TaskGroup() as tg:
+        # task1 = tg.create_task(twitch_bot.start())
+        # task2 = tg.create_task(server.serve())
 
     # noinspection PyProtectedMember
     if not client._closing.is_set():
@@ -1096,6 +1100,6 @@ def patch_socketio():
 
 
 if __name__ == "__main__":
-    dotenv.load_dotenv()
+    load_dotenv()
     patch_socketio()
     asyncio.run(main())

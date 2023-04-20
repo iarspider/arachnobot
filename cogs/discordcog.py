@@ -24,21 +24,21 @@ class DiscordCog(MyCog):
         if not self.check_sender(ctx, "iarspider"):
             return
 
-        await self.announce()
+        await self.announce(True)
 
-    async def announce(self):
+    async def announce(self, now_ = False):
         stream = await self.bot.my_get_stream(self.bot.streamer_id)
         game = self.bot.my_get_game(stream["game_id"])
         delta = self.bot.countdown_to - datetime.datetime.now()
         delta_m = delta.seconds // 60
-        if delta_m > 0:
-            delta_text = numeral.get_plural(delta_m, ("минута", "минуты", "минут"))
+        if delta_m > 0 and not now_:
+            delta_text = "примерно " + numeral.get_plural(delta_m, ("минута", "минуты", "минут"))
         else:
-            delta_text = "одна минута"
+            delta_text = "меньше минуты"
 
         announcement = (
             f"@{discord_role} Паучок запустил стрим \"{stream['title']}\" "
-            f"по игре \"{game['name']}\"! У вас есть примерно {delta_text} чтобы"
+            f"по игре \"{game['name']}\"! У вас есть {delta_text} чтобы"
             " открыть стрим - <https://twitch.tv/iarspider>!"
         )
 

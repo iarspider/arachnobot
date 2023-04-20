@@ -26,7 +26,9 @@ pipwin = "*"
 eyed3 = "*"
 pyaudio = "*"
 loguru = "*"
-dotenv = "*"
+ujson = "*"
+ciso8601 = "*"
+faust-cchardet = "*"
 
 [dev-packages]
 

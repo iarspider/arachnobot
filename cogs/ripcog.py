@@ -59,6 +59,8 @@ class RIPCog(MyCog):
 
         %% rip
         """
+        self.get_game_v5()
+        
         args = ctx.message.content.split()[1:]
         if args and (args[0] == "who" or args[0] == "?"):
             ans = "Счетоводы: " + ", ".join(rippers)
