@@ -19,7 +19,7 @@ from cogs.mycog import MyCog
 import sys
 
 sys.path.append("..")
-from config import trailer_root
+from config import trailer_root, trailer_default
 
 
 class OBSCog(MyCog):
@@ -177,33 +177,31 @@ class OBSCog(MyCog):
         self.show_hide_scene_item("Paused", "ужин", False)
 
         # Load trailer
+        source: obsws_requests.GetSourceSettings = self.ws.call(
+            obsws_requests.GetSourceSettings(
+                sourceName="Screensaver", sourceType="ffmpeg_source"
+            )
+        )
+        settings = source.getSourceSettings()
+
         game = self.game.replace("?", "_").replace(":", "_")
         files = glob.glob(
             os.path.join(trailer_root, game + " trailer.*"), recursive=False
         )
-        if files:
-            source: obsws_requests.GetSourceSettings = self.ws.call(
-                obsws_requests.GetSourceSettings(
-                    sourceName="Trailer", sourceType="ffmpeg_source"
-                )
-            )
-            settings = source.getSourceSettings()
-            logger.info(f"Trailer will use the following file: {files[0]}")
-            settings["local_file"] = files[0].replace("\\", "/")
-            res: obsws_requests.SetSourceSettings = self.ws.call(
-                obsws_requests.SetSourceSettings(
-                    sourceName="Trailer",
-                    sourceSettings=settings,
-                    sourceType="ffmpeg_source",
-                )
-            )
-
-            self.show_hide_scene_item("Starting", "Trailer", True)
-            self.show_hide_scene_item("Starting", "Screensaver", False)
+        if not files:
+            logger.info(f"No trailer found, will use screensaver")
+            files = [trailer_default]
         else:
-            logger.info(f"No trailer found")
-            self.show_hide_scene_item("Starting", "Trailer", False)
-            self.show_hide_scene_item("Starting", "Screensaver", True)
+            logger.info(f"Trailer will use the following file: {files[0]}")
+
+        settings["local_file"] = files[0].replace("\\", "/")
+        res: obsws_requests.SetSourceSettings = self.ws.call(
+            obsws_requests.SetSourceSettings(
+                sourceName="Screensaver",
+                sourceSettings=settings,
+                sourceType="ffmpeg_source",
+            )
+        )
 
         asyncio.ensure_future(
             ctx.send(
