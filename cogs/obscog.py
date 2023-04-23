@@ -5,6 +5,7 @@ import glob
 from loguru import logger
 import os
 import typing
+import traceback
 
 import requests
 from obswebsocket import obsws
@@ -409,7 +410,7 @@ class OBSCog(MyCog):
             res: obsws_requests.GetRecordingStatus = self.ws.call(
                 obsws_requests.GetRecordingStatus()
             )
-            if res.isRecordingPaused:
+            if res.getIsRecordingPaused():
                 self.ws.call(obsws_requests.ResumeRecording())
             else:
 
@@ -435,8 +436,10 @@ class OBSCog(MyCog):
                 asyncio.ensure_future(ctx.send(msg))
 
             logger.debug("sent message")
+            self.bot.get_game_v5()
             return msg
         except (KeyError, TypeError) as exc:
+            print(traceback.format_exc())
             msg = "Перепись населения не удалась :("
             if ctx:
                 asyncio.ensure_future(ctx.send(msg))
@@ -460,7 +463,6 @@ class OBSCog(MyCog):
             return
 
         await self.do_resume(ctx)
-        await self.ripcog.lrip(ctx)
 
     @commands.command(name="pause", aliases=("break",))
     async def pause(self, ctx: commands.Context):
