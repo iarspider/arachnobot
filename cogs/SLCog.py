@@ -57,10 +57,10 @@ class SLClient(socketio.asyncio_client.AsyncClient):
         elif data["type"] == "raid":
             pick_keys.extend(("name", "raiders"))
         elif data["type"] in (
-                "alertPlaying",
-                "streamlabels",
-                "streamlabels.underlying",
-                "subscription-playing",
+            "alertPlaying",
+            "streamlabels",
+            "streamlabels.underlying",
+            "subscription-playing",
         ):
             return
         else:
@@ -123,14 +123,12 @@ class SLCog(MyCog):
                 speed="1.0",
                 pitch="1.0",
                 text="Вы можете менять ударение знаком плюс. Например: хлоп+ок в "
-                     "ладоши или белый "
-                     "хл+опок.",
+                "ладоши или белый "
+                "хл+опок.",
             )
             logger.debug("Session ready")
         except requests.HTTPError as e:
-            logger.exception(
-                msg="Failed to initialize voxworker session", exc_info=e
-            )
+            logger.exception(msg="Failed to initialize voxworker session", exc_info=e)
             self.voxdata = None
         except (IndexError, KeyError) as e:
             logger.exception("Failed to parse voxworker page")
@@ -157,9 +155,7 @@ class SLCog(MyCog):
         logger.debug("Sent request to VoxWorker")
 
         if resj["status"] == "notify":
-            logger.error(
-                f"Got status 'notify': {resj['error']}, {resj['errorText']}"
-            )
+            logger.error(f"Got status 'notify': {resj['error']}, {resj['errorText']}")
             return False
 
         statusAttemptCount = 0
@@ -169,9 +165,7 @@ class SLCog(MyCog):
                 f'https://voxworker.com/ru/ajax/status?id={resj["taskId"]}'
             )
             if not res.ok:
-                logger.error(
-                    f"Status request to VoxWorker failed: {res.status_code}"
-                )
+                logger.error(f"Status request to VoxWorker failed: {res.status_code}")
                 return False
             resj = res.json()
             statusAttemptCount += 1
@@ -296,9 +290,9 @@ class SLCog(MyCog):
     @commands.command(name="sos", aliases=["ыщы", "alarm", "фдфкь"])
     async def sos(self, ctx: commands.Context):
         if not (
-                ctx.author.is_mod
-                or ctx.author.name.lower() == "iarspider"
-                or ctx.author.name in rippers
+            ctx.author.is_mod
+            or ctx.author.name.lower() == "iarspider"
+            or ctx.author.name in rippers
         ):
             asyncio.ensure_future(
                 ctx.send("Эта кнопочка - не для тебя. Руки убрал, ЖИВО!")

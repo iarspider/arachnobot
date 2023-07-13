@@ -231,9 +231,9 @@ class Bot(commands.Bot):
             logger.error("Request to Helix API failed!" + r.json()["message"])
             self.game = GameConfig.create(game="")
             return
-
-        with open("game.json", "w") as f:
-            json.dump(r.json(), f)
+        #
+        # with open("game.json", "w") as f:
+        #     json.dump(r.json(), f)
 
         self.title = r.json()["data"][0]["title"]
         game_name = r.json()["data"][0]["game_name"]
@@ -279,14 +279,10 @@ class Bot(commands.Bot):
             )
             return None
 
-    # # twitchio, I can and will handle pubsub
-    # async def event_pubsub(self, data):
-    #     pass
-
     def set_ws_server(self):
-        print("@@ set_ws_server @@")
+        # print("@@ set_ws_server @@")
         if sio_server is not None and self.sio_server is None:
-            print("@@ set sio_server @@")
+            # print("@@ set sio_server @@")
             self.sio_server = sio_server
             self.timer.cancel()
 
@@ -1057,8 +1053,8 @@ async def main():
 
     await twitch_bot.start()
     # async with asyncio.TaskGroup() as tg:
-        # task1 = tg.create_task(twitch_bot.start())
-        # task2 = tg.create_task(server.serve())
+    # task1 = tg.create_task(twitch_bot.start())
+    # task2 = tg.create_task(server.serve())
 
     # noinspection PyProtectedMember
     if not client._closing.is_set():

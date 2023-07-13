@@ -47,7 +47,7 @@ class RIPCog(MyCog):
         self.write_rip()
 
         return (
-            "riPepperonis {today}".format(**self.deaths)
+            "iarspiRip {today}".format(**self.deaths)
             if n > 0
             else "MercyWing1 PinkMercy MercyWing2"
         )
@@ -59,8 +59,6 @@ class RIPCog(MyCog):
 
         %% rip
         """
-        self.get_game_v5()
-        
         args = ctx.message.content.split()[1:]
         if args and (args[0] == "who" or args[0] == "?"):
             ans = "Счетоводы: " + ", ".join(rippers)
@@ -68,8 +66,7 @@ class RIPCog(MyCog):
             return
 
         if not (
-                ctx.author.is_mod or ctx.author.is_vip or ctx.author.name.lower() in
-                rippers
+            ctx.author.is_mod or ctx.author.is_vip or ctx.author.name.lower() in rippers
         ):
             asyncio.ensure_future(ctx.send("Эту кнопку не трожь!"))
             return

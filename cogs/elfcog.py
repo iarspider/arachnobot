@@ -10,12 +10,12 @@ class ElvenCog(MyCog):
         self.bot = bot
 
         s1 = (
-                "&qwertyuiop[]asdfghjkl;'zxcvbnm,./QWERTYUIOP{"
-                "}ASDFGHJKL:ZXCVBNM<>?`~" + '"'
+            "&qwertyuiop[]asdfghjkl;'zxcvbnm,./QWERTYUIOP{"
+            "}ASDFGHJKL:ZXCVBNM<>?`~" + '"'
         )
         s2 = (
-                "?йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЯЧСМИТЬБЮ,"
-                "ёЁ" + "Э"
+            "?йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЯЧСМИТЬБЮ,"
+            "ёЁ" + "Э"
         )
         self.trans = str.maketrans(s1, s2)
 

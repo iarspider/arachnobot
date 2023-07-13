@@ -26,13 +26,15 @@ class DiscordCog(MyCog):
 
         await self.announce(True)
 
-    async def announce(self, now_ = False):
+    async def announce(self, now_=False):
         stream = await self.bot.my_get_stream(self.bot.streamer_id)
         game = self.bot.my_get_game(stream["game_id"])
         delta = self.bot.countdown_to - datetime.datetime.now()
         delta_m = delta.seconds // 60
         if delta_m > 0 and not now_:
-            delta_text = "примерно " + numeral.get_plural(delta_m, ("минута", "минуты", "минут"))
+            delta_text = "примерно " + numeral.get_plural(
+                delta_m, ("минута", "минуты", "минут")
+            )
         else:
             delta_text = "меньше минуты"
 
