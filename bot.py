@@ -264,6 +264,21 @@ class Bot(commands.Bot):
             self.greeted.add(name)
             self.greeted.add(display_name)
             if user.is_subscriber or user.badges.get("founder", -1) != -1:
+                logger.info("Start custom greeter")
+                if os.path.exists(f"greetings\\{name.lower()}.mp3"):
+                    logger.info("Found from 1st try")
+                    self.play_sound(f"greetings\\{name.lower()}.mp3")
+                    return
+                else:
+                    logger.info(f"No such file: greetings\\{name.lower()}.mp3")
+
+                if os.path.exists(f"greetings\\{display_name.lower()}.mp3"):
+                    logger.info("Found from 2nd try")
+                    self.play_sound(f"greetings\\{display_name.lower()}.mp3")
+                    return
+                else:
+                    logger.info(f"No such file: greetings\\{display_name.lower()}.mp3")
+
                 i = 4
             else:
                 i = random.randint(1, 3)
