@@ -259,10 +259,10 @@ class OBSCog(MyCog):
 
         self.ws.call(
             obsws_requests.SetInputMute(
-                source=self.aud_sources.getMic1(), inputMuted=True
+                inputName=self.aud_sources.getMic1(), inputMuted=True
             )
         )
-        self.ws.call(obsws_requests.SetInputMute(source="Радио", inputMuted=False))
+        self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=False))
 
         self.show_hide_scene_item("Starting", "Ожидание", False)
         self.show_hide_scene_item("Starting", "Countdown v3", True)
@@ -297,7 +297,7 @@ class OBSCog(MyCog):
     async def hide_zeroes(self, seconds: int):
         await asyncio.sleep(seconds)
         if (
-            self.ws.call(obsws_requests.GetCurrentProgramScene()).getSceneName()
+            self.ws.call(obsws_requests.GetCurrentProgramScene()).getCurrentProgramSceneName()
             != "Starting"
         ):
             return
@@ -334,12 +334,11 @@ class OBSCog(MyCog):
         )
 
     def switch_to(self, scene: str):
-        self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=True))
-
-        self.ws.call(obsws_requests.SetCurrentPreviewScene(sceneName=scene))
-        self.ws.call(obsws_requests.TriggerStudioModeTransition())
-
-        self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=False))
+        #self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=True))
+        self.ws.call(obsws_requests.SetCurrentProgramScene(sceneName=scene))
+        #self.ws.call(obsws_requests.TriggerStudioModeTransition())
+        #time.sleep(5)
+        #self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=False))
 
     def do_pause(self, ctx: typing.Optional[commands.Context], is_dinner: bool):
         # self.get_player()
@@ -355,7 +354,7 @@ class OBSCog(MyCog):
             # else:
             self.ws.call(
                 obsws_requests.SetInputMute(
-                    source=self.aud_sources.getMic1(), inputMuted=True
+                    inputName=self.aud_sources.getMic1(), inputMuted=True
                 )
             )
 
@@ -392,7 +391,7 @@ class OBSCog(MyCog):
                 # self.ws.call(obsws_requests.SetMute(source="Mic", mute=False))
                 self.ws.call(
                     obsws_requests.SetInputMute(
-                        source=self.aud_sources.getMic1(), inputMuted=False
+                        inputName=self.aud_sources.getMic1(), inputMuted=False
                     )
                 )
             self.ws.call(
@@ -416,7 +415,7 @@ class OBSCog(MyCog):
             # else:
             self.ws.call(
                 obsws_requests.SetInputMute(
-                    self.aud_sources.getMic1(), inputMuted=False
+                    inputName=self.aud_sources.getMic1(), inputMuted=False
                 )
             )
 
