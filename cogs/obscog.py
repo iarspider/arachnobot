@@ -337,7 +337,7 @@ class OBSCog(MyCog):
         #self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=True))
         self.ws.call(obsws_requests.SetCurrentProgramScene(sceneName=scene))
         #self.ws.call(obsws_requests.TriggerStudioModeTransition())
-        #time.sleep(5)
+        time.sleep(5)
         #self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=False))
 
     def do_pause(self, ctx: typing.Optional[commands.Context], is_dinner: bool):
@@ -505,7 +505,7 @@ class OBSCog(MyCog):
 
         try:
             arg = ctx.message.content.split()[1]
-        except ValueError:
+        except IndexError:
             dt = datetime.datetime.now()
             dt += datetime.timedelta(hours=1)
             arg = dt.strftime("%H:%M")
@@ -533,7 +533,7 @@ class OBSCog(MyCog):
 
         try:
             arg = ctx.message.content.split()[1]
-        except ValueError:
+        except IndexError:
             dt = datetime.datetime.now()
             dt += datetime.timedelta(hours=1)
             arg = dt.strftime("%H:%M")
