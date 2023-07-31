@@ -297,7 +297,9 @@ class OBSCog(MyCog):
     async def hide_zeroes(self, seconds: int):
         await asyncio.sleep(seconds)
         if (
-            self.ws.call(obsws_requests.GetCurrentProgramScene()).getCurrentProgramSceneName()
+            self.ws.call(
+                obsws_requests.GetCurrentProgramScene()
+            ).getCurrentProgramSceneName()
             != "Starting"
         ):
             return
@@ -334,33 +336,33 @@ class OBSCog(MyCog):
         )
 
     def switch_to(self, scene: str):
-        #self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=True))
+        # self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=True))
         self.ws.call(obsws_requests.SetCurrentProgramScene(sceneName=scene))
-        #self.ws.call(obsws_requests.TriggerStudioModeTransition())
+        # self.ws.call(obsws_requests.TriggerStudioModeTransition())
         time.sleep(5)
-        #self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=False))
+        # self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=False))
 
     def do_pause(self, ctx: typing.Optional[commands.Context], is_dinner: bool):
         # self.get_player()
         # self.player_play_pause()
 
-        if self.ws is not None:
-            self.ws.call(obsws_requests.PauseRecord())
-            self.show_hide_scene_item("Paused", "ужин", is_dinner)
+        if self.ws is None:
+            return
 
-            self.switch_to("Paused")
-            # if self.vr:
-            #     self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), True))
-            # else:
-            self.ws.call(
-                obsws_requests.SetInputMute(
-                    inputName=self.aud_sources.getMic1(), inputMuted=True
-                )
-            )
+        self.ws.call(obsws_requests.PauseRecord())
+        self.show_hide_scene_item("Paused", "ужин", is_dinner)
 
-            self.ws.call(
-                obsws_requests.SetInputMute(inputName="Радио", inputMuted=False)
+        self.switch_to("Paused")
+        # if self.vr:
+        #     self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), True))
+        # else:
+        self.ws.call(
+            obsws_requests.SetInputMute(
+                inputName=self.aud_sources.getMic1(), inputMuted=True
             )
+        )
+
+        self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=False))
         # self.get_chatters()
         if ctx:
             asyncio.ensure_future(ctx.send("Начать перепись населения!"))
@@ -381,58 +383,60 @@ class OBSCog(MyCog):
         # self.get_player()
         # self.player_play_pause()
 
-        if self.ws is not None:
-            if self.vr:
-                self.switch_to("VR Game")
-                # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
-                #                                     False))
-            else:
-                self.switch_to("Game")
-                # self.ws.call(obsws_requests.SetMute(source="Mic", mute=False))
-                self.ws.call(
-                    obsws_requests.SetInputMute(
-                        inputName=self.aud_sources.getMic1(), inputMuted=False
-                    )
-                )
-            self.ws.call(
-                obsws_requests.SetInputMute(inputName="Радио", inputMuted=True)
-            )
+        if self.ws is None:
+            return
 
-        self.ws.call(obsws_requests.StartRecord())
+        self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=True))
 
-    async def do_resume(self, ctx: typing.Optional[commands.Context]):
-        if self.ws is not None:
-            old_screne = self.ws.call(obsws_requests.GetCurrentProgramScene())
-
-            self.show_hide_scene_item("Paused", "ужин", False)
+        if self.vr:
+            self.switch_to("VR Game")
+            # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
+            #                                     False))
+        else:
             self.switch_to("Game")
-
-            # TODO: VR
-            # if self.vr:
-            #     self.switch_to("VR Game")
-            #     # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
-            #     # False))
-            # else:
+            # self.ws.call(obsws_requests.SetMute(source="Mic", mute=False))
             self.ws.call(
                 obsws_requests.SetInputMute(
                     inputName=self.aud_sources.getMic1(), inputMuted=False
                 )
             )
 
-            self.ws.call(
-                obsws_requests.SetInputMute(inputName="Радио", inputMuted=True)
+        self.ws.call(obsws_requests.StartRecord())
+
+    async def do_resume(self, ctx: typing.Optional[commands.Context]):
+        if self.ws is None:
+            return
+
+        old_screne = self.ws.call(obsws_requests.GetCurrentProgramScene())
+
+        self.show_hide_scene_item("Paused", "ужин", False)
+
+        # TODO: VR
+        # if self.vr:
+        #     self.switch_to("VR Game")
+        #     # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
+        #     # False))
+        # else:
+        self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=True))
+
+        self.ws.call(
+            obsws_requests.SetInputMute(
+                inputName=self.aud_sources.getMic1(), inputMuted=False
             )
+        )
 
-            res = self.ws.call(obsws_requests.GetRecordStatus())
-            # If recording was stopped, start it again,
-            # Otherwise, resume it
-            if res.getOutputActive():
-                self.ws.call(obsws_requests.ResumeRecord())
-            else:
-                self.ws.call(obsws_requests.StartRecord())
+        res = self.ws.call(obsws_requests.GetRecordStatus())
+        # If recording was stopped, start it again,
+        # Otherwise, resume it
+        if res.getOutputActive():
+            self.ws.call(obsws_requests.ResumeRecord())
+        else:
+            self.ws.call(obsws_requests.StartRecord())
 
-            if old_screne.name == "Battle":
-                return
+        if old_screne.name == "Battle":
+            return
+
+        self.switch_to("Game")
 
         try:
             logger.debug("get stream")
