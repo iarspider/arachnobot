@@ -160,7 +160,7 @@ class RIPCog(MyCog):
     @commands.command(name="norip")
     async def norip(self, ctx: commands.Context):
         """
-        Включает отображение смертей
+        Выключает отображение смертей
         """
         if not self.check_sender(ctx, "iarspider"):
             logger.info("check_sender failed")
