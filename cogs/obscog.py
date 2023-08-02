@@ -42,9 +42,11 @@ class OBSCog(MyCog):
         obsws_password = os.getenv("OBSWS_PASSWORD")
 
         if all((obsws_address, obsws_port, obsws_password)):
-            self.ws = obsws(obsws_address, int(obsws_port), obsws_password, legacy=True)
+            self.ws = obsws(
+                obsws_address, int(obsws_port), obsws_password, legacy=False
+            )
             self.ws.connect()
-            self.aud_sources = self.ws.call(obsws_requests.GetSpecialSources())
+            self.aud_sources = self.ws.call(obsws_requests.GetSpecialInputs())
         else:
             self.ws = None
 
@@ -52,11 +54,16 @@ class OBSCog(MyCog):
         #     self.get_player()
 
     def show_hide_scene_item(self, scene_name, item, visible):
-        self.ws.call(
-            obsws_requests.SetSceneItemProperties(
-                **{"scene-name": scene_name, "item": item, "visible": visible}
-            )
+        res = self.ws.call(
+            obsws_requests.GetSceneItemId(sceneName=scene_name, sourceName=item)
         )
+        if res.status:
+            id = res.datain["sceneItemId"]
+            self.ws.call(
+                obsws_requests.SetSceneItemEnabled(
+                    sceneName=scene_name, sceneItemId=id, sceneItemEnabled=visible
+                )
+            )
 
     def setup(self):
         self.ripcog = self.bot.get_cog("RIPCog")
@@ -128,13 +135,13 @@ class OBSCog(MyCog):
             return
 
         res: obsws_requests.GetStats = self.ws.call(obsws_requests.GetStats())
-        stats = res.getStats()
         asyncio.ensure_future(
             ctx.send(
-                f"FPS: {round(stats['fps'], 2)}, Skipped "
-                f"{stats['output-skipped-frames']} "
+                f"FPS: {round(res.getActiveFps(), 2)}, Skipped "
+                f"{res.getOutputSkippedFrames()} "
                 f"/ "
-                f"{stats['output-total-frames']}, CPU {round(stats['cpu-usage'], 2)}"
+                f"{res.getOutputTotalFrames}, CPU "
+                f"{round(res.GetCpuUsage(), 2)}"
             )
         )
 
@@ -151,30 +158,23 @@ class OBSCog(MyCog):
         self.ws.reconnect()
         self.bot.get_game_v5()
 
-        res: obsws_requests.GetStreamingStatus = self.ws.call(
-            obsws_requests.GetStreamingStatus()
+        res: obsws_requests.GetStreamStatus = self.ws.call(
+            obsws_requests.GetStreamStatus()
         )
-        if res.getStreaming():
+        if res.getOutputActive():
             logger.error("Already streaming!")
             return
 
         self.switch_to("Starting")
 
-        self.aud_sources = self.ws.call(obsws_requests.GetSpecialSources())
+        self.aud_sources = self.ws.call(obsws_requests.GetSpecialInputs())
+        self.ws.call(obsws_requests.SetCurrentProfile(profileName="Regular games"))
         self.ws.call(
-            obsws_requests.SetCurrentProfile(**{"profile-name": "Regular games"})
+            obsws_requests.SetCurrentSceneCollection(sceneCollectionName="Twitch")
         )
-        self.ws.call(obsws_requests.SetCurrentSceneCollection(**{"sc-name": "Twitch"}))
         self.show_hide_scene_item("Paused", "ужин", False)
 
         # Load trailer
-        source: obsws_requests.GetSourceSettings = self.ws.call(
-            obsws_requests.GetSourceSettings(
-                sourceName="Screensaver", sourceType="ffmpeg_source"
-            )
-        )
-        settings = source.getSourceSettings()
-
         game = self.game.replace("?", "_").replace(":", "_")
         files = glob.glob(
             os.path.join(trailer_root, game + " trailer.*"), recursive=False
@@ -185,19 +185,17 @@ class OBSCog(MyCog):
         else:
             logger.info(f"Trailer will use the following file: {files[0]}")
 
-        settings["local_file"] = files[0].replace("\\", "/")
-        res: obsws_requests.SetSourceSettings = self.ws.call(
-            obsws_requests.SetSourceSettings(
-                sourceName="Screensaver",
-                sourceSettings=settings,
-                sourceType="ffmpeg_source",
+        self.ws.call(
+            obsws_requests.SetInputSettings(
+                inputName="Screensaver",
+                inputSettings={"local_file": files[0].replace("\\", "/")},
+                overlay=True,
             )
         )
-        
+
         self.show_hide_scene_item("Starting", "Screensaver", False)
         time.sleep(1)
         self.show_hide_scene_item("Starting", "Screensaver", True)
-
 
         asyncio.ensure_future(
             ctx.send(
@@ -228,7 +226,7 @@ class OBSCog(MyCog):
             self.bot.countdown_to = dt
 
             with codecs.open(
-                    self.htmlfile.replace("html", "template"), encoding="UTF-8"
+                self.htmlfile.replace("html", "template"), encoding="UTF-8"
             ) as f:
                 lines = f.read()
 
@@ -244,10 +242,10 @@ class OBSCog(MyCog):
 
         write_countdown_html()
 
-        self.ws.call(obsws_requests.DisableStudioMode())
+        self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=False))
 
         # Refresh countdown
-        self.ws.call(obsws_requests.SetCurrentScene(**{"scene-name": "Starting"}))
+        self.ws.call(obsws_requests.SetCurrentProgramScene(sceneName="Starting"))
         self.show_hide_scene_item("Starting", "Countdown v3", False)
         time.sleep(1)
         self.show_hide_scene_item("Starting", "Countdown v3", True)
@@ -259,14 +257,17 @@ class OBSCog(MyCog):
         #     logger.warning("[WARN] Can't mute mic-2, please check!")
         # self.ws.call(obsws_requests.SetMute(source="Mic", mute=True))
 
-        # TODO: un-hardcode mic name
-        self.ws.call(obsws_requests.SetMute(source="Mic/Aux", mute=True))
-        self.ws.call(obsws_requests.SetMute(source="Радио", mute=False))
+        self.ws.call(
+            obsws_requests.SetInputMute(
+                inputName=self.aud_sources.getMic1(), inputMuted=True
+            )
+        )
+        self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=False))
 
         self.show_hide_scene_item("Starting", "Ожидание", False)
         self.show_hide_scene_item("Starting", "Countdown v3", True)
 
-        self.ws.call(obsws_requests.StartStreaming())
+        self.ws.call(obsws_requests.StartStream())
 
         asyncio.ensure_future(
             ctx.send(
@@ -295,7 +296,12 @@ class OBSCog(MyCog):
 
     async def hide_zeroes(self, seconds: int):
         await asyncio.sleep(seconds)
-        if self.ws.call(obsws_requests.GetCurrentScene()).getName() != "Starting":
+        if (
+            self.ws.call(
+                obsws_requests.GetCurrentProgramScene()
+            ).getCurrentProgramSceneName()
+            != "Starting"
+        ):
             return
 
         self.show_hide_scene_item("Starting", "Ожидание", True)
@@ -330,35 +336,33 @@ class OBSCog(MyCog):
         )
 
     def switch_to(self, scene: str):
-        res = self.ws.call(obsws_requests.GetStudioModeStatus())
-        if not res.getStudioMode():
-            self.ws.call(obsws_requests.EnableStudioMode())
-
-        self.ws.call(obsws_requests.SetPreviewScene(**{"scene-name": scene}))
-        self.ws.call(
-            obsws_requests.TransitionToProgram(
-                **{"with-transition": {"name": "Stinger"}}
-            )
-        )
-
-        self.ws.call(obsws_requests.DisableStudioMode())
+        # self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=True))
+        self.ws.call(obsws_requests.SetCurrentProgramScene(sceneName=scene))
+        # self.ws.call(obsws_requests.TriggerStudioModeTransition())
+        time.sleep(5)
+        # self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=False))
 
     def do_pause(self, ctx: typing.Optional[commands.Context], is_dinner: bool):
         # self.get_player()
         # self.player_play_pause()
 
-        if self.ws is not None:
-            self.ws.call(obsws_requests.PauseRecording())
-            self.show_hide_scene_item("Paused", "ужин", is_dinner)
+        if self.ws is None:
+            return
 
-            self.switch_to("Paused")
-            # if self.vr:
-            #     self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), True))
-            # else:
-            self.ws.call(obsws_requests.SetMute(source="Mic/Aux", mute=True))
+        self.ws.call(obsws_requests.PauseRecord())
+        self.show_hide_scene_item("Paused", "ужин", is_dinner)
 
+        self.switch_to("Paused")
+        # if self.vr:
+        #     self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(), True))
+        # else:
+        self.ws.call(
+            obsws_requests.SetInputMute(
+                inputName=self.aud_sources.getMic1(), inputMuted=True
+            )
+        )
 
-            self.ws.call(obsws_requests.SetMute(source="Радио", mute=False))
+        self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=False))
         # self.get_chatters()
         if ctx:
             asyncio.ensure_future(ctx.send("Начать перепись населения!"))
@@ -379,48 +383,60 @@ class OBSCog(MyCog):
         # self.get_player()
         # self.player_play_pause()
 
-        if self.ws is not None:
-            if self.vr:
-                self.switch_to("VR Game")
-                # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
-                #                                     False))
-            else:
-                self.switch_to("Game")
-                # self.ws.call(obsws_requests.SetMute(source="Mic", mute=False))
-                # TODO: remove hardcoded source name
-                self.ws.call(obsws_requests.SetMute(source="Mic/Aux",
-                                                    mute=False))
-            self.ws.call(obsws_requests.SetMute(source="Радио", mute=True))
+        if self.ws is None:
+            return
 
-        self.ws.call(obsws_requests.StartRecording())
+        self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=True))
+
+        if self.vr:
+            self.switch_to("VR Game")
+            # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
+            #                                     False))
+        else:
+            self.switch_to("Game")
+            # self.ws.call(obsws_requests.SetMute(source="Mic", mute=False))
+            self.ws.call(
+                obsws_requests.SetInputMute(
+                    inputName=self.aud_sources.getMic1(), inputMuted=False
+                )
+            )
+
+        self.ws.call(obsws_requests.StartRecord())
 
     async def do_resume(self, ctx: typing.Optional[commands.Context]):
-        if self.ws is not None:
-            old_screne = self.ws.call(obsws_requests.GetCurrentScene())
+        if self.ws is None:
+            return
 
-            self.show_hide_scene_item("Paused", "ужин", False)
+        old_screne = self.ws.call(obsws_requests.GetCurrentProgramScene())
 
-            # TODO: VR
-            # if self.vr:
-            #     self.switch_to("VR Game")
-            #     # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
-            #     # False))
-            # else:
-            self.switch_to("Game")
-            # TODO: remove hardcoded name
-            self.ws.call(obsws_requests.SetMute(source="Mic/Aux", mute=False))
+        self.show_hide_scene_item("Paused", "ужин", False)
 
-            self.ws.call(obsws_requests.SetMute(source="Радио", mute=True))
-            res: obsws_requests.GetRecordingStatus = self.ws.call(
-                obsws_requests.GetRecordingStatus()
+        # TODO: VR
+        # if self.vr:
+        #     self.switch_to("VR Game")
+        #     # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
+        #     # False))
+        # else:
+        self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=True))
+
+        self.ws.call(
+            obsws_requests.SetInputMute(
+                inputName=self.aud_sources.getMic1(), inputMuted=False
             )
-            if res.getIsRecordingPaused():
-                self.ws.call(obsws_requests.ResumeRecording())
-            else:
-                self.ws.call(obsws_requests.StartRecording())
+        )
 
-            if old_screne.name == "Battle":
-                return
+        res = self.ws.call(obsws_requests.GetRecordStatus())
+        # If recording was stopped, start it again,
+        # Otherwise, resume it
+        if res.getOutputActive():
+            self.ws.call(obsws_requests.ResumeRecord())
+        else:
+            self.ws.call(obsws_requests.StartRecord())
+
+        if old_screne.name == "Battle":
+            return
+
+        self.switch_to("Game")
 
         try:
             logger.debug("get stream")
@@ -460,7 +476,7 @@ class OBSCog(MyCog):
             asyncio.ensure_future(
                 ctx.send(
                     "@" + ctx.author.name + ", у тебя нет прав на выполнение этой "
-                                            "команды!"
+                    "команды!"
                 )
             )
             return
@@ -493,14 +509,16 @@ class OBSCog(MyCog):
 
         try:
             arg = ctx.message.content.split()[1]
-        except ValueError:
+        except IndexError:
             dt = datetime.datetime.now()
             dt += datetime.timedelta(hours=1)
             arg = dt.strftime("%H:%M")
 
         self.ws.call(
-            obsws_requests.SetTextGDIPlusProperties(
-                source="ужин", text=f"Ужин, продолжим примерно в {arg} мск"
+            obsws_requests.SetInputSettings(
+                inputName="ужин",
+                inputSettings={"text": f"Ужин, продолжим примерно в " f"{arg} мск"},
+                overlay=True,
             )
         )
 
@@ -519,14 +537,16 @@ class OBSCog(MyCog):
 
         try:
             arg = ctx.message.content.split()[1]
-        except ValueError:
+        except IndexError:
             dt = datetime.datetime.now()
             dt += datetime.timedelta(hours=1)
             arg = dt.strftime("%H:%M")
 
         self.ws.call(
-            obsws_requests.SetTextGDIPlusProperties(
-                source="ужин", text=f"Обед, продолжим примерно в {arg} мск"
+            obsws_requests.SetInputSettings(
+                inputName="ужин",
+                inputSettings={"text": f"Обед, продолжим примерно в " f"{arg} мск"},
+                overlay=True,
             )
         )
 
@@ -540,11 +560,9 @@ class OBSCog(MyCog):
         if self.bot.game is None:
             self.bot.get_game_v5()
 
-        source: obsws_requests.GetSourceSettings = self.ws.call(
-            obsws_requests.GetSourceSettings("Game Capture", "game_capture")
-        )
+        source = self.ws.call(obsws_requests.GetInputSettings(inputName="Game Capture"))
 
-        settings = source.getSourceSettings()
+        settings = source.getInputSettings()
         if settings["capture_mode"] != "window":
             await ctx.send("Неправильный режим захвата!")
             return
