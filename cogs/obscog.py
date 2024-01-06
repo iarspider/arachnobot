@@ -33,6 +33,7 @@ class OBSCog(MyCog):
         self.session = requests.Session()
 
         self.ws: typing.Optional[obsws] = None
+        self.teleport_ws: typing.Optional[obsws] = None
 
         self.game = None
         self.title = None
@@ -50,15 +51,35 @@ class OBSCog(MyCog):
         else:
             self.ws = None
 
+        obsws_address = os.getenv("OBSWS_TELEPORT_ADDRESS")
+        obsws_port = os.getenv("OBSWS_TELEPORT_PORT")
+        obsws_password = os.getenv("OBSWS_TELEPORT_PASSWORD")
+
+        if all((obsws_address, obsws_port, obsws_password)):
+            self.teleport_ws = obsws(
+                obsws_address, int(obsws_port), obsws_password, legacy=False
+            )
+            self.teleport_ws.connect()
+            # self.aud_sources = self.ws.call(obsws_requests.GetSpecialInputs())
+        else:
+            self.teleport_ws = None
+
+        self.use_teleport = False
         # if pywinauto:
         #     self.get_player()
+
+    def ws_call(self, request: obsws_requests.Baserequests):
+        if self.use_teleport:
+            return self.teleport_ws.call(request)
+        else:
+            return self.ws.call(request)
 
     def show_hide_scene_item(self, scene_name, item, visible):
         res = self.ws.call(
             obsws_requests.GetSceneItemId(sceneName=scene_name, sourceName=item)
         )
         if res.status:
-            id = res.datain["sceneItemId"]
+            id = res.getSceneItemId()
             self.ws.call(
                 obsws_requests.SetSceneItemEnabled(
                     sceneName=scene_name, sceneItemId=id, sceneItemEnabled=visible
@@ -134,7 +155,7 @@ class OBSCog(MyCog):
             logger.info("Wrong sender!")
             return
 
-        res: obsws_requests.GetStats = self.ws.call(obsws_requests.GetStats())
+        res: obsws_requests.GetStats = self.ws_call(obsws_requests.GetStats())
         asyncio.ensure_future(
             ctx.send(
                 f"FPS: {round(res.getActiveFps(), 2)}, Skipped "
@@ -144,6 +165,24 @@ class OBSCog(MyCog):
                 f"{round(res.GetCpuUsage(), 2)}"
             )
         )
+
+    @commands.command(name="teleport", aliases=["tp"])
+    async def teleport(self, ctx: commands.Context):
+        if not self.bot.check_sender(ctx, "iarspider"):
+            logger.info("Wrong sender!")
+            return
+
+        if not self.ws:
+            return
+
+        if not self.use_teleport:
+            self.teleport_ws.connect()
+            logger.info("Will use teleport!")
+            self.use_teleport = True
+        else:
+            self.teleport_ws.disconnect()
+            logger.info("Will use local OBS")
+            self.use_teleport = False
 
     @commands.command(name="setup")
     async def setup_(self, ctx: commands.Context):
@@ -156,9 +195,12 @@ class OBSCog(MyCog):
             return
 
         self.ws.reconnect()
+        if self.use_teleport:
+            self.teleport_ws.reconnect()
+
         self.bot.get_game_v5()
 
-        res: obsws_requests.GetStreamStatus = self.ws.call(
+        res: obsws_requests.GetStreamStatus = self.ws_call(
             obsws_requests.GetStreamStatus()
         )
         if res.getOutputActive():
@@ -237,9 +279,6 @@ class OBSCog(MyCog):
         if not self.bot.check_sender(ctx, "iarspider"):
             return
 
-        if not self.ws:
-            return
-
         write_countdown_html()
 
         self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=False))
@@ -267,7 +306,7 @@ class OBSCog(MyCog):
         self.show_hide_scene_item("Starting", "Ожидание", False)
         self.show_hide_scene_item("Starting", "Countdown v3", True)
 
-        self.ws.call(obsws_requests.StartStream())
+        self.ws_call(obsws_requests.StartStream())
 
         asyncio.ensure_future(
             ctx.send(
@@ -349,7 +388,7 @@ class OBSCog(MyCog):
         if self.ws is None:
             return
 
-        self.ws.call(obsws_requests.PauseRecord())
+        self.ws_call(obsws_requests.PauseRecord())
         self.show_hide_scene_item("Paused", "ужин", is_dinner)
 
         self.switch_to("Paused")
@@ -401,7 +440,7 @@ class OBSCog(MyCog):
                 )
             )
 
-        self.ws.call(obsws_requests.StartRecord())
+        self.ws_call(obsws_requests.StartRecord())
 
     async def do_resume(self, ctx: typing.Optional[commands.Context]):
         if self.ws is None:
@@ -429,9 +468,9 @@ class OBSCog(MyCog):
         # If recording was stopped, start it again,
         # Otherwise, resume it
         if res.getOutputActive():
-            self.ws.call(obsws_requests.ResumeRecord())
+            self.ws_call(obsws_requests.ResumeRecord())
         else:
-            self.ws.call(obsws_requests.StartRecord())
+            self.ws_call(obsws_requests.StartRecord())
 
         if old_screne.name == "Battle":
             return
@@ -439,13 +478,10 @@ class OBSCog(MyCog):
         self.switch_to("Game")
 
         try:
-            logger.debug("get stream")
             res = await self.bot.my_get_stream(self.bot.streamer_id)
-            logger.debug("got stream")
             viewers = numeral.get_plural(
                 res["viewer_count"], ("зритель", "зрителя", "зрителей")
             )
-            logger.debug("prepared message")
             msg = (
                 f"Перепись населения завершена успешно! Население стрима "
                 f"составляет {viewers}"
@@ -454,7 +490,6 @@ class OBSCog(MyCog):
             if ctx:
                 asyncio.ensure_future(ctx.send(msg))
 
-            logger.debug("sent message")
             # self.bot.get_game_v5()
             return msg
         except (KeyError, TypeError) as exc:

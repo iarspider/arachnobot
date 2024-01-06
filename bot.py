@@ -1,9 +1,6 @@
-from dotenv import load_dotenv
-
 import asyncio
 import datetime
 import http.client as http_client
-import json
 import logging
 import os
 import pathlib
@@ -20,11 +17,14 @@ import peewee
 import requests
 import socketio
 import uvicorn
+from dotenv import load_dotenv
 from loguru import logger
+from pywizlight import wizlight, PilotBuilder
 from requests.structures import CaseInsensitiveDict
 from twitchio import User, Message, Channel, Chatter, Client
 from twitchio.ext import commands, sounds, pubsub
 
+import nightbot_api
 import twitch_api
 from aio_timer import Periodic
 from config import *
@@ -60,11 +60,16 @@ class InterceptHandler(logging.Handler):
 def setup_logging(logfile, debug, color, http_debug):
     loglevel = logging.DEBUG if debug else logging.INFO
     logger.remove()
-    logger.add(sys.stderr, level=loglevel, backtrace=True, diagnose=False,
-               colorize=color,
-               format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | "
-                      "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{"
-                      "line}</cyan> - <level>{message}</level>")
+    logger.add(
+        sys.stderr,
+        level=loglevel,
+        backtrace=True,
+        diagnose=False,
+        colorize=color,
+        format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{"
+        "line}</cyan> - <level>{message}</level>",
+    )
     logger.add(
         logfile,
         level=loglevel,
@@ -129,6 +134,10 @@ class GameConfig(peewee.Model):
     rip_enabled = peewee.BooleanField(default=True)
     music_enabled = peewee.BooleanField(default=False)
     window = peewee.CharField(default="X")
+    infinite = peewee.BooleanField(default=False)
+    inexact = peewee.BooleanField(default=False)
+    mt = peewee.BooleanField(default=False)
+    mt_str = peewee.CharField(default="iarspider/moar__/danzio_plagius")
 
     class Meta:
         database = database
@@ -198,6 +207,12 @@ class Bot(commands.Bot):
 
         self.load_pearls()
 
+        self.nightbot = nightbot_api.get_nightbot_session(
+            os.getenv("NIGHTBOT_CLIENT_ID"),
+            os.getenv("NIGHTBOT_CLIENT_SECRET"),
+            nightbot_redirect_url,
+        )
+
     async def send_message(self, message):
         channel: Channel = self.get_channel(self.initial_channels[0].lstrip("#"))
         asyncio.ensure_future(channel.send(message))
@@ -243,6 +258,25 @@ class Bot(commands.Bot):
             self.game = GameConfig.create(game=game_name)
             self.game.save()
 
+        nightbot_api.enable_disable_timer(self.nightbot, "Мультитвич", self.game.mt)
+        nightbot_api.enable_disable_timer(self.nightbot, "Neputin", not self.game.mt)
+
+        if self.game.mt:
+            commands = nightbot_api.get_commands(self.nightbot)
+            if self.game.mt_str.startswith("http"):
+                msg = "Мультитвич: " + self.game.mt_str
+            else:
+                msg = "Мультитвич: https://www.multitwitch.tv/" + self.game.mt_str
+            cmd_id = None
+            for cmd in commands:
+                if cmd["name"] == "!mt":
+                    cmd_id = cmd["_id"]
+                    break
+            if not cmd_id:
+                logger.error("!mt command not found!")
+            else:
+                nightbot_api.put_command(self.nightbot, cmd_id, {"message": msg})
+
         self.call_cogs("update")
 
     def add_user(self, user: Chatter):
@@ -256,10 +290,10 @@ class Bot(commands.Bot):
             self.viewers[display_name] = user
 
         if not (
-                name in self.greeted
-                or display_name in self.greeted
-                or name in self.bots
-                or name == "iarspider"
+            name in self.greeted
+            or display_name in self.greeted
+            or name in self.bots
+            or name == "iarspider"
         ):
             self.greeted.add(name)
             self.greeted.add(display_name)
@@ -333,9 +367,8 @@ class Bot(commands.Bot):
         return res
 
     async def event_message(self, message: Message):
-
         if message.raw_data.startswith(
-                "> " ":arachnobot!arachnobot@arachnobot.tmi.twitch.tv"
+            "> " ":arachnobot!arachnobot@arachnobot.tmi.twitch.tv"
         ):
             return
 
@@ -376,7 +409,7 @@ class Bot(commands.Bot):
                 logger.debug(
                     f"Updated last messages for {message.author.name}, "
                     + f"will remember last "
-                      f"{len(self.last_messages[message.author.name])}"
+                    f"{len(self.last_messages[message.author.name])}"
                 )
 
         if message.content.startswith("!"):
@@ -415,7 +448,7 @@ class Bot(commands.Bot):
             pass
 
     async def event_pubsub_channel_points(
-            self, event: pubsub.PubSubChannelPointsMessage
+        self, event: pubsub.PubSubChannelPointsMessage
     ):
         user = await self.create_user(event.user.id, event.user.name).fetch()
         # user = await event.user.fetch()
@@ -453,6 +486,13 @@ class Bot(commands.Bot):
                     "action": "event",
                     "value": {"type": "nihil", "from": requestor},
                 }
+            case "Эксклюзивное Ничего, pro edition":
+                logger.debug(f"Queued redepmtion: pro nothing, {requestor}")
+                self.play_sound("my_sound\\exclusive_nothing_pro.mp3")
+                item = {
+                    "action": "event",
+                    "value": {"type": "nihil", "from": requestor},
+                }
             case "Стримлер! Не горбись!":
                 logger.debug(f"Queued redepmtion: sit, {requestor}")
                 self.play_sound("my_sound\\StraightenUp.mp3")
@@ -464,6 +504,7 @@ class Bot(commands.Bot):
                     ["Nice01", "Nice02", "ThatWasFun01", "ThatWasFun02", "ThatWasFun03"]
                 )
                 self.play_sound(f"sound\\Minion General Speech@ignore@{s}.mp3")
+                asyncio.ensure_future(do_wizlight_disco())
             case "Гори!":
                 snd = random.choice(
                     ["Goblin_Burn_1", "Minion_BurnBurn", "Minion_FireNoHurt"]
@@ -518,8 +559,8 @@ class Bot(commands.Bot):
             return
 
         femme = (
-                user.name.lower() in twitch_ladies
-                or user.display_name.lower() in twitch_ladies
+            user.name.lower() in twitch_ladies
+            or user.display_name.lower() in twitch_ladies
         )
 
         if user.is_subscriber:
@@ -742,7 +783,7 @@ class Bot(commands.Bot):
                 headers={
                     "Accept": "application/vnd.twitchtv.v5+json",
                     "Authorization": f"Bearer " f"{os.getenv('TWITCH_CHAT_PASSWORD')}",
-                    "Client-ID": os.getenv('TWITCH_CHAT_CLIENT_ID'),
+                    "Client-ID": os.getenv("TWITCH_CHAT_CLIENT_ID"),
                 },
             )
 
@@ -770,7 +811,7 @@ class Bot(commands.Bot):
             headers={
                 "Accept": "application/vnd.twitchtv.v5+json",
                 "Authorization": f"Bearer {os.getenv('TWITCH_CHAT_PASSWORD')}",
-                "Client-ID": os.getenv('TWITCH_CHAT_CLIENT_ID'),
+                "Client-ID": os.getenv("TWITCH_CHAT_CLIENT_ID"),
             },
         )
 
@@ -781,13 +822,14 @@ class Bot(commands.Bot):
     async def my_run_commercial(self, user_id, length=90):
         await self.my_get_stream(self.streamer_id)
         sess = twitch_api.get_session(
-            os.getenv('TWITCH_CLIENT_ID'), os.getenv('TWITCH_CLIENT_SECRET'),
-            twitch_redirect_url
+            os.getenv("TWITCH_CLIENT_ID"),
+            os.getenv("TWITCH_CLIENT_SECRET"),
+            twitch_redirect_url,
         )
         res = sess.post(
             "https://api.twitch.tv/helix/channels/commercial",
             data={"broadcaster_id": user_id, "length": length},
-            headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')},
+            headers={"Client-ID": os.getenv("TWITCH_CLIENT_ID")},
         )
         try:
             res.raise_for_status()
@@ -873,6 +915,14 @@ class Bot(commands.Bot):
         else:
             await ctx.send("Нет! 🗿")
 
+    @commands.command(name="togglemt")
+    async def toggmelt(self, ctx: commands.Context):
+        if not self.check_sender(ctx, "iarspider"):
+            return
+
+        self.game.mt = not self.game.mt
+        self.game.save()
+
     @commands.command(
         name="perl",
         aliases=[
@@ -935,8 +985,9 @@ class Bot(commands.Bot):
                 tasks.append(asyncio.create_task(self.send_viewer_joined(viewer)))
 
         for item in self.pubsub_events:
-            tasks.append(asyncio.create_task(self.sio_server.emit(item["action"],
-                                                                  item["value"])))
+            tasks.append(
+                asyncio.create_task(self.sio_server.emit(item["action"], item["value"]))
+            )
 
         # noinspection PySimplifyBooleanCheck
         if tasks != []:
@@ -1026,12 +1077,12 @@ async def main():
         twitch_bot.load_module("cogs.obscog")
 
     for extension in (
-            "discordcog",
-            "pluschcog",
-            "ripcog",
-            "SLCog",
-            "elfcog",
-            "duelcog",
+        "discordcog",
+        "pluschcog",
+        "ripcog",
+        "SLCog",
+        "elfcog",
+        "duelcog",
     ):  # 'raidcog', 'vmodcog', 'musiccog'
         # noinspection PyUnboundLocalVariable
         logger.info(f"Loading module {extension}")
@@ -1039,13 +1090,14 @@ async def main():
 
     twitch_bot.call_cogs("setup")
     pubsub_sess = twitch_api.get_session(
-        os.getenv('TWITCH_CLIENT_ID'), os.getenv('TWITCH_CLIENT_SECRET'),
-        twitch_redirect_url
+        os.getenv("TWITCH_CLIENT_ID"),
+        os.getenv("TWITCH_CLIENT_SECRET"),
+        twitch_redirect_url,
     )
     client = Client(
         token=pubsub_sess.token["access_token"].replace("oauth2:", ""),
         initial_channels=["#iarspider"],
-        client_secret=os.getenv('TWITCH_CLIENT_SECRET'),
+        client_secret=os.getenv("TWITCH_CLIENT_SECRET"),
     )
 
     client.pubsub = pubsub.PubSubPool(client)
@@ -1060,8 +1112,9 @@ async def main():
     async def event_token_expired():
         logger.info("Renewing token...")
         pubsub_sess = twitch_api.get_session(
-            os.getenv('TWITCH_CLIENT_ID'), os.getenv('TWITCH_CLIENT_SECRET'),
-            twitch_redirect_url
+            os.getenv("TWITCH_CLIENT_ID"),
+            os.getenv("TWITCH_CLIENT_SECRET"),
+            twitch_redirect_url,
         )
 
         return pubsub_sess.token["access_token"].replace("oauth2:", "")
@@ -1081,8 +1134,9 @@ async def main():
 # Can't update socketio/engineio because SL is using old socketio
 # version that is not supported in modern versions
 # noinspection PyProtectedMember, PySimplifyBooleanCheck
-async def emit(self, event, data, namespace, room=None, skip_sid=None,
-               callback=None, **kwargs):
+async def emit(
+    self, event, data, namespace, room=None, skip_sid=None, callback=None, **kwargs
+):
     """Emit a message to a single client, a room, or all the clients
     connected to the namespace.
 
@@ -1099,11 +1153,51 @@ async def emit(self, event, data, namespace, room=None, skip_sid=None,
                 id = self._generate_ack_id(sid, namespace, callback)
             else:
                 id = None
-            tasks.append(asyncio.create_task(
-                self.server._emit_internal(sid, event, data, namespace, id)))
+            tasks.append(
+                asyncio.create_task(
+                    self.server._emit_internal(sid, event, data, namespace, id)
+                )
+            )
     if tasks == []:  # pragma: no cover
         return
     await asyncio.wait(tasks)
+
+
+async def do_wizlight_disco():
+    states = []
+    logger.info("Starting disco...")
+    for _ in wiz_config:
+        b = wizlight(**_)
+        state = await b.updateState()
+        if not state.get_state():
+            logger.error(f"!!! Lightbulb {_['ip']} is off !!!")
+            states.append(None)
+            continue
+
+        states.append(
+            {
+                "speed": state.get_speed(),
+                "scene": state.get_scene_id(),
+                "brightness": state.get_brightness(),
+            }
+        )
+
+        await b.turn_on(PilotBuilder(speed=200, scene=4, brightness=255))
+        await b.async_close()
+        del b
+
+    logger.info("Sleeping...")
+    await asyncio.sleep(180)
+    logger.info("Restoring...")
+
+    for i, _ in enumerate(config):
+        if states[i] is not None:
+            b = wizlight(**_)
+            await b.turn_on(PilotBuilder(**states[i]))
+            await b.async_close()
+            del b
+
+    await asyncio.sleep(1)
 
 
 def patch_socketio():

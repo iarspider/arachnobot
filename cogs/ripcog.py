@@ -33,6 +33,13 @@ class RIPCog(MyCog):
 
     def display_rip(self):
         with codecs.open("rip_display.txt", "w", "utf8") as f:
+            if self.game.inexact:
+                f.write("☠: {today}+ (всего: ≈{total})".format(**self.deaths))
+                return
+            if self.game.infinite:
+                f.write("☠: ∞".format(**self.deaths))
+                return
+
             f.write("☠: {today} (всего: {total})".format(**self.deaths))
 
     def write_rip(self):
@@ -51,6 +58,29 @@ class RIPCog(MyCog):
             if n > 0
             else "MercyWing1 PinkMercy MercyWing2"
         )
+
+    @commands.command(name="infrip", aliases=["ripinf", "infinity"])
+    async def infrip(self, ctx: commands.Context):
+        """
+        "бесконечные" смерти (если стример сдался и включил читы)
+        """
+        if not self.check_sender(ctx, "iarspider"):
+            return
+
+        self.game.infinite = True
+        asyncio.ensure_future(ctx.send("☠ → ∞"))
+        self.write_rip()
+
+    @commands.command(name="xrip", aliases=["ripx"])
+    async def inexrip(self, ctx: commands.Context):
+        """
+        "неточные" смерти (если чатик сдался и перестал считать читы)
+        """
+        if not self.check_sender(ctx, "iarspider"):
+            return
+
+        self.game.inexact = True
+        asyncio.ensure_future(ctx.send("☠ x много"))
 
     @commands.command(name="rip", aliases=("смерть", "кшз"))
     async def rip(self, ctx: commands.Context):
