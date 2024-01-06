@@ -137,5 +137,5 @@ dmypy.json
 *.txt
 *.json
 config.py
-bot.db
+bot.db*
 Pipfile.lock

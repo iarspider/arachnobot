@@ -34,3 +34,5 @@ twitch_no_bite = ("kaiden_moreil", "kochetov2000", "kaiden__moreil", "babytigero
 
 trailer_root = ''
 database_file = ''
+# format: list of {"ip": "x.x.x.x", "mac": "xxxxxxxxxxxx"}
+wiz_config = []

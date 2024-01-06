@@ -4,7 +4,6 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-twitchio = {extras = ["sounds"], version = "*"}
 requests-oauthlib = "*"
 websocket-client = "*"
 pywinauto = "*"
@@ -29,6 +28,8 @@ loguru = "*"
 ujson = "*"
 ciso8601 = "*"
 faust-cchardet = "*"
+twitchio = {git = "https://github.com/PythonistaGuild/TwitchIO"}
+pywizlight = "*"
 
 [dev-packages]
 

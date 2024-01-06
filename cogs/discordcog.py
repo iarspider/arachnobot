@@ -29,6 +29,8 @@ class DiscordCog(MyCog):
     async def announce(self, now_=False):
         stream = await self.bot.my_get_stream(self.bot.streamer_id)
         game = self.bot.my_get_game(stream["game_id"])
+#        game = {"name": "Just Chatting"}
+#        stream = {"title": "Проверка оповещений"}
         delta = self.bot.countdown_to - datetime.datetime.now()
         delta_m = delta.seconds // 60
         if delta_m > 0 and not now_:
@@ -37,6 +39,8 @@ class DiscordCog(MyCog):
             )
         else:
             delta_text = "меньше минуты"
+
+#        delta_text = "всё время мира"
 
         announcement = (
             f"@{discord_role} Паучок запустил стрим \"{stream['title']}\" "
@@ -48,13 +52,16 @@ class DiscordCog(MyCog):
             pika.URLParameters(os.getenv("RABBIT_URL"))
         )
         channel = connection.channel()
-        channel.queue_declare(queue="discord")
+        channel.queue_declare(queue="discord", durable=True, arguments={"x-message-ttl":60000})
         channel.basic_publish(
             exchange="",
             routing_key="discord",
             body=json.dumps(
                 {"action": "send", "message": announcement, "channel": discord_channel}
             ).encode("utf-8"),
+            properties=pika.BasicProperties(
+                          expiration=str(delta.seconds*1000)
+                      ),
         )
         channel.close()
         connection.close()
