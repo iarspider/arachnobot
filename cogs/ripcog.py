@@ -82,7 +82,7 @@ class RIPCog(MyCog):
         self.game.inexact = True
         asyncio.ensure_future(ctx.send("☠ x много"))
 
-    @commands.command(name="rip", aliases=("смерть", "кшз"))
+    @commands.command(name="rip", aliases=("смерть", "кшз", "рып"))
     async def rip(self, ctx: commands.Context):
         """
         Счётчик смертей
