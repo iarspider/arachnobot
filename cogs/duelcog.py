@@ -213,9 +213,7 @@ class DuelCog(MyCog):
             )
         )
 
-    @commands.command(name="mystats")
-    async def mystats(self, ctx: commands.Context):
-        author = ctx.author.display_name.lower()
+    async def get_duel_stats(self, ctx, author):
         cnt = DuelStats.select().where(DuelStats.attacker == author).count()
         if cnt == 0:
             asyncio.ensure_future(ctx.send(f"{author} ещё никого не атаковал"))
@@ -229,33 +227,69 @@ class DuelCog(MyCog):
             .scalar(as_tuple=True)
         )
 
-        res = (
-            DuelStats.select(DuelStats.wins, DuelStats.defender)
-            .filter(DuelStats.attacker == author)
-            .order_by(DuelStats.wins.asc())
+        max_wins = (
+            DuelStats.select(
+                DuelStats.attacker, peewee.fn.MAX(DuelStats.wins).alias("max_wins")
+            )
+            .where(DuelStats.attacker == author)
             .get()
+            .max_wins
         )
 
-        max_wins = res.wins
-        defender_a = res.defender
+        if max_wins > 0:
+            result = DuelStats.select(
+                DuelStats.attacker, DuelStats.defender, DuelStats.wins
+            ).where((DuelStats.wins == max_wins) & (DuelStats.attacker == author))
 
-        res = (
-            DuelStats.select(DuelStats.wins, DuelStats.defender)
-            .filter(DuelStats.attacker == author)
-            .order_by(DuelStats.losses.asc())
+            defenders_string = ", ".join([row.defender for row in result])
+            max_wins = result[0].wins
+            wins_string = (
+                f"Чаще всего одерживал победу над {defenders_string} ({max_wins} раз),"
+            )
+        else:
+            wins_string = "Не одерживал побед, "
+
+        max_losses = (
+            DuelStats.select(
+                DuelStats.attacker, peewee.fn.MAX(DuelStats.losses).alias("max_losses")
+            )
+            .where(DuelStats.attacker == author)
             .get()
+            .max_losses
         )
 
-        max_losses = res.losses
-        defender_b = res.defender
+        if max_losses > 0:
+            result = DuelStats.select(
+                DuelStats.attacker, DuelStats.defender, DuelStats.losses
+            ).where((DuelStats.losses == max_losses) & (DuelStats.attacker == author))
+
+            defenders_string = ", ".join([row.defender for row in result])
+            max_wins = result[0].wins
+            losses_string = (
+                f"Чаще всего терпел поражение от {defenders_string} ({max_losses} раз)"
+            )
+        else:
+            losses_string = "не терпел поражений"
 
         asyncio.ensure_future(
             ctx.send(
-                f"Статистика {author}: побед {sum_wins}, поражений {sum_losses}. "
-                f"Чаще всего побеждал {defender_a} ({max_wins} раз), "
-                f"чаще всего проигрывал {defender_b} ({max_losses} раз)"
+                f"Статистика дуэлянта {author}: побед {sum_wins}, поражений {sum_losses}. {wins_string}{losses_string}"
             )
         )
+
+    @commands.command(name="duelstats")
+    async def duelstats(self, ctx: commands.Context):
+        args = ctx.message.content.split()[1:]
+        if len(args) != 1:
+            await ctx.send("Использование: !duelstats <кто>")
+            return
+
+        await self.get_duel_stats(ctx, args[0].lower())
+
+    @commands.command(name="mystats")
+    async def mystats(self, ctx: commands.Context):
+        author = ctx.author.display_name.lower()
+        await self.get_duel_stats(ctx, author)
 
 
 def prepare(bot: Bot):

@@ -165,6 +165,17 @@ class Bot(commands.Bot):
             initial_channels=initial_channels or ["#iarspider"],
         )
 
+        s1 = (
+            "&qwertyuiop[]asdfghjkl;'zxcvbnm,./QWERTYUIOP{"
+            "}ASDFGHJKL:ZXCVBNM<>?`~" + '"'
+        )
+        s2 = (
+            "?йцукенгшщзхъфывапролджэячсмитьбю.ЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЯЧСМИТЬБЮ,"
+            "ёЁ" + "Э"
+        )
+        self.trans = str.maketrans(s1, s2)
+        self.rtrans = str.maketrans(s2, s1)
+
         # hack
         self._http._refresh_token = os.getenv("TWITCH_REFRESH_TOKEN")
 
@@ -1190,7 +1201,7 @@ async def do_wizlight_disco():
     await asyncio.sleep(180)
     logger.info("Restoring...")
 
-    for i, _ in enumerate(config):
+    for i, _ in enumerate(wiz_config):
         if states[i] is not None:
             b = wizlight(**_)
             await b.turn_on(PilotBuilder(**states[i]))
