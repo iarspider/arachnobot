@@ -17,6 +17,7 @@ from twitchio.ext import commands
 
 from bot import Bot
 from cogs.mycog import MyCog
+from twitch_commands import twitch_command_aliased
 
 sys.path.append("..")
 from config import trailer_root, trailer_default
@@ -142,14 +143,14 @@ class OBSCog(MyCog):
     #             logger.debug(f"Sending MUTE to player failed: {r.status_code},
     #             {r.text}")
     #
-    # @commands.command(name='play')
+    # @twitch_command_aliased(name='play')
     # async def play(self, ctx: commands.Context):
     #     if not self.bot.check_sender(ctx, 'iarspider'):
     #         return
     #
     #     self.player_play_pause()
 
-    @commands.command(name="stat", aliases=["stats", "ыефе", "ыефеы"])
+    @twitch_command_aliased(name="stat", aliases=("stats",))
     async def stats(self, ctx: commands.Context):
         if not self.bot.check_sender(ctx, "iarspider"):
             logger.info("Wrong sender!")
@@ -166,7 +167,7 @@ class OBSCog(MyCog):
             )
         )
 
-    @commands.command(name="teleport", aliases=["tp"])
+    @twitch_command_aliased(name="teleport", aliases=("tp",))
     async def teleport(self, ctx: commands.Context):
         if not self.bot.check_sender(ctx, "iarspider"):
             logger.info("Wrong sender!")
@@ -184,7 +185,7 @@ class OBSCog(MyCog):
             logger.info("Will use local OBS")
             self.use_teleport = False
 
-    @commands.command(name="setup")
+    @twitch_command_aliased(name="setup")
     async def setup_(self, ctx: commands.Context):
         if not self.bot.check_sender(ctx, "iarspider"):
             logger.info("Wrong sender!")
@@ -247,7 +248,7 @@ class OBSCog(MyCog):
             )
         )
 
-    @commands.command(name="countdown", aliases=["preroll", "cd", "pr", "св", "зк"])
+    @twitch_command_aliased(name="countdown", aliases=("preroll", "cd", "pr"))
     async def countdown(self, ctx: commands.Context):
         def write_countdown_html():
             args = ctx.message.content.split()[1:]
@@ -347,7 +348,7 @@ class OBSCog(MyCog):
         self.show_hide_scene_item("Starting", "Countdown v3", False)
 
     # noinspection PyUnusedLocal
-    @commands.command(name="end", aliases=["fin", "конец", "credits"])
+    @twitch_command_aliased(name="end", aliases=["fin", "конец", "credits"])
     async def end(self, ctx: commands.Context):
         if not self.bot.check_sender(ctx, "iarspider"):
             return
@@ -364,7 +365,7 @@ class OBSCog(MyCog):
             logger.error("Can't roll credits! " + str(exc))
             pass
 
-    @commands.command(name="vr")
+    @twitch_command_aliased(name="vr")
     async def toggle_vr(self, ctx: commands.Context):
         if not self.bot.check_sender(ctx, "iarspider"):
             return
@@ -408,7 +409,7 @@ class OBSCog(MyCog):
 
         asyncio.ensure_future(self.bot.my_run_commercial(self.bot.streamer_id, 60))
 
-    @commands.command(name="start")
+    @twitch_command_aliased(name="start")
     async def start_(self, ctx: commands.Context):
         """
         Начало трансляции. Аналог resume но без подсчёта зрителей
@@ -500,7 +501,7 @@ class OBSCog(MyCog):
             logger.error(str(exc))
             return msg
 
-    @commands.command(name="resume")
+    @twitch_command_aliased(name="resume")
     async def resume(self, ctx: commands.Context):
         """
         Отменяет перерыв
@@ -518,7 +519,7 @@ class OBSCog(MyCog):
 
         await self.do_resume(ctx)
 
-    @commands.command(name="pause", aliases=("break",))
+    @twitch_command_aliased(name="pause", aliases=("break",))
     async def pause(self, ctx: commands.Context):
         """
         Запускает перерыв
@@ -531,7 +532,7 @@ class OBSCog(MyCog):
 
         self.do_pause(ctx, False)
 
-    @commands.command(name="ужин")
+    @twitch_command_aliased(name="ужин")
     async def dinner(self, ctx: commands.Context):
         """
         Ужин - особый тип перерыва, при котором показывается сообщение об ужине
@@ -559,7 +560,7 @@ class OBSCog(MyCog):
 
         self.do_pause(ctx, True)
 
-    @commands.command(name="обед")
+    @twitch_command_aliased(name="обед")
     async def lunch(self, ctx: commands.Context):
         """
         Обед - особый тип перерыва, при котором показывается сообщение об обеде
@@ -590,7 +591,7 @@ class OBSCog(MyCog):
     async def enable_rip(self, state):
         self.show_hide_scene_item("Game", "RIP", state)
 
-    @commands.command(name="save")
+    @twitch_command_aliased(name="save")
     async def save_window(self, ctx: commands.Context):
         if self.bot.game is None:
             self.bot.get_game_v5()

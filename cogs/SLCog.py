@@ -1,5 +1,7 @@
 import sys
 
+from twitch_commands import twitch_command_aliased
+
 sys.path.append("..")
 
 import asyncio
@@ -220,7 +222,7 @@ class SLCog(MyCog):
             self.bot.play_sound(oname, True)
             return True
 
-    @commands.command(name="bugs", aliases=["баги"])
+    @twitch_command_aliased(name="bugs", aliases=("баги",))
     async def bugs(self, ctx: commands.Context):
         """
         Показывает текущее число "багов" (очков лояльности)
@@ -238,7 +240,7 @@ class SLCog(MyCog):
 
         await ctx.send(f"@{user} Набрано багов: {res}")
 
-    @commands.command(name="post", aliases=["почта"])
+    @twitch_command_aliased(name="post", aliases=("почта",))
     async def post(self, ctx: commands.Context):
         try:
             post_message = ctx.message.content.split(None, 1)[1]
@@ -287,7 +289,7 @@ class SLCog(MyCog):
         if not self.say(post_message):
             self.bot.play_sound("my_sound\\pochta.mp3")
 
-    @commands.command(name="sos", aliases=["ыщы", "alarm", "фдфкь"])
+    @twitch_command_aliased(name="sos", aliases=("alarm",))
     async def sos(self, ctx: commands.Context):
         if not (
             ctx.author.is_mod
@@ -301,7 +303,7 @@ class SLCog(MyCog):
 
         self.bot.play_sound("my_sound\\matmatmat.mp3")
 
-    @commands.command(name="spin")
+    @twitch_command_aliased(name="spin")
     async def spin(self, ctx: commands.Context):
         if ctx.author.name.lower() != "iarspider":
             return

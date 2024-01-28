@@ -32,6 +32,7 @@ twitchio = {git = "https://github.com/PythonistaGuild/TwitchIO"}
 pywizlight = "*"
 
 [dev-packages]
+black = "*"
 
 [requires]
 python_version = "3.11"
