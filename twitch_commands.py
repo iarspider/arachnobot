@@ -2,10 +2,20 @@ import functools
 
 from twitchio.ext import commands
 
+__all__ = ["twitch_command_aliased"]
+
 
 def translate_message(message: str):
-    _my_eng_symbols = r"`qwertyuiop[]\asdfghjkl;'zxcvbnm,./" + r'~QWERTYUIOP{}|ASDFGHJKL:"ZXCVBNM<>?' + "@#$^&"
-    _my_ru_symbols = r'ёйцукенгшщзхъ\фывапролджэячсмитьбю.' + r"ЁЙЦУКЕНГШЩЗХЪ/ФЫВАПРОЛДЖЭЯЧСМИТЬБЮ," + '"№;:?'
+    _my_eng_symbols = (
+        r"`qwertyuiop[]\asdfghjkl;'zxcvbnm,./"
+        + r'~QWERTYUIOP{}|ASDFGHJKL:"ZXCVBNM<>?'
+        + "@#$^&"
+    )
+    _my_ru_symbols = (
+        r"ёйцукенгшщзхъ\фывапролджэячсмитьбю."
+        + r"ЁЙЦУКЕНГШЩЗХЪ/ФЫВАПРОЛДЖЭЯЧСМИТЬБЮ,"
+        + '"№;:?'
+    )
 
     @functools.cache
     def translator_to_ru():
@@ -28,17 +38,27 @@ def translate_message(message: str):
         eng_count = len(list(filter(lambda x: x in get_only_eng(), word)))
         ru_count = len(list(filter(lambda x: x in get_only_ru(), word)))
 
-        word_translator = translator_to_eng() if ru_count >= eng_count else translator_to_ru()
+        word_translator = (
+            translator_to_eng() if ru_count >= eng_count else translator_to_ru()
+        )
         translated.append(str.translate(word, word_translator))
 
     return " ".join(translated)
 
 
-def twitch_command_aliased(command: str, *args, additional_command: list[str] | tuple[str] = None, **kwargs):
+def twitch_command_aliased(
+    name: str, *args, aliases: list[str] | tuple = None, **kwargs
+):
+    if aliases is None:
+        aliases = []
+
     def decorator(function):
-        new_aliases = list(map(translate_message, [command, *additional_command]))
-        actual_decorator = commands.command(name=command, aliases=sum([additional_command, new_aliases], start=[]),
-                                            *args, **kwargs)
+        all_commands = [name, *aliases]
+        new_aliases = list(map(translate_message, all_commands))
+        total_aliases = sum([aliases, new_aliases], start=[])
+        actual_decorator = commands.command(
+            name=name, aliases=total_aliases, *args, **kwargs
+        )
         return actual_decorator(function)
 
     return decorator
