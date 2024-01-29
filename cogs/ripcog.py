@@ -83,7 +83,7 @@ class RIPCog(MyCog):
         self.game.inexact = True
         asyncio.ensure_future(ctx.send("☠ x много"))
 
-    @twitch_command_aliased(name="rip", aliases=("смерть",))
+    @twitch_command_aliased(name="rip", aliases=("смерть", "рып", "рип"))
     async def rip(self, ctx: commands.Context):
         """
         Счётчик смертей
