@@ -13,9 +13,9 @@ class BSRCog(MyCog):
             "bsrhelp",
             "queue",
             "queuestatus",
-            "!oops",
-            "!wrongsong",
-            "!wrong",
+            "oops",
+            "wrongsong",
+            "wrong",
         ],
     )
     def bsr(self, ctx):
