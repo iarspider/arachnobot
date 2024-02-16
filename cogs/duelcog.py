@@ -9,6 +9,7 @@ from twitchio.ext import commands
 
 from bot import DuelStats, Bot
 from cogs.mycog import MyCog
+from twitch_commands import twitch_command_aliased
 
 sys.path.append("..")
 from config import allow_duel_from_mod, allow_duel_to_bot, allow_duel_to_mod
@@ -25,7 +26,7 @@ class DuelCog(MyCog):
         # TODO: use Twitch API for this
         await ctx.send(f"/timeout {user} {duration}")
 
-    @commands.command(name="fakeduel")
+    @twitch_command_aliased(name="fakeduel")
     async def fake_duel(self, ctx: commands.Context):
         if not self.check_sender(ctx, "iarspider"):
             return
@@ -78,7 +79,7 @@ class DuelCog(MyCog):
             # await ctx.timeout(defender, 30)
             # await ctx.timeout(attacker, 30)
 
-    @commands.command(name="deny", aliases=("no", "pass"))
+    @twitch_command_aliased(name="deny", aliases=("no", "pass"))
     async def deny_attack(self, ctx: commands.Context):
         defender_s = ctx.author.display_name
         defender = defender_s.lower()
@@ -102,7 +103,7 @@ class DuelCog(MyCog):
             )
         )
 
-    @commands.command(name="accept", aliases=("yes", "ok"))
+    @twitch_command_aliased(name="accept", aliases=("yes", "ok"))
     async def accept_attack(self, ctx: commands.Context):
         defender_name = ctx.author.display_name
         defender_lower = defender_name.lower()
@@ -167,7 +168,7 @@ class DuelCog(MyCog):
             await self.timeout(defender_name, ctx, 30)
             await self.timeout(attacker_name, ctx, 30)
 
-    @commands.command(name="attack")
+    @twitch_command_aliased(name="attack")
     async def attack(self, ctx: commands.Context):
         attacker_s = ctx.author.display_name
         attacker = attacker_s.lower()
@@ -277,7 +278,7 @@ class DuelCog(MyCog):
             )
         )
 
-    @commands.command(name="duelstats")
+    @twitch_command_aliased(name="duelstats")
     async def duelstats(self, ctx: commands.Context):
         args = ctx.message.content.split()[1:]
         if len(args) != 1:
@@ -286,7 +287,7 @@ class DuelCog(MyCog):
 
         await self.get_duel_stats(ctx, args[0].lower())
 
-    @commands.command(name="mystats")
+    @twitch_command_aliased(name="mystats")
     async def mystats(self, ctx: commands.Context):
         author = ctx.author.display_name.lower()
         await self.get_duel_stats(ctx, author)

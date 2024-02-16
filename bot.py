@@ -29,6 +29,8 @@ import twitch_api
 from aio_timer import Periodic
 from config import *
 
+from twitch_commands import twitch_command_aliased
+
 httpclient_logger = logging.getLogger("http.client")
 proc: Process
 dashboard_timer: Periodic
@@ -629,7 +631,7 @@ class Bot(commands.Bot):
     #     for line in lines:
     #         print('>', line)
 
-    @commands.command(name="roll", aliases=["dice", "кинь", "r"])
+    @twitch_command_aliased(name="roll", aliases=("dice", "кинь", "r"))
     async def roll(self, ctx: commands.Context):
         dices = []
 
@@ -673,7 +675,7 @@ class Bot(commands.Bot):
         elif len(rolls) == 1:
             await ctx.send("@{} выкинул: {}".format(ctx.author.display_name, roll_sum))
 
-    @commands.command(name="bite", aliases=["кусь"])
+    @twitch_command_aliased(name="bite", aliases=("кусь",))
     async def bite(self, ctx: commands.Context):
         attacker = ctx.author.name.lower()
         attacker_name = ctx.author.display_name
@@ -848,18 +850,18 @@ class Bot(commands.Bot):
         except requests.HTTPError:
             logger.error("Failed to run commercial:", res.json())
 
-    @commands.command(name="ping", aliases=["пинг", "зштп", "gbyu"])
+    @twitch_command_aliased(name="ping", aliases=("пинг",))
     async def cmd_ping(self, ctx: commands.Context):
         if not self.check_sender(ctx, "iarspider"):
             return
 
         await ctx.send("Yeth, Mathter?")
 
-    @commands.command(name="bomb", aliases=["man", "manual", "руководство"])
+    @twitch_command_aliased(name="bomb", aliases=("man", "manual", "руководство"))
     async def man(self, ctx: commands.Context):
         await ctx.send("Руководство тут - https://bombmanual.com/ru/web/index.html")
 
-    @commands.command(name="help", aliases=("помощь", "справка", "хелп"))
+    @twitch_command_aliased(name="help", aliases=("помощь", "справка", "хелп"))
     async def help(self, ctx: commands.Context):
         # asyncio.ensure_future(ctx.send(f"Никто тебе не поможет,
         # {ctx.author.display_name}!"))
@@ -870,7 +872,7 @@ class Bot(commands.Bot):
             )
         )
 
-    @commands.command(name="join")
+    @twitch_command_aliased(name="join")
     async def test_join(self, ctx: commands.Context):
         if not self.check_sender(ctx, "iarspider"):
             return
@@ -895,7 +897,7 @@ class Bot(commands.Bot):
         else:
             logger.warning("send_viewer_joined: sio_server is none!")
 
-    @commands.command(name="leave")
+    @twitch_command_aliased(name="leave")
     async def test_leave(self, ctx: commands.Context):
         if not self.check_sender(ctx, "iarspider"):
             return
@@ -918,7 +920,7 @@ class Bot(commands.Bot):
             for pearl in self.pearls:
                 print(pearl, file=f)
 
-    @commands.command(name="amivip")
+    @twitch_command_aliased(name="amivip")
     async def amivip(self, ctx: commands.Context):
         logger.info("Badges: " + str(ctx.author.badges))
         if ctx.author.is_vip:
@@ -926,7 +928,7 @@ class Bot(commands.Bot):
         else:
             await ctx.send("Нет! 🗿")
 
-    @commands.command(name="togglemt")
+    @twitch_command_aliased(name="togglemt")
     async def toggmelt(self, ctx: commands.Context):
         if not self.check_sender(ctx, "iarspider"):
             return
@@ -934,19 +936,8 @@ class Bot(commands.Bot):
         self.game.mt = not self.game.mt
         self.game.save()
 
-    @commands.command(
-        name="perl",
-        aliases=[
-            "перл",
-            "пёрл",
-            "pearl",
-            "зуфкд",
-            "quote",
-            "цитата",
-            "цытата",
-            "wbnfnf",
-            "wsnfnf",
-        ],
+    @twitch_command_aliased(
+        name="perl", aliases=("перл", "пёрл", "pearl", "quote", "цитата", "цытата")
     )
     async def pearl(self, ctx: commands.Context):
         try:

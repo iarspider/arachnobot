@@ -6,6 +6,7 @@ from pytils import numeral
 from twitchio.ext import commands
 
 from cogs.mycog import MyCog
+from twitch_commands import twitch_command_aliased
 
 
 class PluschCog(MyCog):
@@ -44,7 +45,7 @@ class PluschCog(MyCog):
         self.plusches += 1
         self.write_plusch()
 
-    @commands.command(name="plusch", aliases=["плющ", "вштырь"])
+    @twitch_command_aliased(name="plusch", aliases=("плющ", "вштырь"))
     async def plusch(self, ctx: commands.Context):
         command_ = ctx.message.content.split()[0]
         try:
@@ -54,20 +55,20 @@ class PluschCog(MyCog):
             self.do_plusch(ctx, "", "вштырь" in command_)
             pass
 
-    @commands.command(name="plushch", aliases=["плющь", "вштыр"])
+    @twitch_command_aliased(name="plushch", aliases=("плющь", "вштыр"))
     async def plushch(self, ctx: commands.Context):
         await ctx.send(
             f"/me стукнул {ctx.author.display_name} по голове учебником Розенталя"
         )
 
-    @commands.command(name="eplusch", aliases=["экипоплющило", "экивштырило"])
+    @twitch_command_aliased(name="eplusch", aliases=("экипоплющило", "экивштырило"))
     async def eplusch(self, ctx: commands.Context):
         command_ = ctx.message.content.split()[0]
         self.do_plusch(ctx, "", "экивштырило" in command_)
         self.plusches += 1
         self.write_plusch()
 
-    @commands.command(name="splusch", aliases=["самоплющ", "самовштырь"])
+    @twitch_command_aliased(name="splusch", aliases=("самоплющ", "самовштырь"))
     async def splusch(self, ctx: commands.Context):
         command_ = ctx.message.content.split()[0]
         display_name = ctx.author.display_name

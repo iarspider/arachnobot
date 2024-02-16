@@ -6,6 +6,7 @@ from loguru import logger
 from twitchio.ext import commands
 
 from cogs.mycog import MyCog
+from twitch_commands import twitch_command_aliased
 
 sys.path.append("..")
 from config import rippers
@@ -59,7 +60,7 @@ class RIPCog(MyCog):
             else "MercyWing1 PinkMercy MercyWing2"
         )
 
-    @commands.command(name="infrip", aliases=["ripinf", "infinity"])
+    @twitch_command_aliased(name="infrip", aliases=("ripinf", "infinity"))
     async def infrip(self, ctx: commands.Context):
         """
         "бесконечные" смерти (если стример сдался и включил читы)
@@ -71,7 +72,7 @@ class RIPCog(MyCog):
         asyncio.ensure_future(ctx.send("☠ → ∞"))
         self.write_rip()
 
-    @commands.command(name="xrip", aliases=["ripx"])
+    @twitch_command_aliased(name="xrip", aliases=("ripx",))
     async def inexrip(self, ctx: commands.Context):
         """
         "неточные" смерти (если чатик сдался и перестал считать читы)
@@ -82,7 +83,7 @@ class RIPCog(MyCog):
         self.game.inexact = True
         asyncio.ensure_future(ctx.send("☠ x много"))
 
-    @commands.command(name="rip", aliases=("смерть", "кшз", "рып"))
+    @twitch_command_aliased(name="rip", aliases=("смерть", "рып", "рип"))
     async def rip(self, ctx: commands.Context):
         """
         Счётчик смертей
@@ -113,7 +114,7 @@ class RIPCog(MyCog):
         ans = await self.do_rip(n=n_rip)
         asyncio.ensure_future(ctx.send(ans))
 
-    @commands.command(name="unrip")
+    @twitch_command_aliased(name="unrip")
     async def unrip(self, ctx: commands.Context):
         """
         Отмена смерти
@@ -125,7 +126,7 @@ class RIPCog(MyCog):
 
         asyncio.ensure_future(ctx.send(msg))
 
-    @commands.command(name="enrip")
+    @twitch_command_aliased(name="enrip")
     async def enrip(self, ctx: commands.Context):
         """
         Временно (до перезапуска бота) добавляет пользователя в rip-список
@@ -140,7 +141,7 @@ class RIPCog(MyCog):
 
         asyncio.ensure_future(ctx.send("{0} TwitchVotes ".format(args[0])))
 
-    @commands.command(name="lrip")
+    @twitch_command_aliased(name="lrip")
     async def lrip(self, ctx: commands.Context):
         """
         Перезагружает счётчик смертей (в случае смены игры)
@@ -152,7 +153,7 @@ class RIPCog(MyCog):
         self.get_game_v5()
         await ctx.send("Счётчик смертей обновлён")
 
-    @commands.command(name="setrip")
+    @twitch_command_aliased(name="setrip")
     async def setrip(self, ctx: commands.Context):
         """
         Устанавливает значение счётчика смертей за сегодня
@@ -172,7 +173,7 @@ class RIPCog(MyCog):
                 self.deaths["total"] = arg
             self.display_rip()
 
-    @commands.command(name="yesrip")
+    @twitch_command_aliased(name="yesrip")
     async def yesrip(self, ctx: commands.Context):
         """
         Включает отображение смертей
@@ -187,7 +188,7 @@ class RIPCog(MyCog):
         await self.obscog.enable_rip(True)
         await ctx.send("Счётчик смертей активирован")
 
-    @commands.command(name="norip")
+    @twitch_command_aliased(name="norip")
     async def norip(self, ctx: commands.Context):
         """
         Выключает отображение смертей
@@ -202,7 +203,7 @@ class RIPCog(MyCog):
         await self.obscog.enable_rip(False)
         await ctx.send("Счётчик смертей отключён")
 
-    # @commands.command(name='ripz')
+    # @twitch_command_aliased(name='ripz')
     # async def ripz(self, ctx: commands.Context):
     #     """
     #         Счётчик смертей
@@ -211,7 +212,7 @@ class RIPCog(MyCog):
     #     """
     #     await self.do_rip(ctx, "#Отзомбячено!")
     #
-    # @commands.command(name='riph')
+    # @twitch_command_aliased(name='riph')
     # async def riph(self, ctx: commands.Context):
     #     """
     #         Счётчик смертей
@@ -220,7 +221,7 @@ class RIPCog(MyCog):
     #     """
     #     await self.do_rip(ctx, "#Захедкраблено")
     #
-    # @commands.command(name='ripc')
+    # @twitch_command_aliased(name='ripc')
     # async def ripc(self, ctx: commands.Context):
     #     """
     #         Счётчик смертей
@@ -229,7 +230,7 @@ class RIPCog(MyCog):
     #     """
     #     await self.do_rip(ctx, "#Укомбайнено")
     #
-    # @commands.command(name='ripb')
+    # @twitch_command_aliased(name='ripb')
     # async def ripb(self, ctx: commands.Context):
     #     """
     #         Счётчик смертей
@@ -238,8 +239,8 @@ class RIPCog(MyCog):
     #     """
     #     await self.do_rip(ctx, "#Барнакнуто")
     #
-    # @commands.command(name='ripn', aliases=['nom', 'omnomnom', 'ном', 'ням',
-    # 'омномном'])
+    # @twitch_command_aliased(name='ripn', aliases=('nom', 'omnomnom', 'ном', 'ням',
+    # 'омномном'))
     # async def nom(self, ctx: commands.Context):
     #     await self.do_rip(ctx, 'Ом-ном-ном!')
 

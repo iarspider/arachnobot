@@ -2,19 +2,20 @@
 from twitchio.ext import commands
 
 from cogs.mycog import MyCog
+from twitch_commands import twitch_command_aliased
 
 
 class BSRCog(MyCog):
-    @commands.command(
+    @twitch_command_aliased(
         name="bsr",
         aliases=[
             "link",
             "bsrhelp",
             "queue",
             "queuestatus",
-            "!oops",
-            "!wrongsong",
-            "!wrong",
+            "oops",
+            "wrongsong",
+            "wrong",
         ],
     )
     def bsr(self, ctx):

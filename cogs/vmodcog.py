@@ -6,6 +6,7 @@ from twitchio.ext import commands
 
 from bot import Bot
 from cogs.mycog import MyCog
+from twitch_commands import twitch_command_aliased
 
 warnings.simplefilter("ignore", UserWarning)
 try:
@@ -65,7 +66,7 @@ class VMcog(MyCog):
         except (pywinauto.findwindows.ElementNotFoundError, RuntimeError):
             logger.warning("Could not find VoiceMod Desktop window")
 
-    @commands.command(name="vmod")
+    @twitch_command_aliased(name="vmod")
     async def vmod(self, ctx: commands.Context):
         if ctx.author.name.lower() != "iarspider":
             return

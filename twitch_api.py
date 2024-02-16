@@ -6,9 +6,17 @@ import json as simplejson
 import requests
 from requests_oauthlib import OAuth2Session
 
-scope = ["channel:edit:commercial", "channel:moderate", "channel:read:redemptions", "chat:edit", "chat:read", "moderator:manage:banned_users"]
+scope = [
+    "channel:edit:commercial",
+    "channel:moderate",
+    "channel:read:redemptions",
+    "chat:edit",
+    "chat:read",
+    "moderator:manage:banned_users",
+]
 
 TOKEN_FILE = "twitch_token.json"
+
 
 def token_saver(token):
     with open(TOKEN_FILE, "w") as f:
@@ -48,8 +56,8 @@ def validate(oauth: OAuth2Session, can_refresh=True):
             token = oauth.refresh_token(oauth.auto_refresh_url)
             token_saver(token)
             oauth_ = get_session(
-                os.getenv('TWITCH_CLIENT_ID'),
-                os.getenv('TWITCH_CLIENT_SECRET'),
+                os.getenv("TWITCH_CLIENT_ID"),
+                os.getenv("TWITCH_CLIENT_SECRET"),
                 "https://iarazumov.com/oauth/twitch",
             )
             validate(oauth_, False)
@@ -88,7 +96,7 @@ def my_get_users(oauth, user_name=None):
     res = oauth.get(
         "https://api.twitch.tv/helix/users",
         params=params,
-        headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')},
+        headers={"Client-ID": os.getenv("TWITCH_CLIENT_ID")},
     )
     try:
         res.raise_for_status()
@@ -96,6 +104,7 @@ def my_get_users(oauth, user_name=None):
         # print(res.text)
         exit(1)
     return res.json()["data"][0]
+
 
 def my_get_users_byid(oauth, id=None):
     if id:
@@ -105,7 +114,7 @@ def my_get_users_byid(oauth, id=None):
     res = oauth.get(
         "https://api.twitch.tv/helix/users",
         params=params,
-        headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')},
+        headers={"Client-ID": os.getenv("TWITCH_CLIENT_ID")},
     )
     try:
         res.raise_for_status()
@@ -113,7 +122,8 @@ def my_get_users_byid(oauth, id=None):
         # print(res.text)
         exit(1)
     return res.json()["data"][0]
-    
+
+
 def main():
     import logging
     import http.client as http_client
@@ -126,8 +136,8 @@ def main():
     requests_log.propagate = True
 
     oauth = get_session(
-        os.getenv('TWITCH_CLIENT_ID'),
-        os.getenv('TWITCH_CLIENT_SECRET'),
+        os.getenv("TWITCH_CLIENT_ID"),
+        os.getenv("TWITCH_CLIENT_SECRET"),
         "https://iarazumov.com/oauth/twitch",
     )
     validate(oauth)
@@ -139,17 +149,17 @@ def main():
     #        params={"login": user_name},
     #        headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')},
 
-    #res = oauth.get("https://api.twitch.tv/helix/subscriptions/user", params={"broadcaster_id": wmuga_id, "user_id": my_id}, headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')})
-    #res = oauth.get("https://api.twitch.tv/helix/channels", params={"broadcaster_id": my_id}, headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')})
+    # res = oauth.get("https://api.twitch.tv/helix/subscriptions/user", params={"broadcaster_id": wmuga_id, "user_id": my_id}, headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')})
+    # res = oauth.get("https://api.twitch.tv/helix/channels", params={"broadcaster_id": my_id}, headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')})
     # res = oauth.get(
-        # f"https://api.twitch.tv/helix/streams",
-        # params={"user_login": "iarspider"},
-        # headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')},
+    # f"https://api.twitch.tv/helix/streams",
+    # params={"user_login": "iarspider"},
+    # headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')},
     # )
-    #res.raise_for_status()
+    # res.raise_for_status()
     from pprint import pprint
 
-    #pprint(res.json()["data"])
+    # pprint(res.json()["data"])
     print(f"=== {my_id} ===")
 
 

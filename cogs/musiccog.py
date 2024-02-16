@@ -12,6 +12,7 @@ from twitchio.ext import commands
 from aio_timer import Periodic
 from bot import Bot
 from cogs.mycog import MyCog
+from twitch_commands import twitch_command_aliased
 
 
 class MusicCog(MyCog):
@@ -75,7 +76,7 @@ class MusicCog(MyCog):
     def update(self):
         self.set_music(self.bot.game.music_enabled)
 
-    @commands.command(name="yesmusic")
+    @twitch_command_aliased(name="yesmusic")
     async def enable_music(self, ctx: commands.Context):
         if not self.check_sender(ctx, "iarspider"):
             logger.info("check_sender failed")
@@ -83,7 +84,7 @@ class MusicCog(MyCog):
 
         self.set_music(True)
 
-    @commands.command(name="nomusic")
+    @twitch_command_aliased(name="nomusic")
     async def disable_music(self, ctx: commands.Context):
         if not self.check_sender(ctx, "iarspider"):
             logger.info("check_sender failed")
