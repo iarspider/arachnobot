@@ -55,7 +55,7 @@ def twitch_command_aliased(
     def decorator(function):
         all_commands = [name, *aliases]
         new_aliases = list(map(translate_message, all_commands))
-        total_aliases = sum([aliases, new_aliases], start=[])
+        total_aliases = sum([list(aliases), list(new_aliases)], start=[])
         actual_decorator = commands.command(
             name=name, aliases=total_aliases, *args, **kwargs
         )

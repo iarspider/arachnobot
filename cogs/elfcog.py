@@ -1,5 +1,6 @@
 import asyncio
 
+from twitch_commands import twitch_command_aliased
 from twitchio.ext import commands
 
 from cogs.mycog import MyCog
@@ -9,7 +10,7 @@ class ElvenCog(MyCog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(
+    @twitch_command_aliased(
         name="translit",
         aliases=("translate", "tr", "trans", "перевод", "переведи", "эльф"),
     )
