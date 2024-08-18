@@ -52,11 +52,12 @@ def setup_mixer():
     pygame.init()
 
 
-def play_sound(sound: str):
-    soundfile = pathlib.Path(__file__).with_name(sound)
-    # logger.debug("play sound", soundfile)
-    pygame.mixer.music.load(str(soundfile))
-    pygame.mixer.music.play()
+#
+# def play_sound(sound: str):
+#     soundfile = pathlib.Path(__file__).with_name(sound)
+#     # logger.debug("play sound", soundfile)
+#     pygame.mixer.music.load(str(soundfile))
+#     pygame.mixer.music.play()
 
 
 def get_new_token():

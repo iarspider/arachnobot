@@ -2,13 +2,12 @@ import sys
 
 from twitch_commands import twitch_command_aliased
 
-sys.path.append("..")
+# sys.path.append("..")
 
 import asyncio
 import datetime
 import logging
 import os
-import subprocess
 import time
 from tempfile import NamedTemporaryFile
 from loguru import logger
@@ -143,7 +142,7 @@ class SLCog(MyCog):
             )
         return self.bot.__getattribute__(item)
 
-    def say(self, text):
+    async def say(self, text):
         if not self.voxdata:
             logger.warning("VoxWorker not setup")
             return False
@@ -193,33 +192,8 @@ class SLCog(MyCog):
                 fname = tempfile.name
                 tempfile.write(res.content)
 
-            with NamedTemporaryFile(delete=False, suffix=".mp3") as tempfile:
-                oname = tempfile.name
-                try:
-                    subprocess.check_call(
-                        (
-                            "ffmpeg.exe",
-                            "-loglevel",
-                            "panic",
-                            "-y",
-                            "-i",
-                            fname,
-                            "-ab",
-                            "128",
-                            "-ar",
-                            "44100",
-                            "-ac",
-                            "2",
-                            oname,
-                        )
-                    )
-                    os.unlink(fname)
-                except subprocess.CalledProcessError as e:
-                    logger.exception("Call to ffmpeg.exe failed")
-                    return False
-
-            self.bot.play_sound("my_sound\\ding-sound-effect_1.mp3")
-            self.bot.play_sound(oname, True)
+            await self.bot.play_sound("my_sound\\ding-sound-effect_1.mp3")
+            await self.bot.play_sound(tempfile.name, True)
             return True
 
     @twitch_command_aliased(name="bugs", aliases=("баги",))
@@ -248,15 +222,15 @@ class SLCog(MyCog):
             return
 
         # await self.ctx.send("Почта на ремонте")
-        # self.bot.play_sound("pochta.mp3")
+        # await self.bot.play_sound("pochta.mp3")
         # return
         #
+        now = datetime.datetime.now()
         if ctx.author.name != "iarspider":
             lastpost = self.last_post.get(ctx.author.name, None)
-            now = datetime.datetime.now()
             if lastpost is not None:
                 delta = now - lastpost
-                if delta.seconds < 10 * 60:
+                if delta.seconds < self.post_timeout:
                     asyncio.ensure_future(
                         ctx.send("Не надо так часто отправлять почту!")
                     )
@@ -280,14 +254,16 @@ class SLCog(MyCog):
                 )
 
                 return
-            res = api.sub_points(self.streamlabs_oauth, ctx.author.name, price)
-            self.last_post[ctx.author.name] = now
-            logger.debug(res)
         else:
             price = 0
 
-        if not self.say(post_message):
-            self.bot.play_sound("my_sound\\pochta.mp3")
+        if await self.say(post_message):
+            if price > 0:
+                res = api.sub_points(self.streamlabs_oauth, ctx.author.name, price)
+                logger.debug(res)
+            self.last_post[ctx.author.name] = now
+        else:
+            await self.bot.play_sound("my_sound\\pochta.mp3")
 
     @twitch_command_aliased(name="sos", aliases=("alarm",))
     async def sos(self, ctx: commands.Context):
@@ -301,7 +277,7 @@ class SLCog(MyCog):
             )
             return
 
-        self.bot.play_sound("my_sound\\matmatmat.mp3")
+        await self.bot.play_sound("my_sound\\matmatmat.mp3")
 
     @twitch_command_aliased(name="spin")
     async def spin(self, ctx: commands.Context):

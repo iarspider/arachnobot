@@ -201,6 +201,17 @@ class OBSCog(MyCog):
 
         self.bot.get_game_v5()
 
+        self.switch_to("Starting")
+
+        if not self.aud_sources:
+            self.aud_sources = self.ws.call(obsws_requests.GetSpecialInputs())
+        
+        self.ws.call(obsws_requests.SetCurrentProfile(profileName="Regular games"))
+        self.ws.call(
+            obsws_requests.SetCurrentSceneCollection(sceneCollectionName="Twitch")
+        )
+        self.show_hide_scene_item("Paused", "ужин", False)
+
         res: obsws_requests.GetStreamStatus = self.ws_call(
             obsws_requests.GetStreamStatus()
         )
@@ -208,19 +219,11 @@ class OBSCog(MyCog):
             logger.error("Already streaming!")
             return
 
-        self.switch_to("Starting")
-
-        self.aud_sources = self.ws.call(obsws_requests.GetSpecialInputs())
-        self.ws.call(obsws_requests.SetCurrentProfile(profileName="Regular games"))
-        self.ws.call(
-            obsws_requests.SetCurrentSceneCollection(sceneCollectionName="Twitch")
-        )
-        self.show_hide_scene_item("Paused", "ужин", False)
-
         # Load trailer
-        game = self.game.replace("?", "_").replace(":", "_")
+        game_trailer_blob = self.game.replace("?", "_").replace(":", "_") + " trailer.*"
+        logger.info("Looking for trailer named " + game_trailer_blob)
         files = glob.glob(
-            os.path.join(trailer_root, game + " trailer.*"), recursive=False
+            os.path.join(trailer_root, game_trailer_blob), recursive=False
         )
         if not files:
             logger.info(f"No trailer found, will use screensaver")
@@ -391,6 +394,19 @@ class OBSCog(MyCog):
 
         self.ws_call(obsws_requests.PauseRecord())
         self.show_hide_scene_item("Paused", "ужин", is_dinner)
+        self.ws.call(
+            obsws_requests.SetInputSettings(
+                inputName="Eating",
+                inputSettings={
+                    "file": (
+                        r"E:/__Stream/Eating.PNG"
+                        if is_dinner
+                        else r"E:/__Stream/Обэд.png"
+                    )
+                },
+                overlay=True,
+            )
+        )
 
         self.switch_to("Paused")
         # if self.vr:
@@ -530,6 +546,8 @@ class OBSCog(MyCog):
             asyncio.ensure_future(ctx.send("/timeout " + ctx.author.name + " 1"))
             return
 
+        self.show_hide_scene_item("Paused", "Eating", False)
+        self.show_hide_scene_item("Paused", "Pause", True)
         self.do_pause(ctx, False)
 
     @twitch_command_aliased(name="ужин")
@@ -553,10 +571,15 @@ class OBSCog(MyCog):
         self.ws.call(
             obsws_requests.SetInputSettings(
                 inputName="ужин",
-                inputSettings={"text": f"Ужин, продолжим примерно в " f"{arg} мск"},
+                inputSettings={"text": f"Ужин, продолжим примерно в {arg} мск"},
                 overlay=True,
             )
         )
+        
+        self.ws.call(obsws_requests.SetInputSettings(inputName="Eating", inputSettings={"file": "E:/__Stream/Eating.PNG"}, overlay=True))
+
+        self.show_hide_scene_item("Paused", "Eating", True)
+        self.show_hide_scene_item("Paused", "Pause", False)
 
         self.do_pause(ctx, True)
 
@@ -585,6 +608,11 @@ class OBSCog(MyCog):
                 overlay=True,
             )
         )
+        
+        self.ws.call(obsws_requests.SetInputSettings(inputName="Eating", inputSettings={"file": "E:/__Stream/Обэд.png"}, overlay=True))
+
+        self.show_hide_scene_item("Paused", "Eating", True)
+        self.show_hide_scene_item("Paused", "Pause", False)
 
         self.do_pause(ctx, True)
 

@@ -100,12 +100,12 @@ def get_socket_token(oauth):
 
 
 def main():
-    from config import (
-        streamlabs_client_id,
-        streamlabs_client_secret,
-        streamlabs_redirect_uri,
-    )
+    from config import streamlabs_redirect_uri
     import logging
+    import os
+
+    streamlabs_client_id = os.environ["STREAMLABS_CLIENT_ID"]
+    streamlabs_client_secret = os.environ["STREAMLABS_CLIENT_SECRET"]
 
     try:
         import http.client as http_client
@@ -120,6 +120,7 @@ def main():
     requests_log = logging.getLogger("requests.packages.urllib3")
     requests_log.setLevel(logging.DEBUG)
     requests_log.propagate = True
+    print(f"{streamlabs_client_id=}, {streamlabs_client_secret=}, {streamlabs_redirect_uri=}")
     oauth = get_streamlabs_session(
         streamlabs_client_id, streamlabs_client_secret, streamlabs_redirect_uri
     )

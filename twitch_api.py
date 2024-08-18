@@ -143,7 +143,7 @@ def main():
     validate(oauth)
     # print(my_get_users(oauth, "cwelth"))
     # print(my_get_users(oauth, "twitch"))
-    my_id = my_get_users_byid(oauth, "51962038")
+    # my_id = my_get_users_byid(oauth, "51962038")
     # wmuga_id = my_get_users(oauth, "wmuga")["id"]
     # wg_id = my_get_users(oauth, "womens_games")["id"]
     #        params={"login": user_name},
@@ -160,7 +160,13 @@ def main():
     from pprint import pprint
 
     # pprint(res.json()["data"])
-    print(f"=== {my_id} ===")
+    # print(f"=== {my_id} ===")
+    def get_game(name):
+        res = oauth.get("https://api.twitch.tv/helix/games", params={"name": name}, headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')})
+        res.raise_for_status()
+        return res.json()
+    res = get_game("LEGO Batman 2")
+    pprint(res)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,6 @@ from collections import defaultdict, deque
 from multiprocessing import Process
 from typing import Union, Iterable, Optional, List, Dict
 
-import eyed3 as eyed3
 import peewee
 import requests
 import socketio
@@ -24,6 +23,7 @@ from requests.structures import CaseInsensitiveDict
 from twitchio import User, Message, Channel, Chatter, Client
 from twitchio.ext import commands, sounds, pubsub
 
+# noinspection PyUnresolvedReferences
 import nightbot_api
 import twitch_api
 from aio_timer import Periodic
@@ -158,7 +158,7 @@ class DuelStats(peewee.Model):
 
 
 class Bot(commands.Bot):
-    def __init__(self, sio_server, initial_channels=None):
+    def __init__(self, sio_server_, initial_channels=None):
         super().__init__(
             token=os.getenv("TWITCH_CHAT_PASSWORD"),
             client_id=os.getenv("TWITCH_CHAT_CLIENT_ID"),
@@ -211,7 +211,7 @@ class Bot(commands.Bot):
 
         self.player = sounds.AudioPlayer(callback=self.player_done)
         self.started = False
-        self.sio_server = sio_server
+        self.sio_server = sio_server_
         self.timer = None
         self.game: Optional[GameConfig] = None
         # self.duels: Optional[DuelStats] = None
@@ -220,17 +220,40 @@ class Bot(commands.Bot):
 
         self.load_pearls()
 
-        self.nightbot = nightbot_api.get_nightbot_session(
-            os.getenv("NIGHTBOT_CLIENT_ID"),
-            os.getenv("NIGHTBOT_CLIENT_SECRET"),
-            nightbot_redirect_url,
-        )
+        self.play_sound_lock = asyncio.Lock()
+        self.current_sound = ""
+
+        # self.nightbot = nightbot_api.get_nightbot_session(
+        # os.getenv("NIGHTBOT_CLIENT_ID"),
+        # os.getenv("NIGHTBOT_CLIENT_SECRET"),
+        # nightbot_redirect_url
+        # )
 
     async def send_message(self, message):
         channel: Channel = self.get_channel(self.initial_channels[0].lstrip("#"))
         asyncio.ensure_future(channel.send(message))
 
     async def player_done(self):
+        self.play_sound_lock.release()
+        if self.current_sound:
+            logger.info(f"Done playing sound {self.current_sound}")
+            count = 60
+            while count > 0:
+                try:
+                    os.unlink(self.current_sound)
+                except PermissionError as e:
+                    logger.warning(
+                        f"Failed to unlink tempfile "
+                        f"{os.path.basename(self.current_sound)}: {str(e)}"
+                    )
+                    count -= 1
+                    time.sleep(1)
+                else:
+                    break
+            else:
+                logger.error(f"Giving up on file {self.current_sound}")
+        else:
+            logger.info(f"Done playing some sound")
         pass
 
     def call_cogs(self, method):
@@ -271,29 +294,28 @@ class Bot(commands.Bot):
             self.game = GameConfig.create(game=game_name)
             self.game.save()
 
-        nightbot_api.enable_disable_timer(self.nightbot, "Мультитвич", self.game.mt)
-        nightbot_api.enable_disable_timer(self.nightbot, "Neputin", not self.game.mt)
+        # nightbot_api.enable_disable_timer(self.nightbot, "Мультитвич", self.game.mt)
+        # nightbot_api.enable_disable_timer(self.nightbot, "Neputin", not self.game.mt)
 
-        if self.game.mt:
-            commands = nightbot_api.get_commands(self.nightbot)
-            if self.game.mt_str.startswith("http"):
-                msg = "Мультитвич: " + self.game.mt_str
-            else:
-                msg = "Мультитвич: https://www.multitwitch.tv/" + self.game.mt_str
-            cmd_id = None
-            for cmd in commands:
-                if cmd["name"] == "!mt":
-                    cmd_id = cmd["_id"]
-                    break
-            if not cmd_id:
-                logger.error("!mt command not found!")
-            else:
-                nightbot_api.put_command(self.nightbot, cmd_id, {"message": msg})
+        # if self.game.mt:
+        # commands = nightbot_api.get_commands(self.nightbot)
+        # if self.game.mt_str.startswith("http"):
+        # msg = "Мультитвич: " + self.game.mt_str
+        # else:
+        # msg = "Мультитвич: https://www.multitwitch.tv/" + self.game.mt_str
+        # cmd_id = None
+        # for cmd in commands:
+        # if cmd["name"] == "!mt":
+        # cmd_id = cmd["_id"]
+        # break
+        # if not cmd_id:
+        # logger.error("!mt command not found!")
+        # else:
+        # nightbot_api.put_command(self.nightbot, cmd_id, {"message": msg})
 
         self.call_cogs("update")
 
     def add_user(self, user: Chatter):
-        new_user = False
         name = user.name.lower()
         display_name = user.display_name.lower()
         if name not in self.viewers:
@@ -314,14 +336,18 @@ class Bot(commands.Bot):
                 logger.info("Start custom greeter")
                 if os.path.exists(f"greetings\\{name.lower()}.mp3"):
                     logger.info("Found from 1st try")
-                    self.play_sound(f"greetings\\{name.lower()}.mp3")
+                    asyncio.ensure_future(
+                        self.play_sound(f"greetings\\{name.lower()}.mp3")
+                    )
                     return
                 else:
                     logger.info(f"No such file: greetings\\{name.lower()}.mp3")
 
                 if os.path.exists(f"greetings\\{display_name.lower()}.mp3"):
                     logger.info("Found from 2nd try")
-                    self.play_sound(f"greetings\\{display_name.lower()}.mp3")
+                    asyncio.ensure_future(
+                        self.play_sound(f"greetings\\{display_name.lower()}.mp3")
+                    )
                     return
                 else:
                     logger.info(f"No such file: greetings\\{display_name.lower()}.mp3")
@@ -329,7 +355,9 @@ class Bot(commands.Bot):
                 i = 4
             else:
                 i = random.randint(1, 3)
-            self.play_sound(f"sound\\TOWER_TITLES@GREETING_{i}@JES.mp3")
+            asyncio.ensure_future(
+                self.play_sound(f"sound\\TOWER_TITLES@GREETING_{i}@JES.mp3")
+            )
 
     # Fill in missing stuff
     def get_cog(self, name):
@@ -366,7 +394,8 @@ class Bot(commands.Bot):
 
         self.get_game_v5()
 
-    def get_emotes(self, tag, msg):
+    @staticmethod
+    def get_emotes(tag, msg):
         # example tag: '306267910:5-11,20-26/74409:13-18'
         res = []
         if tag:
@@ -467,6 +496,7 @@ class Bot(commands.Bot):
         # user = await event.user.fetch()
         await self.do_reward(user, event.reward.title, event.input)
 
+    # noinspection PyUnusedLocal
     async def do_reward(self, user: User, title: str, prompt: str):
         item = None
         requestor = user.display_name or user.name
@@ -487,28 +517,28 @@ class Bot(commands.Bot):
 
             case "Ничего":
                 logger.debug(f"Queued redepmtion: nothing, {requestor}")
-                self.play_sound("my_sound\\nothing0.mp3")
+                await self.play_sound("my_sound\\nothing0.mp3")
                 item = {
                     "action": "event",
                     "value": {"type": "nothing", "from": requestor},
                 }
             case "Дизайнерское Ничего":
                 logger.debug(f"Queued redepmtion: designer nothing, {requestor}")
-                self.play_sound("my_sound\\designer_nothing0.mp3")
+                await self.play_sound("my_sound\\designer_nothing0.mp3")
                 item = {
                     "action": "event",
                     "value": {"type": "nihil", "from": requestor},
                 }
             case "Эксклюзивное Ничего, pro edition":
                 logger.debug(f"Queued redepmtion: pro nothing, {requestor}")
-                self.play_sound("my_sound\\exclusive_nothing_pro.mp3")
+                await self.play_sound("my_sound\\exclusive_nothing_pro.mp3")
                 item = {
                     "action": "event",
                     "value": {"type": "nihil", "from": requestor},
                 }
             case "Стримлер! Не горбись!":
                 logger.debug(f"Queued redepmtion: sit, {requestor}")
-                self.play_sound("my_sound\\StraightenUp.mp3")
+                await self.play_sound("my_sound\\StraightenUp.mp3")
                 item = {"action": "event", "value": {"type": "sit", "from": requestor}}
             case "Распылить упорин":
                 logger.debug(f"Queued redepmtion: fun, {requestor}")
@@ -516,54 +546,40 @@ class Bot(commands.Bot):
                 s = random.choice(
                     ["Nice01", "Nice02", "ThatWasFun01", "ThatWasFun02", "ThatWasFun03"]
                 )
-                self.play_sound(f"sound\\Minion General Speech@ignore@{s}.mp3")
+                await self.play_sound(f"sound\\Minion General Speech@ignore@{s}.mp3")
                 asyncio.ensure_future(do_wizlight_disco())
             case "Гори!":
                 snd = random.choice(
                     ["Goblin_Burn_1", "Minion_BurnBurn", "Minion_FireNoHurt"]
                 )
-                self.play_sound(f"sound\\Minion General Speech@ignore@{snd}.mp3")
+                await self.play_sound(f"sound\\Minion General Speech@ignore@{snd}.mp3")
             case "Лисо-Флешкино безумие":
-                self.play_sound("my_sound\\FoxFlashMadness.mp3")
+                await self.play_sound("my_sound\\FoxFlashMadness.mp3")
             case "Ты всё испортил!":
-                self.play_sound("my_sound\\fail.mp3")
+                await self.play_sound("my_sound\\fail.mp3")
 
         if item and (self.sio_server is not None):
             self.pubsub_events.append(item)
             await self.sio_server.emit(item["action"], item["value"])
 
-    def play_sound(self, sound: str, is_temporary: bool = False):
-        if sound.startswith("sound") and random.randint(1, 20) == 1:
-            sound = sound.replace("sound", "sound.mono")
+    async def play_sound(self, sound: str | bytes, is_temporary: bool = False):
+        logger.info("play_sound - waiting for lock")
+        await self.play_sound_lock.acquire()
+        logger.info("play_sound - lock acquired")
+        self.current_sound = ""
 
         if not is_temporary:
-            soundfile = pathlib.Path(__file__).parent / sound
+            soundfile = str(pathlib.Path(__file__).parent / sound)
         else:
             soundfile = sound
-        logger.debug("play sound %s", soundfile)
-        sound = sounds.Sound(str(soundfile))
+            self.current_sound = soundfile
 
+        logger.debug(
+            f"play sound from{' temporary' if is_temporary else ''} {soundfile}"
+        )
+
+        sound = sounds.Sound(soundfile)
         self.player.play(sound)
-
-        duration = eyed3.load(soundfile).info.time_secs
-        time.sleep(duration)
-
-        if is_temporary:
-            count = 60
-            while count > 0:
-                try:
-                    os.unlink(soundfile)
-                except PermissionError as e:
-                    logger.warning(
-                        f"Failed to unlink tempfile "
-                        f"{os.path.basename(soundfile)}: {str(e)}"
-                    )
-                    count -= 1
-                    time.sleep(1)
-                else:
-                    break
-            else:
-                logger.error(f"Giving up on file {soundfile}")
 
     async def send_viewer_joined(self, user: Chatter, sid: Optional[int] = None):
         # DEBUG
@@ -980,7 +996,7 @@ class Bot(commands.Bot):
 
         tasks = []
 
-        # type: viewer: Chatter
+        # type viewer: Chatter
         for viewer in self.viewers.values():
             if viewer.id not in ids:
                 ids.add(viewer.id)
@@ -999,8 +1015,8 @@ class Bot(commands.Bot):
 twitch_bot: Optional[Bot] = None
 # discord_bot: Optional[discord.Client] = None
 sio_client: Optional[socketio.AsyncClient] = None
-sio_server: Optional[socketio.AsyncServer] = None
-app: Optional[socketio.WSGIApp] = None
+# sio_server: Optional[socketio.AsyncServer] = None
+# app: Optional[socketio.WSGIApp] = None
 
 
 @logger.catch
@@ -1020,6 +1036,7 @@ async def main():
     )
     app = socketio.ASGIApp(sio_server, socketio_path="/ws")
     config = uvicorn.Config(app, host="0.0.0.0", port=8081)
+    # noinspection PyUnusedLocal
     server = uvicorn.Server(config)
 
     @sio_server.on("connect")
@@ -1036,6 +1053,7 @@ async def main():
             logger.warning(f"Dashboard {sid} disconnected!")
             twitch_bot.dashboard.remove(sid)
 
+    # noinspection PyUnresolvedReferences,PyUnusedLocal
     @sio_server.on("rip")
     async def on_ws_rip(sid):
         logger.info(f"Received message: rip")
@@ -1043,6 +1061,7 @@ async def main():
         msg = await ripcog.do_rip(n=1)
         await twitch_bot.send_message(msg)
 
+    # noinspection PyUnresolvedReferences,PyUnusedLocal
     @sio_server.on("unrip")
     async def on_ws_unrip(sid):
         logger.info(f"Received message: unrip")
@@ -1050,6 +1069,7 @@ async def main():
         msg = await ripcog.do_rip(n=-1)
         await twitch_bot.send_message(msg)
 
+    # noinspection PyUnresolvedReferences,PyUnusedLocal
     @sio_server.on("break")
     async def on_ws_break(sid):
         logger.info(f"Received message: break")
@@ -1057,6 +1077,7 @@ async def main():
         cog.do_pause(None, False)
         await twitch_bot.send_message("Начать перепись населения!")
 
+    # noinspection PyUnresolvedReferences,PyUnusedLocal
     @sio_server.on("resume")
     async def on_ws_resume(sid):
         logger.info(f"Received message: resume")
@@ -1064,6 +1085,7 @@ async def main():
         msg = await cog.do_resume(None)
         await twitch_bot.send_message(msg)
 
+    # noinspection PyUnresolvedReferences,PyUnusedLocal
     @sio_server.on("*")
     def catch_all(event, sid, data):
         logger.warning(f"Unhandled event {event} (data {data})")
@@ -1072,7 +1094,7 @@ async def main():
     # Run bot
     if sio_server is None:
         logger.warning("sio_server is none!")
-    twitch_bot = Bot(sio_server=sio_server)
+    twitch_bot = Bot(sio_server_=sio_server)
 
     if os.getenv("OBSWS_ADDRESS") is not None:
         logger.info("Loading module obscog")
@@ -1113,13 +1135,13 @@ async def main():
     @client.event()
     async def event_token_expired():
         logger.info("Renewing token...")
-        pubsub_sess = twitch_api.get_session(
+        pubsub_sess_ = twitch_api.get_session(
             os.getenv("TWITCH_CLIENT_ID"),
             os.getenv("TWITCH_CLIENT_SECRET"),
             twitch_redirect_url,
         )
 
-        return pubsub_sess.token["access_token"].replace("oauth2:", "")
+        return pubsub_sess_.token["access_token"].replace("oauth2:", "")
 
     await twitch_bot.start()
     # async with asyncio.TaskGroup() as tg:
@@ -1135,7 +1157,7 @@ async def main():
 # see https://github.com/miguelgrinberg/python-socketio/pull/941
 # Can't update socketio/engineio because SL is using old socketio
 # version that is not supported in modern versions
-# noinspection PyProtectedMember, PySimplifyBooleanCheck
+# noinspection PyProtectedMember, PySimplifyBooleanCheck,PyUnusedLocal
 async def emit(
     self, event, data, namespace, room=None, skip_sid=None, callback=None, **kwargs
 ):
@@ -1152,12 +1174,12 @@ async def emit(
     for sid in self.get_participants(namespace, room):
         if sid not in skip_sid:
             if callback is not None:
-                id = self._generate_ack_id(sid, namespace, callback)
+                id_ = self._generate_ack_id(sid, namespace, callback)
             else:
-                id = None
+                id_ = None
             tasks.append(
                 asyncio.create_task(
-                    self.server._emit_internal(sid, event, data, namespace, id)
+                    self.server._emit_internal(sid, event, data, namespace, id_)
                 )
             )
     if tasks == []:  # pragma: no cover
