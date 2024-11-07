@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Overlay</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            overflow: hidden;            
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 48px;
+        }
+
+        #death-counter, #plush-counter, #chat-box {
+            position: absolute;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        #death-counter {
+            bottom: 0px;
+            right: 20px;
+            transition: color 0.5s; /* Плавный переход цвета */
+        }
+
+        #plush-counter {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: transform 0.3s ease;
+            height: 40px; /* Задайте фиксированную высоту для предотвращения смещения */
+            display: flex;
+            align-items: center; /* Выравнивание по центру по вертикали */
+            padding: 10px; /* Добавьте внутренние отступы для эстетики */
+            box-sizing: border-box; /* Убедитесь, что padding включён в размеры элемента */
+        }
+
+        #chat-box {
+            bottom: 90px;
+            right: 20px;
+            width: 300px;
+            height: auto;
+            max-height: 250px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+
+        .chat-message {
+            position: relative;
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            margin-bottom: 5px;
+            opacity: 0; /* Сначала скрыто, для анимации */
+            animation: slide-in 1s forwards;
+            word-wrap: break-word; /* Автоматический перенос длинных слов */
+            white-space: normal; /* Перенос текста на новые строки */
+        }
+
+        .chat-message.badge-mod::before {
+            content: '🗡️'; /* Эмодзи для модератора */
+            margin-right: 5px;
+        }
+
+        .chat-message.badge-vip::before {
+            content: '💎'; /* Эмодзи для VIP */
+            margin-right: 5px;
+        }
+
+        .chat-username {
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        /* Анимация для сообщений справа налево */
+        @keyframes slide-in {
+            0% {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            80% {
+                transform: translateX(-5%);
+                opacity: 1;
+            }
+            100% {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Анимация для счётчика плюшей, без изменения размеров */
+        @keyframes plush-squish {
+            0% {
+                transform: translateX(-50%) scale(1, 1);
+            }
+            50% {
+                transform: translateX(-50%) scale(1.5, 0.5); /* Растягивание по горизонтали, сжатие по вертикали */
+            }
+            100% {
+                transform: translateX(-50%) scale(1, 1);
+            }
+        }
+
+        /* Цветовые анимации для счётчика смертей */
+        @keyframes death-increase {
+            0% {
+                color: white;
+            }
+            50% {
+                color: red;
+            }
+            100% {
+                color: white;
+            }
+        }
+
+        @keyframes death-decrease {
+            0% {
+                color: white;
+            }
+            50% {
+                color: gold;
+            }
+            100% {
+                color: white;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Проигрыватель звуков -->
+    <audio id="sound-player" hidden></audio>
+
+    <!-- Счётчик смертей -->
+    <div id="death-counter">Deaths: 0</div>
+
+    <!-- Счётчик "плющей" -->
+    <div id="plush-counter">Пока что никого не плющило</div>
+
+    <!-- Чат -->
+    <div id="chat-box"></div>
+
+    <!-- Подключение к Socket.IO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js"></script>
+    <script>    
+        const socket = io('http://overlay.home', { transports: ['websocket'], path: '/ws/' });
+        const debug = false;
+        let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        let audioBuffer = [];
+
+        if (!debug) {
+            // Обновление счётчика смертей
+            socket.on('update_death_count', (data) => {
+                const { text, animation } = data;  // Получаем текст и тип анимации
+                const deathCounter = document.getElementById('death-counter');
+
+                // Обновляем текст счётчика смертей
+                deathCounter.textContent = text;
+
+                // Применяем анимацию, если требуется
+                if (animation === 1) {
+                    deathCounter.style.animation = 'death-increase 1s';
+                } else if (animation === -1) {
+                    deathCounter.style.animation = 'death-decrease 1s';
+                }
+
+                // Убираем анимацию после её завершения
+                setTimeout(() => {
+                    deathCounter.style.animation = '';
+                }, 1000);
+            });
+
+            // Обновление счётчика плюшей
+            socket.on('update_plush_count', (text) => {
+                const plushCounter = document.getElementById('plush-counter');
+                plushCounter.textContent = text;
+
+                // Анимация сжатия и растяжения при обновлении плюшей
+                plushCounter.style.animation = 'plush-squish 1s 3';
+
+                // Убираем анимацию после её завершения
+                setTimeout(() => {
+                    plushCounter.style.animation = '';
+                }, 3000);
+            });
+
+            // Добавление сообщений чата с поддержкой цвета и бейджей
+            socket.on('new_chat_message', (data) => {
+                const chatBox = document.getElementById('chat-box');
+
+                // Создание нового элемента для сообщения
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('chat-message');
+
+                // Добавление бейджа, если есть
+                if (data.badge === 'mod') {
+                    messageDiv.classList.add('badge-mod');
+                } else if (data.badge === 'vip') {
+                    messageDiv.classList.add('badge-vip');
+                }
+
+                // Добавление никнейма с цветом
+                const usernameSpan = document.createElement('span');
+                usernameSpan.classList.add('chat-username');
+                usernameSpan.style.color = data.color; // Установка цвета ника
+                usernameSpan.textContent = data.username;
+
+                // Добавление сообщения
+                const messageSpan = document.createElement('span');
+                messageSpan.textContent = data.message;
+
+                messageDiv.appendChild(usernameSpan);
+                messageDiv.appendChild(messageSpan);
+                chatBox.appendChild(messageDiv);
+
+                // Скроллим, чтобы показывать только последние 10 сообщений
+                const chatMessages = chatBox.querySelectorAll('.chat-message');
+                if (chatMessages.length > 10) {
+                    chatMessages[0].remove(); // Удаляем самое старое сообщение
+                }
+
+                // Скроллим к последнему сообщению
+                chatBox.scrollTop = chatBox.scrollHeight;
+            });
+
+            // Скрытие/отображение счётчика смертей через SocketIO
+            socket.on('toggle_death_counter', (val) => {
+                const deathCounter = document.getElementById('death-counter');
+                if (val === 1) {
+                   deathCounter.classList.remove('hidden');
+                } else {
+                   deathCounter.classList.add('hidden');
+                }
+            });
+
+            // Проигрывание звука через SocketIO
+            socket.on('play_sound', (soundUrl) => {
+                const soundPlayer = document.getElementById('sound-player');
+                soundPlayer.src = soundUrl;
+                soundPlayer.play();
+            });
+        
+        } else {
+            let plushCount = 0;
+            const plushCounter = document.getElementById('plush-counter');
+
+            function updatePlushCounter(newCount) {
+                plushCount = newCount;
+                
+                // Добавляем класс для анимации
+                plushCounter.textContent = `Plushies: ${plushCount}`;
+
+                plushCounter.style.animation = 'plush-squish 0.5s';
+                // Убираем класс анимации через 400мс, когда она завершится
+                setTimeout(() => {
+                    plushCounter.style.animation = '';
+                }, 500);
+            }
+
+            // Тестовая симуляция обновления счётчика
+            setInterval(() => {
+                updatePlushCounter(plushCount + 1);
+            }, 2000); // Обновляем счётчик каждые 2 секунды
+        }
+        socket.on('mp3_chunk', (chunk) => {
+            // Convert the received chunk (Base64 or binary) into a buffer
+            let arrayBuffer = new Uint8Array(chunk).buffer;
+            audioBuffer.push(arrayBuffer);
+        });
+
+        socket.on('mp3_end', () => {
+            // Concatenate all chunks
+            let fullBuffer = audioBuffer.reduce((acc, buffer) => {
+                let tmp = new Uint8Array(acc.byteLength + buffer.byteLength);
+                tmp.set(new Uint8Array(acc), 0);
+                tmp.set(new Uint8Array(buffer), acc.byteLength);
+                return tmp.buffer;
+            }, new ArrayBuffer(0));
+
+            // Decode and play the audio
+            audioContext.decodeAudioData(fullBuffer, (decodedData) => {
+                const source = audioContext.createBufferSource();
+                source.buffer = decodedData;
+                source.connect(audioContext.destination);
+                source.start(0);
+            });
+
+            // Clear the buffer
+            audioBuffer = [];
+        });
+
+    </script>
+</body>
+</html>

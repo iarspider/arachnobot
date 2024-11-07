@@ -66,6 +66,7 @@ class OBSCog(MyCog):
             self.teleport_ws = None
 
         self.use_teleport = False
+        self.event = asyncio.Event()
         # if pywinauto:
         #     self.get_player()
 
@@ -250,6 +251,8 @@ class OBSCog(MyCog):
                 )
             )
         )
+        
+        self.event.set()
 
     @twitch_command_aliased(name="countdown", aliases=("preroll", "cd", "pr"))
     async def countdown(self, ctx: commands.Context):
@@ -284,6 +287,9 @@ class OBSCog(MyCog):
             return
 
         write_countdown_html()
+        logger.info("Waiting for setup_() to complete...")
+        await self.event.wait()
+        logger.info("Done waiting for setup_()")
 
         self.ws.call(obsws_requests.SetStudioModeEnabled(studioModeEnabled=False))
 
@@ -308,6 +314,7 @@ class OBSCog(MyCog):
         self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=False))
 
         self.show_hide_scene_item("Starting", "Ожидание", False)
+        self.show_hide_scene_item("Starting", "Ожидание 2", False)
         self.show_hide_scene_item("Starting", "Countdown v3", True)
 
         self.ws_call(obsws_requests.StartStream())

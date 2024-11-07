@@ -32,6 +32,7 @@ twitchio = {git = "https://github.com/PythonistaGuild/TwitchIO"}
 pywizlight = "*"
 yt-dlp = "*"
 tinytag = "*"
+watchdog = "*"
 
 [dev-packages]
 black = "*"

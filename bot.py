@@ -140,6 +140,8 @@ class GameConfig(peewee.Model):
     inexact = peewee.BooleanField(default=False)
     mt = peewee.BooleanField(default=False)
     mt_str = peewee.CharField(default="iarspider/moar__/danzio_plagius")
+    watchfile = peewee.CharField(default="")
+    rip_emoji = peewee.CharField(default="☠")
 
     class Meta:
         database = database
@@ -369,12 +371,12 @@ class Bot(commands.Bot):
             )
             return None
 
-    def set_ws_server(self):
-        # print("@@ set_ws_server @@")
-        if sio_server is not None and self.sio_server is None:
-            # print("@@ set sio_server @@")
-            self.sio_server = sio_server
-            self.timer.cancel()
+    # def set_ws_server(self, sio_server):
+    #     # print("@@ set_ws_server @@")
+    #     if sio_server is not None and self.sio_server is None:
+    #         # print("@@ set sio_server @@")
+    #         self.sio_server = sio_server
+    #         self.timer.cancel()
 
     async def event_ready(self):
         logger.info(f"Ready | {self.nick}")
@@ -399,12 +401,27 @@ class Bot(commands.Bot):
         # example tag: '306267910:5-11,20-26/74409:13-18'
         res = []
         if tag:
-            emotes_list = (x.split(":")[1].split(",", 1)[0] for x in tag.split("/"))
-            for emote in emotes_list:
-                emote_range = emote.split("-")
-                start = int(emote_range[0])
-                end = int(emote_range[1]) + 1
-                res.append(msg[start:end])
+            emotes_list = tag.split("/")
+            for emote_data in emotes_list:
+                emote_id, ranges = emote_data.split(":")
+                # emote_id = int(emote_id)
+
+                if "," not in ranges:
+                    ranges = [ranges]
+                else:
+                    ranges = ranges.split(",")
+
+                for range_ in ranges:
+                    start, end = map(int, range_.split("-"))
+                    end += 1
+                    res.append(
+                        {
+                            "id": emote_id,
+                            "start": start,
+                            "end": end,
+                            "text": msg[start:end],
+                        }
+                    )
 
         return res
 
@@ -443,10 +460,13 @@ class Bot(commands.Bot):
             self.last_messages[message.author.name] = deque(maxlen=10)
 
         if message.author.name.lower() not in self.bots:
+            emotes = self.get_emotes(message.tags["emotes"], message.content)
+            # todo: chat2html?
+
             if not message.content.startswith("!"):
-                emotes = self.get_emotes(message.tags["emotes"], message.content)
+                tmp_emotes = set(x["text"] for x in emotes)
                 self.last_messages[message.author.name].append(
-                    (message.content, emotes)
+                    (message.content, tmp_emotes)
                 )
                 logger.debug(
                     f"Updated last messages for {message.author.name}, "
@@ -514,6 +534,13 @@ class Bot(commands.Bot):
                 await self.send_message(
                     f"{requestor} обнял стримера! Спасибо, {requestor}!"
                 )
+            case "Обнять чатик":
+                logger.debug(f"Queued redepmtion: hugs, {requestor}")
+                item = {"action": "event", "value": {"type": "hugs", "from": requestor}}
+                channel: Channel = self.get_channel(
+                    self.initial_channels[0].lstrip("#")
+                )
+                await self.send_message(f"{requestor} обнял чатик!")
 
             case "Ничего":
                 logger.debug(f"Queued redepmtion: nothing, {requestor}")
@@ -557,6 +584,8 @@ class Bot(commands.Bot):
                 await self.play_sound("my_sound\\FoxFlashMadness.mp3")
             case "Ты всё испортил!":
                 await self.play_sound("my_sound\\fail.mp3")
+            case "СТОП-игра!":
+                await self.play_sound("my_sound\\NO GOD, PLEASE NO.mp3")
 
         if item and (self.sio_server is not None):
             self.pubsub_events.append(item)
@@ -566,20 +595,34 @@ class Bot(commands.Bot):
         logger.info("play_sound - waiting for lock")
         await self.play_sound_lock.acquire()
         logger.info("play_sound - lock acquired")
-        self.current_sound = ""
 
-        if not is_temporary:
-            soundfile = str(pathlib.Path(__file__).parent / sound)
+        if not self.sio_server:
+            self.current_sound = ""
+
+            if not is_temporary:
+                soundfile = str(pathlib.Path(__file__).parent / sound)
+            else:
+                soundfile = sound
+                self.current_sound = soundfile
+
+            logger.debug(
+                f"play sound from{' temporary' if is_temporary else ''} {soundfile}"
+            )
+
+            sound = sounds.Sound(soundfile)
+            self.player.play(sound)
         else:
-            soundfile = sound
-            self.current_sound = soundfile
-
-        logger.debug(
-            f"play sound from{' temporary' if is_temporary else ''} {soundfile}"
-        )
-
-        sound = sounds.Sound(soundfile)
-        self.player.play(sound)
+            with open(sound, "rb") as mp3_file:
+                chunk_size = 4096  # Size of each chunk
+                while True:
+                    chunk = mp3_file.read(chunk_size)
+                    if not chunk:
+                        break
+                    await self.sio_server.emit("mp3_chunk", chunk)
+                await self.sio_server.emit(
+                    "mp3_end",
+                )
+                self.play_sound_lock.release()
 
     async def send_viewer_joined(self, user: Chatter, sid: Optional[int] = None):
         # DEBUG
@@ -1032,19 +1075,24 @@ async def main():
     sio_server = socketio.AsyncServer(
         async_mode="asgi",
         # logger=True, engineio_logger=True,
-        cors_allowed_origins="https://fr.iarazumov.com",
+        cors_allowed_origins=["https://fr.iarazumov.com", "http://overlay.home"],
     )
     app = socketio.ASGIApp(sio_server, socketio_path="/ws")
     config = uvicorn.Config(app, host="0.0.0.0", port=8081)
     # noinspection PyUnusedLocal
     server = uvicorn.Server(config)
 
+    # noinspection PyUnresolvedReferences,PyUnusedLocal
     @sio_server.on("connect")
     async def on_ws_connected(sid, _):
         global twitch_bot
         twitch_bot.dashboard.append(sid)
         asyncio.ensure_future(twitch_bot.on_dashboard_connected(sid))
         logger.info(f"Dashboard connected with id {sid}")
+        ripcog: "RIPCog" = twitch_bot.get_cog("RIPCog")
+        await ripcog.display_rip()
+        plushchcog = twitch_bot.get_cog("PluschCog")
+        plushchcog.write_plusch()
 
     @sio_server.on("disconnect")
     async def on_ws_disconnected(sid):
@@ -1143,14 +1191,14 @@ async def main():
 
         return pubsub_sess_.token["access_token"].replace("oauth2:", "")
 
-    await twitch_bot.start()
-    # async with asyncio.TaskGroup() as tg:
-    # task1 = tg.create_task(twitch_bot.start())
-    # task2 = tg.create_task(server.serve())
+    # await twitch_bot.start()
+    async with asyncio.TaskGroup() as tg:
+        task1 = tg.create_task(twitch_bot.start())
+        task2 = tg.create_task(server.serve())
 
     # noinspection PyProtectedMember
-    if not client._closing.is_set():
-        await client.close()
+    # if not client._closing.is_set():
+    #     await client.close()
 
 
 # Patched version of socketio.AsyncManager.emit,

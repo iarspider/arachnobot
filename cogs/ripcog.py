@@ -1,15 +1,29 @@
 import asyncio
-import codecs
+import os
 import sys
+from pathlib import Path
 
 from loguru import logger
 from twitchio.ext import commands
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 from cogs.mycog import MyCog
 from twitch_commands import twitch_command_aliased
 
 sys.path.append("..")
 from config import rippers
+
+
+class CustomFileChangeHandler(FileSystemEventHandler):
+    def __init__(self, cog, file_to_watch):
+        self.cog = cog
+        self.file_to_watch = file_to_watch
+
+    def on_modified(self, event):
+        # Check if the event corresponds to the file we are watching
+        if event.src_path == self.file_to_watch:
+            self.cog.on_watchdog()
 
 
 class RIPCog(MyCog):
@@ -20,31 +34,71 @@ class RIPCog(MyCog):
         self.check_sender = self.bot.check_sender
 
         self.deaths = {"today": 0, "total": 0}
+        self.rip_emoji = ""
 
         self.obscog = None
+        self.observer = None
 
     def setup(self):
         self.obscog = self.bot.get_cog("OBSCog")
 
     def update(self):
         self.deaths = {"today": 0, "total": self.bot.game.rip_total}
+        self.rip_emoji = self.bot.game.rip_emoji
         enabled = self.bot.game.rip_enabled
         asyncio.ensure_future(self.obscog.enable_rip(enabled))
-        self.display_rip()
+        asyncio.ensure_future(self.display_rip())
+        if self.observer and not self.bot.game.watchfile:
+            self.observer.stop()
+            self.observer.join()
+            self.observer = None
 
-    def display_rip(self):
-        with codecs.open("rip_display.txt", "w", "utf8") as f:
-            if self.game.inexact:
-                f.write("☠: {today}+ (всего: ≈{total})".format(**self.deaths))
-                return
+        if self.bot.game.watchfile and os.path.exists(self.bot.game.watchfile):
+            if self.observer:
+                self.observer.stop()
+                self.observer.join()
+            event_handler = CustomFileChangeHandler(self, self.bot.game.watchfile)
+            self.observer = Observer()
+            self.observer.schedule(
+                event_handler,
+                path=Path(self.file_to_watch).parent,
+                recursive=False,
+            )
+
+    def on_watchdog(self):
+        with open(self.bot.game.watchfile) as f:
+            tmp = int(f.readline().strip())
+
+        new_deaths = tmp - self.deaths[1]
+        self.deaths[0] += new_deaths
+        self.write_rip()
+
+    async def display_rip(self, n=0):
+        if self.game.inexact:
+            text = f"{self.rip_emoji}: {{today}}+ (всего: ≈{{total}})".format(
+                **self.deaths
+            )
+        else:
             if self.game.infinite:
-                f.write("☠: ∞".format(**self.deaths))
-                return
+                text = f"{self.rip_emoji}: ∞"
+            else:
+                text = f"{self.rip_emoji}: {{today}} (всего: {{total}})".format(
+                    **self.deaths
+                )
 
-            f.write("☠: {today} (всего: {total})".format(**self.deaths))
+        with open("rip_display.txt", "w", encoding="utf8") as f:
+            f.write(text)
 
-    def write_rip(self):
-        self.display_rip()
+        logger.info(f"animation {n} {0 if n == 0 else n // abs(n)}")
+        if self.bot.sio_server:
+            data = {
+                "text": text,
+                "animation": 0 if n == 0 else n // abs(n),
+            }
+            await self.sio_server.emit("update_death_count", data)
+
+    async def write_rip(self, n=0):
+        await self.display_rip(n)
         self.game.rip_total = self.deaths["total"]
         self.game.save()
 
@@ -52,7 +106,7 @@ class RIPCog(MyCog):
         self.deaths["today"] += n
         self.deaths["total"] += n
 
-        self.write_rip()
+        await self.write_rip(n)
 
         return (
             "iarspiRip {today}".format(**self.deaths)
@@ -69,8 +123,8 @@ class RIPCog(MyCog):
             return
 
         self.game.infinite = True
-        asyncio.ensure_future(ctx.send("☠ → ∞"))
-        self.write_rip()
+        asyncio.ensure_future(ctx.send(f"{self.rip_emoji} → ∞"))
+        await self.write_rip()
 
     @twitch_command_aliased(name="xrip", aliases=("ripx",))
     async def inexrip(self, ctx: commands.Context):
@@ -81,7 +135,7 @@ class RIPCog(MyCog):
             return
 
         self.game.inexact = True
-        asyncio.ensure_future(ctx.send("☠ x много"))
+        asyncio.ensure_future(ctx.send(f"{self.rip_emoji} x много"))
 
     @twitch_command_aliased(name="rip", aliases=("смерть", "рып", "рип"))
     async def rip(self, ctx: commands.Context):
@@ -105,7 +159,7 @@ class RIPCog(MyCog):
         if args and args[0].startswith("+"):
             try:
                 n_rip = int(args[0])
-            except ValueError as e:
+            except ValueError:
                 n_rip = 1
         else:
             n_rip = 1
@@ -171,7 +225,7 @@ class RIPCog(MyCog):
             self.deaths["today"] = arg
             if self.deaths["total"] == 0:
                 self.deaths["total"] = arg
-            self.display_rip()
+            await self.display_rip()
 
     @twitch_command_aliased(name="yesrip")
     async def yesrip(self, ctx: commands.Context):
@@ -185,7 +239,11 @@ class RIPCog(MyCog):
         self.bot.game.rip_enabled = True
         self.bot.game.save()
 
-        await self.obscog.enable_rip(True)
+        if self.bot.sio_server:
+            await self.bot.sio_server.emit("toggle_death_counter", 1)
+        else:
+            await self.obscog.enable_rip(True)
+
         await ctx.send("Счётчик смертей активирован")
 
     @twitch_command_aliased(name="norip")
@@ -200,7 +258,10 @@ class RIPCog(MyCog):
         self.bot.game.rip_enabled = False
         self.bot.game.save()
 
-        await self.obscog.enable_rip(False)
+        if self.bot.sio_server:
+            await self.bot.sio_server.emit("toggle_death_counter", 0)
+        else:
+            await self.obscog.enable_rip(False)
         await ctx.send("Счётчик смертей отключён")
 
     # @twitch_command_aliased(name='ripz')

@@ -1,8 +1,6 @@
 import asyncio
-import codecs
 
 from pytils import numeral
-
 from twitchio.ext import commands
 
 from cogs.mycog import MyCog
@@ -17,15 +15,18 @@ class PluschCog(MyCog):
         self.write_plusch()
 
     def write_plusch(self):
-        with codecs.open("plusch.txt", "w", "utf8") as f:
-            if self.plusches == 0:
-                f.write("Пока что никого не плющило")
-            else:
-                f.write(
-                    "Кого-то поплющило {0}...".format(
-                        numeral.get_plural(self.plusches, ("раз", "раза", "раз"))
-                    )
-                )
+        if self.plusches == 0:
+            text = "Пока что никого не плющило"
+        else:
+            text = "Кого-то поплющило {0}...".format(
+                numeral.get_plural(self.plusches, ("раз", "раза", "раз"))
+            )
+
+        with open("plusch.txt", "w", encoding="utf8") as f:
+            f.write(text)
+
+        if self.bot.sio_server:
+            asyncio.ensure_future(self.bot.sio_server.emit("update_plush_count", text))
 
     def do_plusch(self, ctx: commands.Context, who="", shtyr=False, slf=False):
         if not who.strip():
