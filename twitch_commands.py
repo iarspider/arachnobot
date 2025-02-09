@@ -1,8 +1,9 @@
 import functools
+import typing
 
 from twitchio.ext import commands
 
-__all__ = ["twitch_command_aliased"]
+__all__ = ["twitch_command_aliased", "check_sender"]
 
 
 def translate_message(message: str):
@@ -62,3 +63,10 @@ def twitch_command_aliased(
         return actual_decorator(function)
 
     return decorator
+
+
+def check_sender(allowed: typing.Iterable[str]):
+    def predicate(ctx: commands.Context) -> bool:
+        return ctx.chatter.name in allowed
+
+    return commands.guard(predicate)

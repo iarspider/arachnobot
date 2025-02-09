@@ -6,7 +6,6 @@ name = "pypi"
 [packages]
 requests-oauthlib = "*"
 websocket-client = "*"
-pywinauto = "*"
 obs-websocket-py = "*"
 py-dateutil = "*"
 python-dotenv = "*"
@@ -33,9 +32,11 @@ pywizlight = "*"
 yt-dlp = "*"
 tinytag = "*"
 watchdog = "*"
+websockets = "*"
+python-xlib = "*"
 
 [dev-packages]
 black = "*"
 
 [requires]
-python_version = "3.11"
+python_version = "3.12"
