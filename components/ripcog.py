@@ -79,7 +79,7 @@ class RIPCog(Component):
 
     async def display_rip(self, n=0):
         if not self.game:
-            return
+            await self.bot.get_game_v5()
 
         if self.game.inexact:
             text = f"{self.rip_emoji}: {{today}}+ (всего: ≈{{total}})".format(

@@ -91,7 +91,6 @@ class OBSCog(Component):
         self.ws: typing.Optional[obsws] = None
         self.teleport_ws: typing.Optional[obsws] = None
 
-        self.game = None
         self.title = None
 
         obsws_address = os.getenv("OBSWS_ADDRESS")
@@ -213,9 +212,6 @@ class OBSCog(Component):
     def setup(self):
         self.ripcog = self.bot.get_component("RIPCog")
 
-    def update(self):
-        self.game = self.bot.game.game
-
     @is_broadcaster()
     @twitch_command_aliased(name="stat", aliases=("stats",))
     async def stats(self, ctx: commands.Context):
@@ -279,10 +275,10 @@ class OBSCog(Component):
             return
 
         # Load trailer
-        game_trailer_blob = sanitize_filename(self.game) + " trailer.*"
-        logger.info("Looking for trailer named " + game_trailer_blob)
+        game_trailer_glob = sanitize_filename(self.bot.game.game) + " trailer.*"
+        logger.info("Looking for trailer named " + game_trailer_glob)
         files = glob.glob(
-            os.path.join(trailer_root, game_trailer_blob), recursive=False
+            os.path.join(trailer_root, game_trailer_glob), recursive=False
         )
         if not files:
             logger.info(f"No trailer found, will use screensaver")
@@ -305,7 +301,7 @@ class OBSCog(Component):
         asyncio.ensure_future(
             ctx.send(
                 "К стриму готов! | {0}... | {1}".format(
-                    self.bot.title.split("|")[0], self.game
+                    self.bot.title.split("|")[0], self.bot.game.game
                 )
             )
         )

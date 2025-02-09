@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import http.client as http_client
+import json
 import logging
 import os
 import pathlib
@@ -12,7 +13,6 @@ from collections import defaultdict
 from multiprocessing import Process
 from typing import Optional, List, Dict
 
-import asqlite
 import peewee
 import socketio
 import twitchio
@@ -146,6 +146,9 @@ class GameConfig(peewee.Model):
     rip_emoji = peewee.CharField(default="☠")
     use_game_capture = peewee.BooleanField(default=True)
 
+    def __str__(self):
+        return self.game
+
     class Meta:
         database = database
 
@@ -163,8 +166,8 @@ class DuelStats(peewee.Model):
 
 
 class Bot(commands.Bot):
-    def __init__(self, *, token_database: asqlite.Pool, sio_server_) -> None:
-        self.token_database = token_database
+    def __init__(self, *, token_filename: str, sio_server_) -> None:
+        self.token_filename = token_filename
         self.sio_server = sio_server_
         super().__init__(
             client_id=CLIENT_ID,
@@ -230,7 +233,10 @@ class Bot(commands.Bot):
         self.play_sound_lock = asyncio.Lock()
         self.current_sound = ""
 
-    # TODO: hack!
+    #
+    # @game.setter
+    # async def game(self, value):
+    #     self.game_ = value
 
     async def play_sound(self, sound: str | bytes, is_temporary: bool = False):
         logger.info("play_sound - waiting for lock")
@@ -263,6 +269,7 @@ class Bot(commands.Bot):
                 )
                 self.play_sound_lock.release()
 
+    # TODO: Temporary solution until implemented upstream
     async def bot_play_sound(self, filename: str):
         """Plays a sound file using mplayer asynchronously, returning immediately."""
         full_path = os.path.abspath(filename)  # Ensure full path
@@ -327,6 +334,10 @@ class Bot(commands.Bot):
     #         users = (users,)
     #
     #     return ctx.chatter.name in users
+
+    # TODO
+    async def my_run_commercial(self, user_id, length=90):
+        return
 
     async def get_game_v5(self):
         channel_info = await self.fetch_channels([OWNER_ID])
@@ -434,7 +445,7 @@ class Bot(commands.Bot):
         else:
             status = "eye"
 
-        color = user.color
+        color = user.color.hex
 
         # logger.debug(f"Tags: {user.tags}")
         logger.debug(f"Badges: {user.badges}")
@@ -637,37 +648,24 @@ class Bot(commands.Bot):
         )
 
         # Store our tokens in a simple SQLite Database when they are authorized...
-        query = """
-        INSERT INTO tokens (user_id, token, refresh)
-        VALUES (?, ?, ?)
-        ON CONFLICT(user_id)
-        DO UPDATE SET
-            token = excluded.token,
-            refresh = excluded.refresh;
-        """
+        with open(self.token_filename, "r") as f:
+            tokens = json.load(f)
 
-        async with self.token_database.acquire() as connection:
-            await connection.execute(query, (resp.user_id, token, refresh))
+        tokens[resp.user_id] = {"token": token, "refresh": refresh}
+
+        with open(self.token_filename, "w") as f:
+            json.dump(tokens, f)
 
         logger.info(f"Added token to the database for user: {resp.user_id}")
         return resp
 
     async def load_tokens(self, path: str | None = None) -> None:
         # We don't need to call this manually, it is called in .login() from .start() internally...
+        with open(self.token_filename, "r") as f:
+            tokens = json.load(f)
 
-        async with self.token_database.acquire() as connection:
-            rows: list[sqlite3.Row] = await connection.fetchall(
-                """SELECT * from tokens"""
-            )
-
-        for row in rows:
+        for row in tokens.values():
             await self.add_token(row["token"], row["refresh"])
-
-    async def setup_database(self) -> None:
-        # Create our token table, if it doesn't exist
-        query = """CREATE TABLE IF NOT EXISTS tokens(user_id TEXT PRIMARY KEY, token TEXT NOT NULL, refresh TEXT NOT NULL)"""
-        async with self.token_database.acquire() as connection:
-            await connection.execute(query)
 
     async def event_ready(self) -> None:
         logger.info(f"Ready | {self.bot_id}")
@@ -695,7 +693,7 @@ def main() -> None:
         cors_allowed_origins=["https://fr.iarazumov.com", "http://overlay.home"],
     )
     app = socketio.ASGIApp(sio_server, socketio_path="/ws")
-    config = uvicorn.Config(app, host="0.0.0.0", port=8082)
+    config = uvicorn.Config(app, host="0.0.0.0", port=8081)
     # noinspection PyUnusedLocal
     server = uvicorn.Server(config)
 
@@ -760,17 +758,14 @@ def main() -> None:
     if sio_server is None:
         logger.warning("sio_server is none!")
 
+    twitch_bot = Bot(token_filename="twitch_token.json", sio_server_=sio_server)
+
     async def runner() -> None:
-        global twitch_bot
-        async with (
-            asqlite.create_pool("tokens.db") as tdb,
-            Bot(token_database=tdb, sio_server_=sio_server) as _twitch_bot,
-        ):
-            twitch_bot = _twitch_bot
-            await _twitch_bot.setup_database()
-            async with asyncio.TaskGroup() as tg:
-                _ = tg.create_task(_twitch_bot.start())
-                __ = tg.create_task(server.serve())
+        async with asyncio.TaskGroup() as tg:
+            _ = tg.create_task(twitch_bot.start())
+            __ = tg.create_task(server.serve())
+
+        await twitch_bot.close()
 
     try:
         asyncio.run(runner())

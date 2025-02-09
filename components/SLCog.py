@@ -230,9 +230,9 @@ class SLCog(Component):
                     )
                     return
 
-            if ctx.author.is_mod:
+            if ctx.author.moderator:
                 price = self.post_price["mod"]
-            elif ctx.author.is_vip:
+            elif ctx.author.vip:
                 price = self.post_price["vip"]
             else:
                 price = self.post_price["regular"]
