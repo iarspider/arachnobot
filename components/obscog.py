@@ -29,53 +29,54 @@ from obswebsocket.core import LOG
 import threading
 import json
 
-
-def ws_call(self, obj):
-    """
-    Make a call to the OBS server through the Websocket.
-
-    :param obj: Request (class from obswebsocket.requests module) to send
-        to the server.
-    :return: Request object populated with response data.
-    """
-    if not isinstance(obj, base_classes.Baserequests):
-        raise exceptions.ObjectError("Call parameter is not a request object")
-    data = obj.data()
-
-    message_id = str(self.id)
-    self.id += 1
-    event = threading.Event()
-    self.events[message_id] = event
-
-    if self.legacy:
-        payload = {"message-id": message_id, "request-type": obj.name}
-        payload.update(data)
-    else:
-        payload = {
-            "op": 6,
-            "d": {
-                "requestId": message_id,
-                "requestType": obj.name,
-                "requestData": data,
-            },
-        }
-    # IARSpider: send UTF-8 encoded data
-    payload_body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    LOG.debug("Sending message id {}: {}".format(message_id, payload_body))
-    self.ws.send(payload_body)
-    # end
-
-    event.wait(self.timeout)
-    self.events.pop(message_id)
-
-    if message_id in self.answers:
-        r = self.answers.pop(message_id)
-        if self.legacy:
-            obj.input(r, r["status"] == "ok")
-        else:
-            obj.input(r.get("responseData", {}), r["requestStatus"]["result"])
-        return obj
-    raise exceptions.MessageTimeout("No answer for message {}".format(message_id))
+#
+# def ws_call(self, obj):
+#     """
+#     Make a call to the OBS server through the Websocket.
+#
+#     :param obj: Request (class from obswebsocket.requests module) to send
+#         to the server.
+#     :return: Request object populated with response data.
+#     """
+#     if not isinstance(obj, base_classes.Baserequests):
+#         raise exceptions.ObjectError("Call parameter is not a request object")
+#     data = obj.data()
+#
+#     message_id = str(self.id)
+#     self.id += 1
+#     event = threading.Event()
+#     self.events[message_id] = event
+#
+#     if self.legacy:
+#         payload = {"message-id": message_id, "request-type": obj.name}
+#         payload.update(data)
+#     else:
+#         payload = {
+#             "op": 6,
+#             "d": {
+#                 "requestId": message_id,
+#                 "requestType": obj.name,
+#                 "requestData": data,
+#             },
+#         }
+#     # IARSpider: send UTF-8 encoded data
+#     payload_body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+#     LOG.debug("Sending message id {}: {}".format(message_id, payload_body))
+#     self.ws.send(payload_body)
+#     # end
+#
+#     event.wait(self.timeout)
+#     self.events.pop(message_id)
+#
+#     if message_id in self.answers:
+#         r = self.answers.pop(message_id)
+#         if self.legacy:
+#             obj.input(r, r["status"] == "ok")
+#         else:
+#             obj.input(r.get("responseData", {}), r["requestStatus"]["result"])
+#         return obj
+#     raise exceptions.MessageTimeout("No answer for message {}".format(message_id))
+#
 
 
 class OBSCog(Component):
@@ -103,7 +104,7 @@ class OBSCog(Component):
             )
             self.ws.connect()
             self._aud_sources = self.ws.call(obsws_requests.GetSpecialInputs())
-            obsws.call = ws_call
+            # obsws.call = ws_call
         else:
             self.ws = None
 
@@ -521,10 +522,9 @@ class OBSCog(Component):
                         )
                         await ctx.send("Окно игры не найдено")
                     else:
-                        parts[0] = f"{win.id}"
-                        settings["capture_window"] = "\r\n".join(parts)
+                        settings["capture_window"] = f"{win.id}"
                         self.ws.call(
-                            obsws_requests.SetSourceSettings(
+                            obsws_requests.SetInputSettings(
                                 inputName="Game Capture",
                                 inputSettings=settings,
                                 overlay=False,
