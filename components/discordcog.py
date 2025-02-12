@@ -25,7 +25,7 @@ class DiscordCog(Component):
         await self.announce(True)
 
     async def announce(self, now_=False):
-        stream = await self.bot.fetch_streams(user_ids=[self.bot.streamer_id])
+        stream = await self.bot.fetch_streams(user_ids=[self.bot.owner_id])
         stream = stream[0]
         game = self.bot.fetch_game(id=stream["game_id"])
         #        game = {"name": "Just Chatting"}

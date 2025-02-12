@@ -125,6 +125,10 @@ class OBSCog(Component):
         self.event = asyncio.Event()
 
     @property
+    def game(self):
+        return self.bot.game
+
+    @property
     def aud_sources(self):
         for _ in range(10):
             try:
@@ -260,12 +264,11 @@ class OBSCog(Component):
 
         await self.bot.get_game_v5()
 
-        self.switch_to("Starting")
-
         self.ws.call(obsws_requests.SetCurrentProfile(profileName="Twitch"))
         self.ws.call(
             obsws_requests.SetCurrentSceneCollection(sceneCollectionName="Twitch")
         )
+        self.switch_to("Starting")
         self.show_hide_scene_item("Paused", "ужин", False)
 
         res: obsws_requests.GetStreamStatus = self.ws_call(
@@ -307,6 +310,9 @@ class OBSCog(Component):
             )
         )
 
+        tags = self.game.tags.split(";")
+        if tags:
+            await ctx.broadcaster.modify_channel(tags=tags)
         self.event.set()
 
     @is_broadcaster()
@@ -325,7 +331,7 @@ class OBSCog(Component):
                 h, m, s = parts
                 dt = datetime.datetime.now().replace(hour=h, minute=m, second=s)
             else:
-                self.botlogger.error("Invalid call to countdown: {0}".format(args[0]))
+                self.bot.logger.error("Invalid call to countdown: {0}".format(args[0]))
                 return
 
             self.bot.countdown_to = dt
@@ -379,10 +385,10 @@ class OBSCog(Component):
                 )
             )
         )
-        asyncio.ensure_future(self.bot.my_run_commercial(self.bot.streamer_id))
+        asyncio.ensure_future(self.bot.my_run_commercial(self.bot.owner_id))
 
         logger.info("Getting Discord cog...")
-        discord_bot = self.bot.get_cog("DiscordCog")
+        discord_bot = self.bot.get_component("DiscordCog")
         if discord_bot:
             logger.info("Got it, requesting announce...")
             # noinspection PyUnresolvedReferences
@@ -414,7 +420,7 @@ class OBSCog(Component):
     @is_broadcaster()
     @twitch_command_aliased(name="end", aliases=["fin", "конец", "credits"])
     async def end(self, ctx: commands.Context):
-        api = self.bot.get_cog("SLCog")
+        api = self.bot.get_component("SLCog")
         if not api:
             return
 
@@ -577,7 +583,7 @@ class OBSCog(Component):
         self.switch_to("Game")
 
         try:
-            res = await self.bot.my_get_stream(self.bot.streamer_id)
+            res = await self.bot.my_get_stream(self.bot.owner_id)
             viewers = numeral.get_plural(
                 res["viewer_count"], ("зритель", "зрителя", "зрителей")
             )
@@ -668,12 +674,9 @@ class OBSCog(Component):
 
         %%обед
         """
-        if not self.bot.check_sender(ctx, "iarspider"):
-            asyncio.ensure_future(ctx.send("/timeout " + ctx.author.name + " 1"))
-            return
 
         try:
-            arg = ctx.message.content.split()[1]
+            arg = ctx.message.text.split()[1]
         except IndexError:
             dt = datetime.datetime.now()
             dt += datetime.timedelta(hours=1)
@@ -721,12 +724,8 @@ class OBSCog(Component):
     @is_broadcaster()
     @twitch_command_aliased(name="глаза", aliases=["eyes", "глоза"])
     async def eyes(self, ctx: commands.Context):
-        if not self.bot.check_sender(ctx, "iarspider"):
-            asyncio.ensure_future(ctx.send("/timeout " + ctx.author.name + " 1"))
-            return
-
-        await self.bot.play_sound("my_sound//EYES1.mp3")
         await ctx.send("ГЛАЗААААА!!!")
+        await self.bot.play_sound("my_sound//EYES1.mp3")
 
 
 async def setup(bot: commands.Bot):

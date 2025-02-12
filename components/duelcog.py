@@ -6,7 +6,7 @@ from collections import defaultdict
 import peewee
 from loguru import logger
 from twitchio.ext import commands
-from twitchio.ext.commands import Component
+from twitchio.ext.commands import Component, is_broadcaster
 
 from newbot import Bot, DuelStats
 from twitch_commands import twitch_command_aliased
@@ -26,10 +26,9 @@ class DuelCog(Component):
         # TODO: use Twitch API for this
         await ctx.send(f"/timeout {user} {duration}")
 
+    @is_broadcaster()
     @twitch_command_aliased(name="fakeduel")
     async def fake_duel(self, ctx: commands.Context):
-        if not self.check_sender(ctx, "iarspider"):
-            return
 
         args = ctx.message.text.split()[1:]
         if len(args) != 4:

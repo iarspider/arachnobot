@@ -65,7 +65,7 @@ class RIPCog(Component):
             self.observer = Observer()
             self.observer.schedule(
                 event_handler,
-                path=Path(self.file_to_watch).parent,
+                path=Path(self.bot.game.watchfile).parent,
                 recursive=False,
             )
 

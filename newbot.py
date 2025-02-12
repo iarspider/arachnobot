@@ -6,7 +6,6 @@ import logging
 import os
 import pathlib
 import random
-import sqlite3
 import sys
 import time
 from collections import defaultdict
@@ -145,6 +144,7 @@ class GameConfig(peewee.Model):
     watchfile = peewee.CharField(default="")
     rip_emoji = peewee.CharField(default="☠")
     use_game_capture = peewee.BooleanField(default=True)
+    tags = peewee.TextField(default="")
 
     def __str__(self):
         return self.game
@@ -198,8 +198,6 @@ class Bot(commands.Bot):
 
         self.db = {}
         self.pearls = []
-
-        self.streamer_id = -1
 
         self.vmod = None
         self.vmod_active = False
@@ -337,6 +335,8 @@ class Bot(commands.Bot):
 
     # TODO
     async def my_run_commercial(self, user_id, length=90):
+        user = self.create_partialuser(user_id=user_id)
+        await user.start_commercial(length=length)
         return
 
     async def get_game_v5(self):
@@ -598,28 +598,6 @@ class Bot(commands.Bot):
     async def setup_hook(self) -> None:
         # Bot: http://localhost:4343/oauth?scopes=user:read:chat%20user:write:chat%20user:bot%20channel:read:redemptions%20channel:manage:redemptions%20channel:manage:broadcast%20channel:edit:commercial
         # User: http://localhost:4343/oauth?scopes=channel:bot%20channel:read:redemptions%20channel:manage:redemptions
-
-        # return
-        # Add our component which contains our commands...
-        # await self.add_component(MyComponent(self))
-        await self.load_module("components.misccog")
-        if os.getenv("OBSWS_ADDRESS") is not None:
-            logger.info("Loading module obscog")
-            await self.load_module("components.obscog")
-
-        for extension in (
-            "discordcog",
-            "pluschcog",
-            "ripcog",
-            "SLCog",
-            "elfcog",
-            "duelcog",
-        ):  # 'raidcog', 'vmodcog', 'musiccog'
-            # noinspection PyUnboundLocalVariable
-            logger.info(f"Loading module {extension}")
-            await self.load_module(f"components.{extension}")
-
-        self.call_components("setup")
         # Subscribe to read chat (event_message) from our channel as the bot...
         # This creates and opens a websocket to Twitch EventSub...
         subscription = eventsub.ChatMessageSubscription(
@@ -761,6 +739,25 @@ def main() -> None:
     twitch_bot = Bot(token_filename="twitch_token.json", sio_server_=sio_server)
 
     async def runner() -> None:
+        await twitch_bot.load_module("components.misccog")
+        if os.getenv("OBSWS_ADDRESS") is not None:
+            logger.info("Loading module obscog")
+            await twitch_bot.load_module("components.obscog")
+
+        for extension in (
+            "discordcog",
+            "pluschcog",
+            "ripcog",
+            "SLCog",
+            "elfcog",
+            "duelcog",
+        ):  # 'raidcog', 'vmodcog', 'musiccog'
+            # noinspection PyUnboundLocalVariable
+            logger.info(f"Loading module {extension}")
+            await twitch_bot.load_module(f"components.{extension}")
+
+        twitch_bot.call_components("setup")
+
         async with asyncio.TaskGroup() as tg:
             _ = tg.create_task(twitch_bot.start())
             __ = tg.create_task(server.serve())

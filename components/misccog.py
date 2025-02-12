@@ -22,6 +22,10 @@ class MiscCog(commands.Component):
     def last_messages(self):
         return self.bot.last_messages
 
+    @property
+    def game(self):
+        return self.bot.game
+
     # We use a listener in our Component to display the messages received.
     @commands.Component.listener()
     async def event_message(self, payload: twitchio.ChatMessage) -> None:
@@ -255,11 +259,9 @@ class MiscCog(commands.Component):
         else:
             logger.warning("send_viewer_joined: sio_server is none!")
 
+    @is_broadcaster()
     @twitch_command_aliased(name="leave")
     async def test_leave(self, ctx: commands.Context):
-        if not self.bot.check_sender(ctx, "iarspider"):
-            return
-
         arg = ctx.message.text.split()[1]
         item = {"action": "remove", "value": arg}
         if self.bot.sio_server is not None:
@@ -314,6 +316,17 @@ class MiscCog(commands.Component):
                 pearl = self.bot.pearls[pearl_id]
 
             await ctx.send(f"ПаукоПёрл №{pearl_id}: {pearl}")
+
+    @is_broadcaster()
+    @twitch_command_aliased(name="savetags")
+    async def savetags(self, ctx: commands.Context):
+        owner = ctx.broadcaster
+        channel_info = await self.bot.fetch_channels([owner.id])
+        if not self.game:
+            await self.bot.get_game_v5()
+
+        self.game.tags = ",".join(channel_info[0].tags)
+        self.game.save()
 
 
 # This is our entry point for the module.

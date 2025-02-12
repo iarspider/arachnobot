@@ -8,6 +8,7 @@ from msilib.schema import Component
 import requests
 from loguru import logger
 from twitchio.ext import commands
+from twitchio.ext.commands import is_broadcaster
 
 from aio_timer import Periodic
 from twitch_commands import twitch_command_aliased
@@ -25,7 +26,7 @@ class MusicCog(Component):
         self.bot.loop.run_until_complete(self.timer.start())
 
     def setup(self):
-        self.obscog = self.bot.get_cog("OBSCog")
+        self.obscog = self.bot.get_component("OBSCog")
 
     def set_music(self, enabled: bool):
         r = requests.post(
@@ -74,20 +75,14 @@ class MusicCog(Component):
     def update(self):
         self.set_music(self.bot.game.music_enabled)
 
+    @is_broadcaster()
     @twitch_command_aliased(name="yesmusic")
     async def enable_music(self, ctx: commands.Context):
-        if not self.check_sender(ctx, "iarspider"):
-            logger.info("check_sender failed")
-            return
-
         self.set_music(True)
 
+    @is_broadcaster()
     @twitch_command_aliased(name="nomusic")
     async def disable_music(self, ctx: commands.Context):
-        if not self.check_sender(ctx, "iarspider"):
-            logger.info("check_sender failed")
-            return
-
         self.set_music(False)
 
     def get_new_token(self):
