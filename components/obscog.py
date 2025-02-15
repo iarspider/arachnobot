@@ -711,6 +711,14 @@ class OBSCog(Component):
         await ctx.send("ГЛАЗААААА!!!")
         await self.bot.play_sound("my_sound//EYES1.mp3")
 
+    @twitch_command_aliased(name="камень", aliases=["stone", "rock"])
+    async def stone(self, ctx: commands.Context):
+        await self.bot.play_sound("my_sound//Камень я не дам.mp3")
+
+    @twitch_command_aliased(name="непонимаю", aliases=["колобки", "колобок"])
+    async def stone(self, ctx: commands.Context):
+        await self.bot.play_sound("my_sound//Ничего не понимаю.mp3")
+
 
 async def setup(bot: commands.Bot):
     await bot.add_component(OBSCog(bot))
