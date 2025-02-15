@@ -22,9 +22,12 @@ class DuelCog(Component):
         self.attacks = defaultdict(list)
         self.bots = bot.bots
 
-    async def timeout(self, user: str, ctx: commands.Context, duration: int = 600):
-        # TODO: use Twitch API for this
-        await ctx.send(f"/timeout {user} {duration}")
+    @staticmethod
+    async def timeout(user: str, ctx: commands.Context, duration: int = 600):
+        await ctx.broadcaster.timeout_user(
+            moderator=ctx.broadcaster, user=user, duration=duration, reason="Duel"
+        )
+        # await ctx.send(f"/timeout {user} {duration}")
 
     @is_broadcaster()
     @twitch_command_aliased(name="fakeduel")

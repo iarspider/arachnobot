@@ -335,6 +335,7 @@ class Bot(commands.Bot):
 
     # TODO
     async def my_run_commercial(self, user_id, length=90):
+        return
         user = self.create_partialuser(user_id=user_id)
         await user.start_commercial(length=length)
         return
@@ -589,6 +590,14 @@ class Bot(commands.Bot):
         if tasks != []:
             await asyncio.wait(tasks)
 
+    async def my_get_stream(self):
+        stream = await self.fetch_streams(user_ids=[self.owner_id])
+        while not stream:
+            logger.info("Stream not detected yet, sleeping...")
+            await asyncio.sleep(5)
+
+        return stream
+
     # region Boilerplate
 
     ####################
@@ -597,7 +606,7 @@ class Bot(commands.Bot):
 
     async def setup_hook(self) -> None:
         # Bot: http://localhost:4343/oauth?scopes=user:read:chat%20user:write:chat%20user:bot%20channel:read:redemptions%20channel:manage:redemptions%20channel:manage:broadcast%20channel:edit:commercial
-        # User: http://localhost:4343/oauth?scopes=channel:bot%20channel:read:redemptions%20channel:manage:redemptions
+        # User: http://localhost:4343/oauth?scopes=channel:bot%20channel:read:redemptions%20channel:manage:redemptions%20user:edit:broadcast
         # Subscribe to read chat (event_message) from our channel as the bot...
         # This creates and opens a websocket to Twitch EventSub...
         subscription = eventsub.ChatMessageSubscription(
@@ -632,6 +641,7 @@ class Bot(commands.Bot):
         tokens[resp.user_id] = {"token": token, "refresh": refresh}
 
         with open(self.token_filename, "w") as f:
+            # noinspection PyTypeChecker
             json.dump(tokens, f)
 
         logger.info(f"Added token to the database for user: {resp.user_id}")

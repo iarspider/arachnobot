@@ -1,6 +1,8 @@
+import asyncio
 import os
 import sys
 
+from loguru import logger
 from twitchio.ext.commands import Component, is_broadcaster
 
 sys.path.append("..")
@@ -25,7 +27,8 @@ class DiscordCog(Component):
         await self.announce(True)
 
     async def announce(self, now_=False):
-        stream = await self.bot.fetch_streams(user_ids=[self.bot.owner_id])
+        stream = await self.bot.my_get_stream()
+
         stream = stream[0]
         game = self.bot.fetch_game(id=stream["game_id"])
         #        game = {"name": "Just Chatting"}

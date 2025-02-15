@@ -74,10 +74,19 @@ class MiscCog(commands.Component):
 
         # Keep in mind we are assuming this is for ourselves
         # others may not want your bot randomly sending messages...
-        await payload.broadcaster.send_message(
-            sender=self.bot.bot_id,
-            message=f"Hi... {payload.broadcaster}! You are live!",
-        )
+        # await payload.broadcaster.send_message(
+        #     sender=self.bot.bot_id,
+        #     message=f"Hi... {payload.broadcaster}! You are live!",
+        # )
+
+        logger.info("Getting Discord cog...")
+        discord_bot = self.bot.get_component("DiscordCog")
+        if discord_bot:
+            logger.info("Got it, requesting announce...")
+            # noinspection PyUnresolvedReferences
+            asyncio.ensure_future(discord_bot.announce())
+        else:
+            logger.warning("Discord cog not found")
 
     @twitch_command_aliased(name="roll", aliases=("dice", "кинь", "r"))
     async def roll(self, ctx: commands.Context):

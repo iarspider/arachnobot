@@ -16,18 +16,14 @@ from obswebsocket import obsws
 from obswebsocket import requests as obsws_requests
 from pytils import numeral
 from twitchio.ext import commands
+from twitchio.ext.commands import Component
 from twitchio.ext.commands import is_broadcaster
 
 from twitch_commands import twitch_command_aliased
-from twitchio.ext.commands import Component
 
 sys.path.append("..")
 from config import trailer_root, trailer_default
 
-from obswebsocket import base_classes, exceptions
-from obswebsocket.core import LOG
-import threading
-import json
 
 #
 # def ws_call(self, obj):
@@ -231,6 +227,7 @@ class OBSCog(Component):
             )
         )
 
+    # noinspection PyUnusedLocal
     @is_broadcaster()
     @twitch_command_aliased(name="teleport", aliases=("tp",))
     async def teleport(self, ctx: commands.Context):
@@ -301,18 +298,18 @@ class OBSCog(Component):
         self.show_hide_scene_item("Starting", "Screensaver", False)
         time.sleep(1)
         self.show_hide_scene_item("Starting", "Screensaver", True)
+        tags = [x for x in self.game.tags.split(";") if x]
 
-        asyncio.ensure_future(
-            ctx.send(
-                "К стриму готов! | {0}... | {1}".format(
-                    self.bot.title.split("|")[0], self.bot.game.game
-                )
+        if tags:
+            print("Set tags", tags)
+            await ctx.broadcaster.modify_channel(tags=tags)
+
+        await ctx.reply(
+            "К стриму готов! | {0}... | {1}".format(
+                self.bot.title.split("|")[0], self.bot.game.game
             )
         )
 
-        tags = self.game.tags.split(";")
-        if tags:
-            await ctx.broadcaster.modify_channel(tags=tags)
         self.event.set()
 
     @is_broadcaster()
@@ -323,25 +320,24 @@ class OBSCog(Component):
             parts = tuple(int(x) for x in args[0].split(":"))
             if len(parts) == 2:
                 m, s = parts
-                m, s = parts
                 # noinspection PyShadowingNames
-                delta = datetime.timedelta(minutes=m, seconds=s)
-                dt = datetime.datetime.now() + delta
+                end_time = datetime.timedelta(minutes=m, seconds=s)
+                end_time = datetime.datetime.now() + end_time
             elif len(parts) == 3:
                 h, m, s = parts
-                dt = datetime.datetime.now().replace(hour=h, minute=m, second=s)
+                end_time = datetime.datetime.now().replace(hour=h, minute=m, second=s)
             else:
                 self.bot.logger.error("Invalid call to countdown: {0}".format(args[0]))
                 return
 
-            self.bot.countdown_to = dt
+            self.bot.countdown_to = end_time
 
             with codecs.open(
                 self.htmlfile.replace("html", "template"), encoding="UTF-8"
             ) as f:
                 lines = f.read()
 
-            lines = lines.replace("@@date@@", dt.isoformat())
+            lines = lines.replace("@@date@@", end_time.isoformat())
             with codecs.open(self.htmlfile, "w", encoding="UTF-8") as f:
                 f.write(lines)
 
@@ -378,23 +374,11 @@ class OBSCog(Component):
 
         self.ws_call(obsws_requests.StartStream())
 
-        asyncio.ensure_future(
-            ctx.send(
-                "Начат обратный отсчёт до {0}!".format(
-                    self.bot.countdown_to.strftime("%X")
-                )
-            )
+        await ctx.reply(
+            "Начат обратный отсчёт до {0}!".format(self.bot.countdown_to.strftime("%X"))
         )
-        asyncio.ensure_future(self.bot.my_run_commercial(self.bot.owner_id))
 
-        logger.info("Getting Discord cog...")
-        discord_bot = self.bot.get_component("DiscordCog")
-        if discord_bot:
-            logger.info("Got it, requesting announce...")
-            # noinspection PyUnresolvedReferences
-            asyncio.ensure_future(discord_bot.announce())
-        else:
-            logger.warning("Discord cog not found")
+        asyncio.ensure_future(self.bot.my_run_commercial(self.bot.owner_id))
 
         now = datetime.datetime.now()
         dt = self.bot.countdown_to - now
@@ -555,7 +539,7 @@ class OBSCog(Component):
 
         self.show_hide_scene_item("Paused", "ужин", False)
 
-        # TODO: VR
+        # TO DO: VR
         # if self.vr:
         #     self.switch_to("VR Game")
         #     # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
@@ -583,9 +567,9 @@ class OBSCog(Component):
         self.switch_to("Game")
 
         try:
-            res = await self.bot.my_get_stream(self.bot.owner_id)
+            res = await self.bot.my_get_stream()
             viewers = numeral.get_plural(
-                res["viewer_count"], ("зритель", "зрителя", "зрителей")
+                res.viewer_count, ("зритель", "зрителя", "зрителей")
             )
             msg = (
                 f"Перепись населения завершена успешно! Население стрима "
