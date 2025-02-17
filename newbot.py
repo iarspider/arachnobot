@@ -614,11 +614,11 @@ class Bot(commands.Bot):
         )
         await self.subscribe_websocket(payload=subscription)
         #
-        # # Subscribe and listen to when a stream goes live...
-        # # For this example listen to our own stream...
-        # subscription = eventsub.StreamOnlineSubscription(broadcaster_user_id=OWNER_ID)
-        # await self.subscribe_websocket(payload=subscription)
-        #
+        # Subscribe and listen to when a stream goes live...
+        # For this example listen to our own stream...
+        subscription = eventsub.StreamOnlineSubscription(broadcaster_user_id=OWNER_ID)
+        await self.subscribe_websocket(payload=subscription)
+
         subscription = eventsub.ChannelPointsRedeemAddSubscription(
             broadcaster_user_id=OWNER_ID
         )
