@@ -334,7 +334,7 @@ class MiscCog(commands.Component):
         if not self.game:
             await self.bot.get_game_v5()
 
-        self.game.tags = ",".join(channel_info[0].tags)
+        self.game.tags = ";".join(channel_info[0].tags)
         self.game.save()
 
 

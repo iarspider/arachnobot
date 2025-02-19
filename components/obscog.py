@@ -301,7 +301,7 @@ class OBSCog(Component):
         tags = [x for x in self.game.tags.split(";") if x]
 
         if tags:
-            print("Set tags", tags)
+            logger.debug("Set tags", tags)
             await ctx.broadcaster.modify_channel(tags=tags)
 
         await ctx.reply(
