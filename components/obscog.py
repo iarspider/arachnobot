@@ -719,6 +719,12 @@ class OBSCog(Component):
     async def stone(self, ctx: commands.Context):
         await self.bot.play_sound("my_sound//Ничего не понимаю.mp3")
 
+    @is_broadcaster()
+    @twitch_command_aliased(name="end", aliases=["shutdown", "shitdown"])
+    async def end_(self, ctx: commands.Context):
+        await ctx.reply("💤")
+        open("shutdown", "w").close()
+
 
 async def setup(bot: commands.Bot):
     await bot.add_component(OBSCog(bot))
