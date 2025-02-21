@@ -401,20 +401,20 @@ class OBSCog(Component):
         self.show_hide_scene_item("Starting", "Countdown v3", False)
 
     # noinspection PyUnusedLocal
-    @is_broadcaster()
-    @twitch_command_aliased(name="end", aliases=["fin", "конец", "credits"])
-    async def end(self, ctx: commands.Context):
-        api = self.bot.get_component("SLCog")
-        if not api:
-            return
+    #    @is_broadcaster()
+    #    @twitch_command_aliased(name="end", aliases=["fin", "конец", "credits"])
+    #   async def end(self, ctx: commands.Context):
+    #       api = self.bot.get_component("SLCog")
+    #       if not api:
+    #           return
 
-        self.switch_to("End")
-        try:
-            # noinspection PyUnresolvedReferences
-            api.roll_credits(self.streamlabs_oauth)
-        except requests.HTTPError as exc:
-            logger.error("Can't roll credits! " + str(exc))
-            pass
+    #       self.switch_to("End")
+    #       try:
+    # noinspection PyUnresolvedReferences
+    #           api.roll_credits(self.streamlabs_oauth)
+    #       except requests.HTTPError as exc:
+    #           logger.error("Can't roll credits! " + str(exc))
+    #           pass
 
     @is_broadcaster()
     @twitch_command_aliased(name="vr")
@@ -469,7 +469,7 @@ class OBSCog(Component):
         if ctx:
             asyncio.ensure_future(ctx.send("Начать перепись населения!"))
 
-        asyncio.ensure_future(self.bot.my_run_commercial(self.bot.streamer_id, 60))
+        asyncio.ensure_future(self.bot.my_run_commercial(ctx.broadcaster.id, 60))
 
     @is_broadcaster()
     @twitch_command_aliased(name="start")
@@ -716,7 +716,7 @@ class OBSCog(Component):
         await self.bot.play_sound("my_sound//Камень я не дам.mp3")
 
     @twitch_command_aliased(name="непонимаю", aliases=["колобки", "колобок"])
-    async def stone(self, ctx: commands.Context):
+    async def confused(self, ctx: commands.Context):
         await self.bot.play_sound("my_sound//Ничего не понимаю.mp3")
 
     @is_broadcaster()
