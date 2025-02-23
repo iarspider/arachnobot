@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 from loguru import logger
 from pywizlight import wizlight, PilotBuilder
 from requests.structures import CaseInsensitiveDict
-from twitchio import eventsub, Client, Chatter, PartialUser
+from twitchio import eventsub, Client, Chatter, PartialUser, Stream
 from twitchio.ext import commands
 
 # noinspection PyUnresolvedReferences
@@ -446,7 +446,7 @@ class Bot(commands.Bot):
         else:
             status = "eye"
 
-        color = user.color.hex
+        color = user.color.hex if user.color else "#FFFFFF"
 
         # logger.debug(f"Tags: {user.tags}")
         logger.debug(f"Badges: {user.badges}")
@@ -590,13 +590,16 @@ class Bot(commands.Bot):
         if tasks != []:
             await asyncio.wait(tasks)
 
-    async def my_get_stream(self):
+    async def my_get_stream(self) -> Stream:
+        logger.debug(f"Getting stream for {self.owner_id=}")
         stream = await self.fetch_streams(user_ids=[self.owner_id])
+        logger.debug(stream)
         while not stream:
             logger.info("Stream not detected yet, sleeping...")
             await asyncio.sleep(5)
 
-        return stream
+        logger.info(f"Got stream {stream[0]}")
+        return stream[0]
 
     # region Boilerplate
 

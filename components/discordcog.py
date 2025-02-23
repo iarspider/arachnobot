@@ -3,6 +3,7 @@ import os
 import sys
 
 from loguru import logger
+from twitchio import Stream
 from twitchio.ext.commands import Component, is_broadcaster
 
 sys.path.append("..")
@@ -27,10 +28,10 @@ class DiscordCog(Component):
         await self.announce(True)
 
     async def announce(self, now_=False):
+        stream: Stream
         stream = await self.bot.my_get_stream()
 
-        stream = stream[0]
-        game = self.bot.fetch_game(id=stream["game_id"])
+        game = await self.bot.fetch_game(id=stream.game_id)
         #        game = {"name": "Just Chatting"}
         #        stream = {"title": "Проверка оповещений"}
         delta = self.bot.countdown_to - datetime.datetime.now()

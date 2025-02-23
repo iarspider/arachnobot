@@ -68,16 +68,17 @@ class MiscCog(commands.Component):
     async def cmd_ping(self, ctx: commands.Context):
         await ctx.send("Yeth, Mathter?")
 
+    # noinspection PyUnusedLocal
     @commands.Component.listener()
     async def event_stream_online(self, payload: twitchio.StreamOnline) -> None:
         # Event dispatched when a user goes live from the subscription we made above...
 
         # Keep in mind we are assuming this is for ourselves
         # others may not want your bot randomly sending messages...
-        # await payload.broadcaster.send_message(
-        #     sender=self.bot.bot_id,
-        #     message=f"Hi... {payload.broadcaster}! You are live!",
-        # )
+        await payload.broadcaster.send_message(
+            sender=self.bot.bot_id,
+            message=f"Hi... {payload.broadcaster}! You are live!",
+        )
 
         logger.info("Getting Discord cog...")
         discord_bot = self.bot.get_component("DiscordCog")
