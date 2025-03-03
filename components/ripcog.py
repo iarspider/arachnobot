@@ -97,11 +97,15 @@ class RIPCog(Component):
             f.write(text)
 
         if self.bot.sio_server:
-            data = {
-                "text": text,
-                "animation": 0 if n == 0 else n // abs(n),
-            }
-            await self.sio_server.emit("update_death_count", data)
+            if self.bot.game.rip_enabled:
+                await self.bot.sio_server.emit("toggle_death_counter", 1)
+                data = {
+                    "text": text,
+                    "animation": 0 if n == 0 else n // abs(n),
+                }
+                await self.sio_server.emit("update_death_count", data)
+            else:
+                await self.bot.sio_server.emit("toggle_death_counter", 0)
 
     async def write_rip(self, n=0):
         await self.display_rip(n)
@@ -200,7 +204,8 @@ class RIPCog(Component):
         """
         Перезагружает счётчик смертей (в случае смены игры)
         """
-        self.get_game_v5()
+        await self.bot.get_game_v5()
+        await self.display_rip(0)
         await ctx.send("Счётчик смертей обновлён")
 
     @is_broadcaster()

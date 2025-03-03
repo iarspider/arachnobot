@@ -231,6 +231,8 @@ class Bot(commands.Bot):
         self.play_sound_lock = asyncio.Lock()
         self.current_sound = ""
 
+        self.bot_ready = False
+
     #
     # @game.setter
     # async def game(self, value):
@@ -660,6 +662,7 @@ class Bot(commands.Bot):
 
     async def event_ready(self) -> None:
         logger.info(f"Ready | {self.bot_id}")
+        self.bot_ready = True
         await self.get_game_v5()
 
     # endregion
@@ -692,6 +695,9 @@ def main() -> None:
     @sio_server.on("connect")
     async def on_ws_connected(sid, _):
         global twitch_bot
+        while not twitch_bot.bot_ready:
+            await asyncio.sleep(0.1)
+
         twitch_bot.dashboard.append(sid)
         asyncio.ensure_future(twitch_bot.on_dashboard_connected(sid))
         logger.info(f"Dashboard connected with id {sid}")
