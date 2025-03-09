@@ -244,6 +244,7 @@ class Bot(commands.Bot):
         logger.info("play_sound - lock acquired")
 
         if not self.sio_server:
+            logger.info("Playing sound", sound, "using mplayer")
             self.current_sound = ""
 
             if not is_temporary:
@@ -257,6 +258,7 @@ class Bot(commands.Bot):
             )
             await self.bot_play_sound(soundfile)
         else:
+            logger.info("Playing sound", sound, "using dashboard")
             with open(sound, "rb") as mp3_file:
                 chunk_size = 4096  # Size of each chunk
                 while True:
@@ -267,7 +269,6 @@ class Bot(commands.Bot):
                 await self.sio_server.emit(
                     "mp3_end",
                 )
-                self.play_sound_lock.release()
 
     # TODO: Temporary solution until implemented upstream
     async def bot_play_sound(self, filename: str):
@@ -337,9 +338,12 @@ class Bot(commands.Bot):
 
     # TODO
     async def my_run_commercial(self, user_id, length=90):
-        return
-        user = self.create_partialuser(user_id=user_id)
-        await user.start_commercial(length=length)
+        # return
+        try:
+            user = self.create_partialuser(user_id=user_id)
+            await user.start_commercial(length=length)
+        except:
+            pass
         return
 
     async def get_game_v5(self):
@@ -744,6 +748,11 @@ def main() -> None:
         cog: "OBSCog" = twitch_bot.get_component("OBSCog")
         msg = await cog.do_resume(None)
         await twitch_bot.send_message(msg)
+
+    @sio_server.on("audioFinished")
+    async def on_ws_audio_finished(sid):
+        logger.info(f"Received message: audioFinished")
+        twitch_bot.play_sound_lock.release()
 
     # noinspection PyUnresolvedReferences,PyUnusedLocal
     @sio_server.on("*")

@@ -29,7 +29,7 @@
         }
 
         #plush-counter {
-            bottom: 20px;
+            top: 20px;
             left: 50%;
             transform: translateX(-50%);
             transition: transform 0.3s ease;
@@ -152,7 +152,7 @@
     <div id="plush-counter">Пока что никого не плющило</div>
 
     <!-- Чат -->
-    <div id="chat-box"></div>
+    <!-- div id="chat-box"></div -->
 
     <!-- Подключение к Socket.IO -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js"></script>
@@ -185,17 +185,20 @@
             });
 
             // Обновление счётчика плюшей
-            socket.on('update_plush_count', (text) => {
+            socket.on('update_plush_count', (data) => {
+                const { text, animate } = data;
                 const plushCounter = document.getElementById('plush-counter');
                 plushCounter.textContent = text;
 
-                // Анимация сжатия и растяжения при обновлении плюшей
-                plushCounter.style.animation = 'plush-squish 1s 3';
+                if (animate) {
+                    // Анимация сжатия и растяжения при обновлении плюшей
+                    plushCounter.style.animation = 'plush-squish 1s 3';
 
-                // Убираем анимацию после её завершения
-                setTimeout(() => {
-                    plushCounter.style.animation = '';
-                }, 3000);
+                    // Убираем анимацию после её завершения
+                    setTimeout(() => {
+                        plushCounter.style.animation = '';
+                    }, 3000);
+                }
             });
 
             // Добавление сообщений чата с поддержкой цвета и бейджей
@@ -296,6 +299,9 @@
                 const source = audioContext.createBufferSource();
                 source.buffer = decodedData;
                 source.connect(audioContext.destination);
+                source.onended = () => {
+                    socket.emit('audioFinished');  // Replace 'audioFinished' with your event name
+                };
                 source.start(0);
             });
 
