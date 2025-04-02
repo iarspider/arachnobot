@@ -1,4 +1,5 @@
 import sys
+import typing
 
 from twitchio.ext.commands import is_broadcaster, Component
 

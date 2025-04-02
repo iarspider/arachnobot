@@ -725,6 +725,16 @@ class OBSCog(Component):
         await ctx.reply("💤")
         open("shutdown", "w").close()
 
+    async def sante_custom_key(ctx: commands.Context) -> typing.Hashable | None:
+        return 1
+
+    @twitch_command_aliased(
+        name="sante", aliases=("буд", "будь", "будароф", "бударофф")
+    )
+    @commands.cooldown(rate=1, per=30, key=sante_custom_key)
+    async def sante(self, ctx: commands.Context):
+        await self.bot.play_sound("my_sound//Sante.mp3")
+
 
 async def setup(bot: commands.Bot):
     await bot.add_component(OBSCog(bot))
