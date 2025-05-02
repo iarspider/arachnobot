@@ -145,6 +145,7 @@ class GameConfig(peewee.Model):
     rip_emoji = peewee.CharField(default="☠")
     use_game_capture = peewee.BooleanField(default=True)
     tags = peewee.TextField(default="")
+    window_inexact = peewee.BooleanField(default=False)
 
     def __str__(self):
         return self.game

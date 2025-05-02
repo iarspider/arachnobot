@@ -1,8 +1,10 @@
 import asyncio
 import codecs
 import datetime
+import fnmatch
 import glob
 import os
+import random
 import re
 import sys
 import time
@@ -11,6 +13,7 @@ import typing
 
 import requests
 from Xlib import X, display
+from Xlib.error import XError
 from loguru import logger
 from obswebsocket import obsws
 from obswebsocket import requests as obsws_requests
@@ -137,7 +140,7 @@ class OBSCog(Component):
         exit(1)
 
     @staticmethod
-    def find_window_by_title_and_class(target_title, target_class):
+    def find_window_by_title_and_class(target_title, target_class, inexact=False):
         # Connect to the X server
         disp = display.Display()
         root = disp.screen().root
@@ -153,6 +156,8 @@ class OBSCog(Component):
 
         all_windows = get_all_windows(root)
 
+        title_match = False
+
         for window in all_windows:
             try:
                 # Get the window's title
@@ -160,8 +165,15 @@ class OBSCog(Component):
                 title = window.get_property(title_atom, X.AnyPropertyType, 0, 1024)
                 if title:
                     title = title.value.decode("utf-8")
-                    if title == target_title:
+                    if title == target_title and not inexact:
                         logger.debug(f"Found window with matching title")
+                        title_match = True
+                    else:
+                        if fnmatch.fnmatch(title, target_title) and inexact:
+                            logger.debug(
+                                f"Found window with matching title (wildcard match)"
+                            )
+                            title_match = True
 
                 # Get the window's class
                 class_atom = disp.intern_atom("WM_CLASS")
@@ -173,17 +185,14 @@ class OBSCog(Component):
                     if target_class in window_class:
                         logger.debug("Found window with matching class")
 
-                if (
-                    (title == target_title)
-                    and window_class
-                    and (target_class in window_class)
-                ):
+                if title_match and window_class and (target_class in window_class):
                     logger.debug(
                         f"Found window with title '{title}' and class '{window_class}'"
                     )
                     return window
-            except Exception:
-                continue  # Ignore inaccessible windows or errors
+            except (XError, UnicodeDecodeError, AttributeError) as e:
+                logger.debug(f"Ignored window due to exception: {e}")
+                continue  # Ignore inaccessible windows or decoding errors
 
         logger.debug(
             f"Window with title '{target_title}' and class '{target_class}' not found"
@@ -366,6 +375,13 @@ class OBSCog(Component):
                 inputName=self.aud_sources.getMic1(), inputMuted=True
             )
         )
+
+        self.ws.call(
+            obsws_requests.SetInputMute(
+                inputName=self.aud_sources.getDesktop1(), inputMuted=True
+            )
+        )
+
         self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=False))
 
         self.show_hide_scene_item("Starting", "Ожидание", False)
@@ -496,38 +512,43 @@ class OBSCog(Component):
                     inputName=self.aud_sources.getMic1(), inputMuted=False
                 )
             )
-            if self.bot.game.use_game_capture:
-                self.show_hide_scene_item("Game", "Game Capture", True)
-                self.show_hide_scene_item("Game", "Window Capture", False)
-                if self.bot.game.window != "X":
-                    source: obsws_requests.GetInputSettings = self.ws.call(
-                        obsws_requests.GetInputSettings(inputName="Game Capture")
+            self.ws.call(
+                obsws_requests.SetInputMute(
+                    inputName=self.aud_sources.getDesktop1(), inputMuted=False
+                )
+            )
+        if self.bot.game.use_game_capture:
+            self.show_hide_scene_item("Game", "Game Capture", True)
+            self.show_hide_scene_item("Game", "Window Capture", False)
+            if self.bot.game.window != "X":
+                source: obsws_requests.GetInputSettings = self.ws.call(
+                    obsws_requests.GetInputSettings(inputName="Game Capture")
+                )
+                settings = source.getInputSettings()
+                parts = self.bot.game.window.split("\r\n")
+                win = OBSCog.find_window_by_title_and_class(
+                    parts[1], parts[2], self.bot.game.window_inexact
+                )
+                if win is None:
+                    logger.error(
+                        f"Can't find window title={parts[1]}, class={parts[2]}!"
                     )
-                    settings = source.getInputSettings()
-                    parts = self.bot.game.window.split("\r\n")
-                    win = OBSCog.find_window_by_title_and_class(parts[1], parts[2])
-                    if win is None:
-                        logger.error(
-                            f"Can't find window title={parts[1]}, class={parts[2]}!"
+                    await ctx.send("Окно игры не найдено")
+                else:
+                    settings["capture_window"] = f"{win.id}"
+                    self.ws.call(
+                        obsws_requests.SetInputSettings(
+                            inputName="Game Capture",
+                            inputSettings=settings,
+                            overlay=False,
                         )
-                        await ctx.send("Окно игры не найдено")
-                    else:
-                        settings["capture_window"] = f"{win.id}"
-                        self.ws.call(
-                            obsws_requests.SetInputSettings(
-                                inputName="Game Capture",
-                                inputSettings=settings,
-                                overlay=False,
-                            )
-                        )
-                        await ctx.send("Захват окна настроен")
-                        logger.debug(
-                            f"Set capture window to {settings['capture_window']}"
-                        )
+                    )
+                    await ctx.send("Захват окна настроен")
+                    logger.debug(f"Set capture window to {settings['capture_window']}")
 
-            else:
-                self.show_hide_scene_item("Game", "Game Capture", False)
-                self.show_hide_scene_item("Game", "Window Capture", True)
+        else:
+            self.show_hide_scene_item("Game", "Game Capture", False)
+            self.show_hide_scene_item("Game", "Window Capture", True)
 
         self.ws_call(obsws_requests.StartRecord())
 
@@ -725,6 +746,7 @@ class OBSCog(Component):
         await ctx.reply("💤")
         open("shutdown", "w").close()
 
+    # noinspection PyMethodMayBeStatic
     async def sante_custom_key(ctx: commands.Context) -> typing.Hashable | None:
         return 1
 
@@ -734,6 +756,14 @@ class OBSCog(Component):
     @commands.cooldown(rate=1, per=30, key=sante_custom_key)
     async def sante(self, ctx: commands.Context):
         await self.bot.play_sound("my_sound//Sante.mp3")
+
+    @twitch_command_aliased(name="эксперименты")
+    @commands.cooldown(rate=1, per=30, key=sante_custom_key)
+    async def experiment(self, ctx: commands.Context):
+        # await self.bot.play_sound("my_sound//Sante.mp3")
+        i = random.randint(1, 8)
+
+        await self.bot.play_sound(f"my_sound//experiments_{i}.mp3")
 
 
 async def setup(bot: commands.Bot):

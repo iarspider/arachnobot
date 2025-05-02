@@ -1,29 +1,24 @@
-import sys
-import typing
-
-from twitchio.ext.commands import is_broadcaster, Component
-
-from twitch_commands import twitch_command_aliased
-
-# sys.path.append("..")
-
 import asyncio
 import datetime
 import logging
 import os
 import time
 from tempfile import NamedTemporaryFile
-from loguru import logger
 
 import requests
 import socketio.asyncio_client
 from bs4 import BeautifulSoup
+from loguru import logger
 from requests.structures import CaseInsensitiveDict
 from twitchio.ext import commands
+from twitchio.ext.commands import is_broadcaster, Component
 
 import streamlabs_api as api
-
 from config import rippers, streamlabs_redirect_uri
+from twitch_commands import twitch_command_aliased, check_sender
+
+
+# sys.path.append("..")
 
 
 class SLClient(socketio.asyncio_client.AsyncClient):
@@ -184,7 +179,6 @@ class SLCog(Component):
             if not res.ok:
                 logger.error(f"Failed to download URL: {res.status_code}")
             with NamedTemporaryFile(delete=False, suffix=".mp3") as tempfile:
-                fname = tempfile.name
                 tempfile.write(res.content)
 
             await self.bot.play_sound("my_sound//ding-sound-effect_1.mp3")
@@ -211,6 +205,68 @@ class SLCog(Component):
 
     @twitch_command_aliased(name="post", aliases=("почта",))
     async def post(self, ctx: commands.Context):
+        try:
+            post_message = ctx.message.text.split(None, 1)[1]
+        except IndexError:
+            return
+
+        # await self.ctx.send("Почта на ремонте")
+        # await self.bot.play_sound("pochta.mp3")
+        # return
+        #
+        now = datetime.datetime.now()
+        if ctx.author.name != "iarspider":
+            lastpost = self.last_post.get(ctx.author.name, None)
+            if lastpost is not None:
+                delta = now - lastpost
+                if delta.seconds < self.post_timeout:
+                    asyncio.ensure_future(
+                        ctx.send("Не надо так часто отправлять почту!")
+                    )
+                    return
+
+            if ctx.author.moderator:
+                price = self.post_price["mod"]
+            elif ctx.author.vip:
+                price = self.post_price["vip"]
+            else:
+                price = self.post_price["regular"]
+
+            points = api.get_points(self.streamlabs_oauth, ctx.author.name)
+
+            if points < price:
+                asyncio.ensure_future(
+                    ctx.send(
+                        f"У вас недостаточно багов для отправки почты - вам нужно "
+                        f"минимум {price}. Проверить баги: !баги"
+                    )
+                )
+
+                return
+        else:
+            price = 0
+
+        if self.bot.sio_server:
+            logger.info("Send tts event to overlay")
+            await self.bot.play_sound("my_sound//ding-sound-effect_1.mp3")
+            await self.bot.sio_server.emit("tts", post_message)
+            logger.info("TTS sent to overlay")
+            if price > 0:
+                res = api.sub_points(self.streamlabs_oauth, ctx.author.name, price)
+                logger.debug(res)
+            self.last_post[ctx.author.name] = now
+        else:
+            if await self.say(post_message):
+                if price > 0:
+                    res = api.sub_points(self.streamlabs_oauth, ctx.author.name, price)
+                    logger.debug(res)
+                self.last_post[ctx.author.name] = now
+            else:
+                await self.bot.play_sound("my_sound//pochta.mp3")
+
+    @check_sender(("iarspider",))
+    @twitch_command_aliased(name="postt", aliases=("апочта",))
+    async def postt(self, ctx: commands.Context):
         try:
             post_message = ctx.message.text.split(None, 1)[1]
         except IndexError:

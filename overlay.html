@@ -1,22 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stream Overlay</title>
     <style>
-        body, html {
+        body,
+        html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
             background: transparent;
-            overflow: hidden;            
+            overflow: hidden;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             font-size: 48px;
         }
 
-        #death-counter, #plush-counter, #chat-box {
+        #death-counter,
+        #plush-counter,
+        #chat-box {
             position: absolute;
             color: white;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
@@ -25,7 +29,8 @@
         #death-counter {
             bottom: 0px;
             right: 20px;
-            transition: color 0.5s; /* Плавный переход цвета */
+            transition: color 0.5s;
+            /* Плавный переход цвета */
         }
 
         #plush-counter {
@@ -33,11 +38,15 @@
             left: 50%;
             transform: translateX(-50%);
             transition: transform 0.3s ease;
-            height: 40px; /* Задайте фиксированную высоту для предотвращения смещения */
+            height: 40px;
+            /* Задайте фиксированную высоту для предотвращения смещения */
             display: flex;
-            align-items: center; /* Выравнивание по центру по вертикали */
-            padding: 10px; /* Добавьте внутренние отступы для эстетики */
-            box-sizing: border-box; /* Убедитесь, что padding включён в размеры элемента */
+            align-items: center;
+            /* Выравнивание по центру по вертикали */
+            padding: 10px;
+            /* Добавьте внутренние отступы для эстетики */
+            box-sizing: border-box;
+            /* Убедитесь, что padding включён в размеры элемента */
         }
 
         #chat-box {
@@ -60,19 +69,24 @@
             flex-direction: row;
             align-items: flex-start;
             margin-bottom: 5px;
-            opacity: 0; /* Сначала скрыто, для анимации */
+            opacity: 0;
+            /* Сначала скрыто, для анимации */
             animation: slide-in 1s forwards;
-            word-wrap: break-word; /* Автоматический перенос длинных слов */
-            white-space: normal; /* Перенос текста на новые строки */
+            word-wrap: break-word;
+            /* Автоматический перенос длинных слов */
+            white-space: normal;
+            /* Перенос текста на новые строки */
         }
 
         .chat-message.badge-mod::before {
-            content: '🗡️'; /* Эмодзи для модератора */
+            content: '🗡️';
+            /* Эмодзи для модератора */
             margin-right: 5px;
         }
 
         .chat-message.badge-vip::before {
-            content: '💎'; /* Эмодзи для VIP */
+            content: '💎';
+            /* Эмодзи для VIP */
             margin-right: 5px;
         }
 
@@ -87,10 +101,12 @@
                 transform: translateX(100%);
                 opacity: 0;
             }
+
             80% {
                 transform: translateX(-5%);
                 opacity: 1;
             }
+
             100% {
                 transform: translateX(0);
                 opacity: 1;
@@ -102,9 +118,12 @@
             0% {
                 transform: translateX(-50%) scale(1, 1);
             }
+
             50% {
-                transform: translateX(-50%) scale(1.5, 0.5); /* Растягивание по горизонтали, сжатие по вертикали */
+                transform: translateX(-50%) scale(1.5, 0.5);
+                /* Растягивание по горизонтали, сжатие по вертикали */
             }
+
             100% {
                 transform: translateX(-50%) scale(1, 1);
             }
@@ -115,9 +134,11 @@
             0% {
                 color: white;
             }
+
             50% {
                 color: red;
             }
+
             100% {
                 color: white;
             }
@@ -127,9 +148,11 @@
             0% {
                 color: white;
             }
+
             50% {
                 color: gold;
             }
+
             100% {
                 color: white;
             }
@@ -140,6 +163,7 @@
         }
     </style>
 </head>
+
 <body>
 
     <!-- Проигрыватель звуков -->
@@ -154,9 +178,12 @@
     <!-- Чат -->
     <!-- div id="chat-box"></div -->
 
+    <script src="./Yandex SpeechKit for all (YSKFA).js"></script>
+    <script src="./jquery-3.6.0.min.js"></script>
+
     <!-- Подключение к Socket.IO -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js"></script>
-    <script>    
+    <script>
         const socket = io('http://overlay.home', { transports: ['websocket'], path: '/ws/' });
         const debug = false;
         let audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -244,9 +271,9 @@
             socket.on('toggle_death_counter', (val) => {
                 const deathCounter = document.getElementById('death-counter');
                 if (val === 1) {
-                   deathCounter.classList.remove('hidden');
+                    deathCounter.classList.remove('hidden');
                 } else {
-                   deathCounter.classList.add('hidden');
+                    deathCounter.classList.add('hidden');
                 }
             });
 
@@ -256,14 +283,14 @@
                 soundPlayer.src = soundUrl;
                 soundPlayer.play();
             });
-        
+
         } else {
             let plushCount = 0;
             const plushCounter = document.getElementById('plush-counter');
 
             function updatePlushCounter(newCount) {
                 plushCount = newCount;
-                
+
                 // Добавляем класс для анимации
                 plushCounter.textContent = `Plushies: ${plushCount}`;
 
@@ -309,6 +336,11 @@
             audioBuffer = [];
         });
 
+        socket.on('tts', (text) => {
+            textSender(text);
+        });
+
     </script>
 </body>
+
 </html>
