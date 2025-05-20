@@ -376,11 +376,11 @@ class OBSCog(Component):
             )
         )
 
-        self.ws.call(
-            obsws_requests.SetInputMute(
-                inputName=self.aud_sources.getDesktop1(), inputMuted=True
-            )
-        )
+#        self.ws.call(
+#            obsws_requests.SetInputMute(
+#                inputName=self.aud_sources.getDesktop1(), inputMuted=True
+#            )
+#        )
 
         self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=False))
 
@@ -512,11 +512,11 @@ class OBSCog(Component):
                     inputName=self.aud_sources.getMic1(), inputMuted=False
                 )
             )
-            self.ws.call(
-                obsws_requests.SetInputMute(
-                    inputName=self.aud_sources.getDesktop1(), inputMuted=False
-                )
-            )
+#            self.ws.call(
+#                obsws_requests.SetInputMute(
+#                    inputName=self.aud_sources.getDesktop1(), inputMuted=False
+#                )
+#            )
         if self.bot.game.use_game_capture:
             self.show_hide_scene_item("Game", "Game Capture", True)
             self.show_hide_scene_item("Game", "Window Capture", False)
@@ -526,6 +526,9 @@ class OBSCog(Component):
                 )
                 settings = source.getInputSettings()
                 parts = self.bot.game.window.split("\r\n")
+                while len(parts) < 3:
+                    parts.append("")
+
                 win = OBSCog.find_window_by_title_and_class(
                     parts[1], parts[2], self.bot.game.window_inexact
                 )
@@ -758,7 +761,7 @@ class OBSCog(Component):
         await self.bot.play_sound("my_sound//Sante.mp3")
 
     @twitch_command_aliased(name="эксперименты")
-    @commands.cooldown(rate=1, per=30, key=sante_custom_key)
+    @commands.cooldown(rate=1, per=60, key=sante_custom_key)
     async def experiment(self, ctx: commands.Context):
         # await self.bot.play_sound("my_sound//Sante.mp3")
         i = random.randint(1, 8)

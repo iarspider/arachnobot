@@ -46,6 +46,7 @@ class PluschCog(Component):
                     "Эк {0} вштырно {1}поплющило...".format(who, "само" if slf else "")
                 )
             )
+            asyncio.ensure_future(self.bot.play_sound("my_sound//Вот это вштырило.mp3"))
 
         self.plusches += 1
         self.write_plusch()
