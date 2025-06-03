@@ -376,11 +376,11 @@ class OBSCog(Component):
             )
         )
 
-#        self.ws.call(
-#            obsws_requests.SetInputMute(
-#                inputName=self.aud_sources.getDesktop1(), inputMuted=True
-#            )
-#        )
+        #        self.ws.call(
+        #            obsws_requests.SetInputMute(
+        #                inputName=self.aud_sources.getDesktop1(), inputMuted=True
+        #            )
+        #        )
 
         self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=False))
 
@@ -500,11 +500,12 @@ class OBSCog(Component):
 
         self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=True))
 
-        if self.vr:
-            self.switch_to("VR Game")
-            # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
-            #                                     False))
-        else:
+        # if self.vr:
+        #     self.switch_to("VR Game")
+        # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
+        #                                     False))
+        # else:
+        if True:
             self.switch_to("Game")
             # self.ws.call(obsws_requests.SetMute(source="Mic", mute=False))
             self.ws.call(
@@ -512,11 +513,11 @@ class OBSCog(Component):
                     inputName=self.aud_sources.getMic1(), inputMuted=False
                 )
             )
-#            self.ws.call(
-#                obsws_requests.SetInputMute(
-#                    inputName=self.aud_sources.getDesktop1(), inputMuted=False
-#                )
-#            )
+        self.ws.call(
+            obsws_requests.SetInputMute(
+                inputName=self.aud_sources.getDesktop1(), inputMuted=False
+            )
+        )
         if self.bot.game.use_game_capture:
             self.show_hide_scene_item("Game", "Game Capture", True)
             self.show_hide_scene_item("Game", "Window Capture", False)

@@ -30,6 +30,10 @@ class MiscCog(commands.Component):
     @commands.Component.listener()
     async def event_message(self, payload: twitchio.ChatMessage) -> None:
         # print(f"[{payload.broadcaster.name}] - {payload.chatter.name}: {payload.text}")
+        if payload.source_broadcaster is not None:
+            # Filter out messages in shared chat
+            return
+
         if payload.chatter is None:
             d = datetime.datetime.now().timestamp()
             fn = f"msg_{d}.txt"
