@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 from loguru import logger
 from pywizlight import wizlight, PilotBuilder
 from requests.structures import CaseInsensitiveDict
-from twitchio import eventsub, Client, Chatter, PartialUser, Stream
+from twitchio import eventsub, Client, Chatter, PartialUser, Stream, HTTPException
 from twitchio.ext import commands
 
 # noinspection PyUnresolvedReferences
@@ -164,6 +164,17 @@ class DuelStats(peewee.Model):
         table_name = "duelstats"
         database = database
         primary_key = peewee.CompositeKey("attacker", "defender")
+
+
+class SourceConfig(peewee.Model):
+    game = peewee.ForeignKeyField(model=GameConfig, backref="sources")
+    scene = peewee.CharField()
+    source = peewee.CharField()
+    state = peewee.BooleanField()
+
+    class Meta:
+        table_name = "sourceconfig"
+        database = database
 
 
 class Bot(commands.Bot):
@@ -343,7 +354,7 @@ class Bot(commands.Bot):
         try:
             user = self.create_partialuser(user_id=user_id)
             await user.start_commercial(length=length)
-        except:
+        except HTTPException:
             pass
         return
 
@@ -752,6 +763,7 @@ def main() -> None:
 
     @sio_server.on("audioFinished")
     async def on_ws_audio_finished(sid):
+        _ = sid
         logger.info(f"Received message: audioFinished")
         twitch_bot.play_sound_lock.release()
 

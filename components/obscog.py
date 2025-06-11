@@ -22,6 +22,7 @@ from twitchio.ext import commands
 from twitchio.ext.commands import Component
 from twitchio.ext.commands import is_broadcaster
 
+from newbot import SourceConfig
 from twitch_commands import twitch_command_aliased
 
 sys.path.append("..")
@@ -549,10 +550,18 @@ class OBSCog(Component):
                     )
                     await ctx.send("Захват окна настроен")
                     logger.debug(f"Set capture window to {settings['capture_window']}")
-
         else:
             self.show_hide_scene_item("Game", "Game Capture", False)
             self.show_hide_scene_item("Game", "Window Capture", True)
+
+        scene_obj: SourceConfig
+        for scene_obj in SourceConfig.select():
+            self.show_hide_scene_item(scene_obj.scene, scene_obj.source, False)
+
+        for scene_obj in self.bot.game.sources:
+            self.show_hide_scene_item(
+                scene_obj.scene, scene_obj.source, scene_obj.state
+            )
 
         self.ws_call(obsws_requests.StartRecord())
 

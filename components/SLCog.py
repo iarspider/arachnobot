@@ -318,9 +318,7 @@ class SLCog(Component):
 
     @twitch_command_aliased(name="sos", aliases=("alarm",))
     async def sos(self, ctx: commands.Context):
-        if not (
-            ctx.author.moderator or ctx.author.broadcaster or ctx.author.name in rippers
-        ):
+        if not (ctx.author.vip or ctx.author.broadcaster or ctx.author.name in rippers):
             asyncio.ensure_future(
                 ctx.send("Эта кнопочка - не для тебя. Руки убрал, ЖИВО!")
             )
