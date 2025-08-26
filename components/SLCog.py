@@ -337,6 +337,16 @@ class SLCog(Component):
         )
         # httpclient_logging_patch(logging.INFO)
 
+    @is_broadcaster()
+    @twitch_command_aliased(name="addsp")
+    async def addsp(self, ctx: commands.Context):
+        try:
+            user, points = ctx.message.text.split(None, 2)[1:]
+        except IndexError:
+            return
+
+        api.add_points(self.streamlabs_oauth, user, points)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_component(SLCog(bot))

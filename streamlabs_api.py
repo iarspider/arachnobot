@@ -1,5 +1,7 @@
 #!python3
 # -*- coding: utf-8 -*-
+import pprint
+
 import requests
 import json as simplejson
 from requests_oauthlib import OAuth2Session
@@ -85,6 +87,16 @@ def sub_points(oauth, username, points, channel="iarspider"):
     return r.json()
 
 
+def add_points(oauth, username, points, channel="iarspider"):
+    points = get_points(oauth, username, channel) + points
+    r = oauth.post(
+        "https://streamlabs.com/api/v1.0/points/user_point_edit",
+        data=dict(username=username, points=points),
+    )
+    r.raise_for_status()
+    return r.json()
+
+
 def roll_credits(oauth):
     r = oauth.post("https://streamlabs.com/api/v1.0/credits/roll")
     r.raise_for_status()
@@ -120,20 +132,20 @@ def main():
     requests_log = logging.getLogger("requests.packages.urllib3")
     requests_log.setLevel(logging.DEBUG)
     requests_log.propagate = True
-    print(f"{streamlabs_client_id=}, {streamlabs_client_secret=}, {streamlabs_redirect_uri=}")
+    print(
+        f"{streamlabs_client_id=}, {streamlabs_client_secret=}, {streamlabs_redirect_uri=}"
+    )
     oauth = get_streamlabs_session(
         streamlabs_client_id, streamlabs_client_secret, streamlabs_redirect_uri
     )
-    points = get_points(oauth, "iarspider")
-    from pprint import pprint
-
-    pprint(points)
-    r = requests.get(
-        "https://streamlabs.com/api/v1.0/socket/token?access_token="
-        + oauth.access_token
-    )
-    # r.raise_for_status()
-    print(r.json())
+    r = add_points(oauth, "veniamin_arefev", 750, "iarspider")
+    pprint.pprint(r)
+    # r = requests.get(
+    #     "https://streamlabs.com/api/v1.0/socket/token?access_token="
+    #     + oauth.access_token
+    # )
+    # # r.raise_for_status()
+    # print(r.json())
 
 
 if __name__ == "__main__":

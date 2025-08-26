@@ -383,6 +383,9 @@ class OBSCog(Component):
         #            )
         #        )
 
+        self.ws.call(
+            obsws_requests.SetInputVolume(inputName="Радио", inputVolumeDb=-7.0)
+        )
         self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=False))
 
         self.show_hide_scene_item("Starting", "Ожидание", False)
@@ -501,24 +504,6 @@ class OBSCog(Component):
 
         self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=True))
 
-        # if self.vr:
-        #     self.switch_to("VR Game")
-        # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
-        #                                     False))
-        # else:
-        if True:
-            self.switch_to("Game")
-            # self.ws.call(obsws_requests.SetMute(source="Mic", mute=False))
-            self.ws.call(
-                obsws_requests.SetInputMute(
-                    inputName=self.aud_sources.getMic1(), inputMuted=False
-                )
-            )
-        self.ws.call(
-            obsws_requests.SetInputMute(
-                inputName=self.aud_sources.getDesktop1(), inputMuted=False
-            )
-        )
         if self.bot.game.use_game_capture:
             self.show_hide_scene_item("Game", "Game Capture", True)
             self.show_hide_scene_item("Game", "Window Capture", False)
@@ -563,6 +548,27 @@ class OBSCog(Component):
                 scene_obj.scene, scene_obj.source, scene_obj.state
             )
 
+        # if self.vr:
+        #     self.switch_to("VR Game")
+        # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
+        #                                     False))
+        # else:
+        if True:
+            self.switch_to("Game")
+            # self.ws.call(obsws_requests.SetMute(source="Mic", mute=False))
+            self.ws.call(
+                obsws_requests.SetInputMute(
+                    inputName=self.aud_sources.getMic1(), inputMuted=False
+                )
+            )
+        self.ws.call(
+            obsws_requests.SetInputMute(
+                inputName=self.aud_sources.getDesktop1(), inputMuted=False
+            )
+        )
+
+        await asyncio.sleep(5)
+
         self.ws_call(obsws_requests.StartRecord())
 
     async def do_resume(self, ctx: typing.Optional[commands.Context]):
@@ -584,6 +590,12 @@ class OBSCog(Component):
         self.ws.call(
             obsws_requests.SetInputMute(
                 inputName=self.aud_sources.getMic1(), inputMuted=False
+            )
+        )
+
+        self.ws.call(
+            obsws_requests.SetInputMute(
+                inputName=self.aud_sources.getDesktop1(), inputMuted=False
             )
         )
 
