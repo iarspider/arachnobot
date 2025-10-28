@@ -726,7 +726,8 @@ def main() -> None:
 
     sio_server = socketio.AsyncServer(
         async_mode="asgi",
-        # logger=True, engineio_logger=True,
+        logger=True,
+        engineio_logger=True,
         cors_allowed_origins=["https://fr.iarazumov.com", "http://overlay.home"],
     )
     app = socketio.ASGIApp(sio_server, socketio_path="/ws")
@@ -819,7 +820,7 @@ def main() -> None:
             "SLCog",
             "elfcog",
             "duelcog",
-            "PointCog",
+            "pointcog",
         ):  # 'raidcog', 'vmodcog', 'musiccog'
             # noinspection PyUnboundLocalVariable
             logger.info(f"Loading module {extension}")
@@ -917,5 +918,5 @@ def patch_socketio():
 
 if __name__ == "__main__":
     load_dotenv()
-    patch_socketio()
+    # patch_socketio()
     main()
