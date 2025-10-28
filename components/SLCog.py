@@ -299,8 +299,7 @@ class SLCog(Component):
             if points < price:
                 asyncio.ensure_future(
                     ctx.send(
-                        f"У вас недостаточно багов для отправки почты - вам нужно "
-                        f"минимум {price}. Проверить баги: !баги"
+                        f"У вас недостаточно багов для отправки почты: цена {price}, баланс {points}. Проверить баги: !баги"
                     )
                 )
 
@@ -345,7 +344,76 @@ class SLCog(Component):
         except IndexError:
             return
 
-        api.add_points(self.streamlabs_oauth, user, points)
+        api.add_points(self.streamlabs_oauth, user, int(points))
+
+    @twitch_command_aliased(name="жадный")
+    async def greedy(self, ctx: commands.Context):
+        now = datetime.datetime.now()
+        lastpost = self.last_post.get(ctx.author.name, None)
+        if lastpost is not None:
+            delta = now - lastpost
+            if delta.seconds < self.post_timeout:
+                asyncio.ensure_future(ctx.send("Не надо так часто отправлять почту!"))
+                return
+
+        points = api.get_points(self.streamlabs_oauth, ctx.author.name)
+        if points < 1000:
+            asyncio.ensure_future(
+                ctx.send(
+                    f"У вас недостаточно багов для выполнения этой команды: цена 1000, баланс {points}"
+                )
+            )
+        else:
+            await self.bot.play_sound("my_sound//Я не жадный.mp3")
+            res = api.sub_points(self.streamlabs_oauth, ctx.author.name, 1000)
+            logger.debug(res)
+            self.last_post[ctx.author.name] = now
+
+    @twitch_command_aliased(name="маловато")
+    async def moar(self, ctx: commands.Context):
+        now = datetime.datetime.now()
+        lastpost = self.last_post.get(ctx.author.name, None)
+        if lastpost is not None:
+            delta = now - lastpost
+            if delta.seconds < self.post_timeout:
+                asyncio.ensure_future(ctx.send("Не надо так часто отправлять почту!"))
+                return
+
+        points = api.get_points(self.streamlabs_oauth, ctx.author.name)
+        if points < 500:
+            asyncio.ensure_future(
+                ctx.send(
+                    f"У вас недостаточно багов для выполнения этой команды: цена 500, баланс {points}"
+                )
+            )
+        else:
+            await self.bot.play_sound("my_sound//МАЛОВАТО БУДЕТ.mp3")
+            res = api.sub_points(self.streamlabs_oauth, ctx.author.name, 500)
+            logger.debug(res)
+            self.last_post[ctx.author.name] = now
+
+    @twitch_command_aliased(name="жадность")
+    async def greed(self, ctx: commands.Context):
+        now = datetime.datetime.now()
+        lastpost = self.last_post.get(ctx.author.name, None)
+        if lastpost is not None:
+            delta = now - lastpost
+            if delta.seconds < self.post_timeout:
+                asyncio.ensure_future(ctx.send("Не надо так часто отправлять почту!"))
+                return
+
+        points = api.get_points(self.streamlabs_oauth, ctx.author.name)
+        if points < 1000:
+            asyncio.ensure_future(
+                ctx.send(
+                    f"У вас недостаточно багов для выполнения этой команды: цена 1000, баланс {points}"
+                )
+            )
+        else:
+            await self.bot.play_sound("my_sound//Жадность это плохо.mp3")
+            res = api.sub_points(self.streamlabs_oauth, ctx.author.name, 1000)
+            logger.debug(res)
+            self.last_post[ctx.author.name] = now
 
 
 async def setup(bot: commands.Bot):

@@ -18,6 +18,7 @@ import twitchio
 import uvicorn
 from dotenv import load_dotenv
 from loguru import logger
+from pytils import numeral
 from pywizlight import wizlight, PilotBuilder
 from requests.structures import CaseInsensitiveDict
 from twitchio import eventsub, Client, Chatter, PartialUser, Stream, HTTPException
@@ -249,6 +250,32 @@ class Bot(commands.Bot):
     # @game.setter
     # async def game(self, value):
     #     self.game_ = value
+
+    async def get_announce_text(self, now_=False):
+        stream: Stream
+        stream = await self.my_get_stream()
+
+        game = await self.fetch_game(id=stream.game_id)
+        #        game = {"name": "Just Chatting"}
+        #        stream = {"title": "Проверка оповещений"}
+        delta = self.countdown_to - datetime.datetime.now()
+        delta_m = delta.seconds // 60
+        if delta_m > 0 and not now_:
+            delta_text = "примерно " + numeral.get_plural(
+                delta_m, ("минута", "минуты", "минут")
+            )
+        else:
+            delta_text = "меньше минуты"
+
+        #        delta_text = "всё время мира"
+
+        announcement = (
+            f'Паучок запустил стрим "{stream.title}" '
+            f'по игре "{game.name}"! У вас есть {delta_text} чтобы'
+            " открыть стрим - https://twitch.tv/iarspider !"
+        )
+
+        return announcement
 
     async def play_sound(self, sound: str | bytes, is_temporary: bool = False):
         logger.info("play_sound - waiting for lock")
@@ -499,7 +526,7 @@ class Bot(commands.Bot):
         self, payload: twitchio.ChannelPointsRedemptionAdd
     ) -> None:
         logger.debug(
-            f"{payload.user!r} has redeemed {payload.reward!r} at {payload.timestamp}"
+            f"{payload.user!r} has redeemed {payload.reward!r} ({payload.reward.id} at {payload.timestamp}"
         )
         await self.do_reward(
             payload.user,
@@ -515,10 +542,6 @@ class Bot(commands.Bot):
         item = None
         requestor = user.display_name or user.name
         match title:
-            case "Смена голоса на 1 минуту":
-                vmod = self.get_component("VMcog")
-                # noinspection PyUnresolvedReferences
-                asyncio.ensure_future(vmod.activate_voicemod())
             case "Обнять стримера":
                 logger.debug(f"Queued redepmtion: hugs, {requestor}")
                 item = {"action": "event", "value": {"type": "hugs", "from": requestor}}
@@ -573,10 +596,14 @@ class Bot(commands.Bot):
                     ["Goblin_Burn_1", "Minion_BurnBurn", "Minion_FireNoHurt"]
                 )
                 await self.play_sound(f"sound//Minion General Speech@ignore@{snd}.mp3")
-            case "Лисо-Флешкино безумие":
-                await self.play_sound("my_sound//FoxFlashMadness.mp3")
             case "Ты всё испортил!":
                 await self.play_sound("my_sound//fail.mp3")
+            case "Я не жадный":
+                await self.play_sound("my_sound//Я не жадный.mp3")
+            case "Жадность":
+                await self.play_sound("my_sound//Жадность это плохо.mp3")
+            case "Маловато будет":
+                await self.play_sound("my_sound//МАЛОВАТО БУДЕТ.mp3")
             case "СТОП-игра!":
                 await self.play_sound("my_sound//NO GOD, PLEASE NO.mp3")
 

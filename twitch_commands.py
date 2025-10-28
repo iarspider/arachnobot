@@ -1,3 +1,4 @@
+import asyncio
 import functools
 import typing
 
@@ -70,3 +71,29 @@ def check_sender(allowed: typing.Iterable[str]):
         return ctx.chatter.name in allowed
 
     return commands.guard(predicate)
+
+
+# def sl_points(api, streamlabs_oauth, prices: int | dict[str, int]):
+#     if isinstance(prices, int):
+#         prices = {"vip": prices, "regular": prices, "mod": prices}
+#
+#     def predicate(ctx: commands.Context):
+#         points = api.get_points(streamlabs_oauth, ctx.author.name)
+#         price = prices["regular"]
+#         if ctx.author.admin:
+#             price = prices["admin"]
+#         elif ctx.author.vip:
+#             price = prices["vip"]
+#
+#         if points < price:
+#             asyncio.ensure_future(
+#                 ctx.reply(
+#                     f"У вас недостаточно багов для использования команды: цена {price}, баланс {points}"
+#                 )
+#             )
+#             return False
+#
+#         api.sub_points(streamlabs_oauth, ctx.author.name, price)
+#         return True
+#
+#     return commands.guard(predicate)

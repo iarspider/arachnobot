@@ -25,31 +25,12 @@ class DiscordCog(Component):
     @is_broadcaster()
     @twitch_command_aliased(name="announce")
     async def cmd_announce(self, ctx: commands.Context):
-        await self.announce(True)
+        await self.announce(await self.bot.get_announce_text(True))
 
-    async def announce(self, now_=False):
-        stream: Stream
-        stream = await self.bot.my_get_stream()
-
-        game = await self.bot.fetch_game(id=stream.game_id)
-        #        game = {"name": "Just Chatting"}
-        #        stream = {"title": "Проверка оповещений"}
+    # noinspection PyMethodMayBeStatic
+    async def announce(self, text):
+        announcement = f"@{discord_role} " + text
         delta = self.bot.countdown_to - datetime.datetime.now()
-        delta_m = delta.seconds // 60
-        if delta_m > 0 and not now_:
-            delta_text = "примерно " + numeral.get_plural(
-                delta_m, ("минута", "минуты", "минут")
-            )
-        else:
-            delta_text = "меньше минуты"
-
-        #        delta_text = "всё время мира"
-
-        announcement = (
-            f'@{discord_role} Паучок запустил стрим "{stream.title}" '
-            f'по игре "{game.name}"! У вас есть {delta_text} чтобы'
-            " открыть стрим - <https://twitch.tv/iarspider>!"
-        )
 
         connection = pika.BlockingConnection(
             pika.URLParameters(os.getenv("RABBIT_URL"))

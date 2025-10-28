@@ -15,7 +15,7 @@ scope = [
     "moderator:manage:banned_users",
 ]
 
-TOKEN_FILE = "twitch_token.json"
+TOKEN_FILE = "twitch_api_token.json"
 
 
 def token_saver(token):

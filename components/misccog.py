@@ -1,16 +1,22 @@
 import asyncio
 import datetime
+import os
 import random
 import string
 from collections import deque
 
 import twitchio
 from loguru import logger
+from pytils import numeral
+from twitchio import Stream
 from twitchio.ext import commands
 from twitchio.ext.commands import is_broadcaster
 
+import config
 from config import twitch_extra_bite, twitch_no_bite, rippers
 from twitch_commands import twitch_command_aliased, check_sender
+
+import telegram
 
 
 class MiscCog(commands.Component):
@@ -84,14 +90,22 @@ class MiscCog(commands.Component):
             message=f"Hi... {payload.broadcaster}! You are live!",
         )
 
+        ann_text = await self.bot.get_announce_text()
+
         logger.info("Getting Discord cog...")
-        discord_bot = self.bot.get_component("DiscordCog")
-        if discord_bot:
+        discord_cog = self.bot.get_component("DiscordCog")
+        if discord_cog:
             logger.info("Got it, requesting announce...")
             # noinspection PyUnresolvedReferences
-            asyncio.ensure_future(discord_bot.announce())
+            asyncio.ensure_future(discord_cog.announce(ann_text))
         else:
             logger.warning("Discord cog not found")
+
+        # ann_text = ann_text.replace(
+        #     "<https://twitch.tv/iarspider>", "https://twitch.tv/iarspider"
+        # )
+        bot = telegram.Bot(os.getenv("TELEGRAM_TOKEN"))
+        await bot.send_message(config.telegram_channel, text=ann_text)
 
     @twitch_command_aliased(name="roll", aliases=("dice", "кинь", "r"))
     async def roll(self, ctx: commands.Context):
