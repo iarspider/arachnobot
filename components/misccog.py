@@ -8,6 +8,7 @@ from collections import deque
 import twitchio
 from loguru import logger
 from pytils import numeral
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from twitchio import Stream
 from twitchio.ext import commands
 from twitchio.ext.commands import is_broadcaster
@@ -90,22 +91,31 @@ class MiscCog(commands.Component):
             message=f"Hi... {payload.broadcaster}! You are live!",
         )
 
-        ann_text = await self.bot.get_announce_text()
+        ann_texts = await self.bot.get_announce_text()
 
         logger.info("Getting Discord cog...")
         discord_cog = self.bot.get_component("DiscordCog")
         if discord_cog:
             logger.info("Got it, requesting announce...")
             # noinspection PyUnresolvedReferences
-            asyncio.ensure_future(discord_cog.announce(ann_text))
+            asyncio.ensure_future(discord_cog.announce(ann_texts[0]))
         else:
             logger.warning("Discord cog not found")
 
-        # ann_text = ann_text.replace(
-        #     "<https://twitch.tv/iarspider>", "https://twitch.tv/iarspider"
-        # )
         bot = telegram.Bot(os.getenv("TELEGRAM_TOKEN"))
-        await bot.send_message(config.telegram_channel, text=ann_text)
+        await bot.send_message(
+            config.telegram_channel,
+            text=ann_texts[1],
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            text="открыть стрим", url="https://twitch.tv/iarspider"
+                        )
+                    ]
+                ]
+            ),
+        )
 
     @twitch_command_aliased(name="roll", aliases=("dice", "кинь", "r"))
     async def roll(self, ctx: commands.Context):
