@@ -19,9 +19,8 @@ import uvicorn
 from dotenv import load_dotenv
 from loguru import logger
 from pytils import numeral
-from pywizlight import wizlight, PilotBuilder
 from requests.structures import CaseInsensitiveDict
-from twitchio import eventsub, Client, Chatter, PartialUser, Stream, HTTPException
+from twitchio import eventsub, Client, Chatter, Stream, HTTPException
 from twitchio.ext import commands
 
 # noinspection PyUnresolvedReferences
@@ -269,11 +268,17 @@ class Bot(commands.Bot):
 
         #        delta_text = "всё время мира"
 
-        announcement = (
-            f'Паучок запустил стрим "{stream.title}" '
-            f'по игре "{game.name}"! У вас есть {delta_text} чтобы'
-            " открыть стрим - https://twitch.tv/iarspider !"
-        )
+        announcement = [
+            (
+                f'Паучок запустил стрим "{stream.title}" '
+                f'по игре "{game.name}"! У вас есть {delta_text} чтобы'
+                " открыть стрим - https://twitch.tv/iarspider !"
+            ),
+            (
+                f'Паучок запустил стрим "{stream.title}" '
+                f'по игре "{game.name}"! У вас есть {delta_text} чтобы'
+            ),
+        ]
 
         return announcement
 
@@ -521,95 +526,95 @@ class Bot(commands.Bot):
     #             break
     #
     #     await self.process_commands(chat_message)
-
-    async def event_custom_redemption_add(
-        self, payload: twitchio.ChannelPointsRedemptionAdd
-    ) -> None:
-        logger.debug(
-            f"{payload.user!r} has redeemed {payload.reward!r} ({payload.reward.id} at {payload.timestamp}"
-        )
-        await self.do_reward(
-            payload.user,
-            payload.reward.title,
-            payload.reward.prompt,
-            payload.broadcaster,
-        )
-
-    # noinspection PyUnusedLocal
-    async def do_reward(
-        self, user: PartialUser, title: str, prompt: str, broadcaster: PartialUser
-    ):
-        item = None
-        requestor = user.display_name or user.name
-        match title:
-            case "Обнять стримера":
-                logger.debug(f"Queued redepmtion: hugs, {requestor}")
-                item = {"action": "event", "value": {"type": "hugs", "from": requestor}}
-
-                await broadcaster.send_message(
-                    sender=BOT_ID,
-                    message=f"{requestor} обнял стримера! Спасибо, {requestor}!",
-                )
-            case "Обнять чатик":
-                logger.debug(f"Queued redepmtion: hugs, {requestor}")
-                item = {"action": "event", "value": {"type": "hugs", "from": requestor}}
-
-                await broadcaster.send_message(
-                    sender=BOT_ID, message=f"{requestor} обнял чатик!"
-                )
-
-            case "Ничего":
-                logger.debug(f"Queued redepmtion: nothing, {requestor}")
-                await self.play_sound("my_sound//nothing0.mp3")
-                item = {
-                    "action": "event",
-                    "value": {"type": "nothing", "from": requestor},
-                }
-            case "Дизайнерское Ничего":
-                logger.debug(f"Queued redepmtion: designer nothing, {requestor}")
-                await self.play_sound("my_sound//designer_nothing0.mp3")
-                item = {
-                    "action": "event",
-                    "value": {"type": "nihil", "from": requestor},
-                }
-            case "Эксклюзивное Ничего, pro edition":
-                logger.debug(f"Queued redepmtion: pro nothing, {requestor}")
-                await self.play_sound("my_sound//exclusive_nothing_pro.mp3")
-                item = {
-                    "action": "event",
-                    "value": {"type": "nihil", "from": requestor},
-                }
-            case "Стримлер! Не горбись!":
-                logger.debug(f"Queued redepmtion: sit, {requestor}")
-                await self.play_sound("my_sound//StraightenUp.mp3")
-                item = {"action": "event", "value": {"type": "sit", "from": requestor}}
-            case "Распылить упорин":
-                logger.debug(f"Queued redepmtion: fun, {requestor}")
-                item = {"action": "event", "value": {"type": "fun", "from": requestor}}
-                s = random.choice(
-                    ["Nice01", "Nice02", "ThatWasFun01", "ThatWasFun02", "ThatWasFun03"]
-                )
-                await self.play_sound(f"sound//Minion General Speech@ignore@{s}.mp3")
-                asyncio.ensure_future(do_wizlight_disco())
-            case "Гори!":
-                snd = random.choice(
-                    ["Goblin_Burn_1", "Minion_BurnBurn", "Minion_FireNoHurt"]
-                )
-                await self.play_sound(f"sound//Minion General Speech@ignore@{snd}.mp3")
-            case "Ты всё испортил!":
-                await self.play_sound("my_sound//fail.mp3")
-            case "Я не жадный":
-                await self.play_sound("my_sound//Я не жадный.mp3")
-            case "Жадность":
-                await self.play_sound("my_sound//Жадность это плохо.mp3")
-            case "Маловато будет":
-                await self.play_sound("my_sound//МАЛОВАТО БУДЕТ.mp3")
-            case "СТОП-игра!":
-                await self.play_sound("my_sound//NO GOD, PLEASE NO.mp3")
-
-        if item and (self.sio_server is not None):
-            self.pubsub_events.append(item)
-            await self.sio_server.emit(item["action"], item["value"])
+    #
+    # async def event_custom_redemption_add(
+    #     self, payload: twitchio.ChannelPointsRedemptionAdd
+    # ) -> None:
+    #     logger.debug(
+    #         f"{payload.user!r} has redeemed {payload.reward!r} ({payload.reward.id} at {payload.timestamp}"
+    #     )
+    #     await self.do_reward(
+    #         payload.user,
+    #         payload.reward.title,
+    #         payload.reward.prompt,
+    #         payload.broadcaster,
+    #     )
+    #
+    # # noinspection PyUnusedLocal
+    # async def do_reward(
+    #     self, user: PartialUser, title: str, prompt: str, broadcaster: PartialUser
+    # ):
+    #     item = None
+    #     requestor = user.display_name or user.name
+    #     match title:
+    #         case "Обнять стримера":
+    #             logger.debug(f"Queued redepmtion: hugs, {requestor}")
+    #             item = {"action": "event", "value": {"type": "hugs", "from": requestor}}
+    #
+    #             await broadcaster.send_message(
+    #                 sender=BOT_ID,
+    #                 message=f"{requestor} обнял стримера! Спасибо, {requestor}!",
+    #             )
+    #         case "Обнять чатик":
+    #             logger.debug(f"Queued redepmtion: hugs, {requestor}")
+    #             item = {"action": "event", "value": {"type": "hugs", "from": requestor}}
+    #
+    #             await broadcaster.send_message(
+    #                 sender=BOT_ID, message=f"{requestor} обнял чатик!"
+    #             )
+    #
+    #         case "Ничего":
+    #             logger.debug(f"Queued redepmtion: nothing, {requestor}")
+    #             await self.play_sound("my_sound//nothing0.mp3")
+    #             item = {
+    #                 "action": "event",
+    #                 "value": {"type": "nothing", "from": requestor},
+    #             }
+    #         case "Дизайнерское Ничего":
+    #             logger.debug(f"Queued redepmtion: designer nothing, {requestor}")
+    #             await self.play_sound("my_sound//designer_nothing0.mp3")
+    #             item = {
+    #                 "action": "event",
+    #                 "value": {"type": "nihil", "from": requestor},
+    #             }
+    #         case "Эксклюзивное Ничего, pro edition":
+    #             logger.debug(f"Queued redepmtion: pro nothing, {requestor}")
+    #             await self.play_sound("my_sound//exclusive_nothing_pro.mp3")
+    #             item = {
+    #                 "action": "event",
+    #                 "value": {"type": "nihil", "from": requestor},
+    #             }
+    #         case "Стримлер! Не горбись!":
+    #             logger.debug(f"Queued redepmtion: sit, {requestor}")
+    #             await self.play_sound("my_sound//StraightenUp.mp3")
+    #             item = {"action": "event", "value": {"type": "sit", "from": requestor}}
+    #         case "Распылить упорин":
+    #             logger.debug(f"Queued redepmtion: fun, {requestor}")
+    #             item = {"action": "event", "value": {"type": "fun", "from": requestor}}
+    #             s = random.choice(
+    #                 ["Nice01", "Nice02", "ThatWasFun01", "ThatWasFun02", "ThatWasFun03"]
+    #             )
+    #             await self.play_sound(f"sound//Minion General Speech@ignore@{s}.mp3")
+    #             asyncio.ensure_future(do_wizlight_disco())
+    #         case "Гори!":
+    #             snd = random.choice(
+    #                 ["Goblin_Burn_1", "Minion_BurnBurn", "Minion_FireNoHurt"]
+    #             )
+    #             await self.play_sound(f"sound//Minion General Speech@ignore@{snd}.mp3")
+    #         case "Ты всё испортил!":
+    #             await self.play_sound("my_sound//fail.mp3")
+    #         case "Я не жадный":
+    #             await self.play_sound("my_sound//Я не жадный.mp3")
+    #         case "Жадность":
+    #             await self.play_sound("my_sound//Жадность это плохо.mp3")
+    #         case "Маловато будет":
+    #             await self.play_sound("my_sound//МАЛОВАТО БУДЕТ.mp3")
+    #         case "СТОП-игра!":
+    #             await self.play_sound("my_sound//NO GOD, PLEASE NO.mp3")
+    #
+    #     if item and (self.sio_server is not None):
+    #         self.pubsub_events.append(item)
+    #         await self.sio_server.emit(item["action"], item["value"])
 
     async def on_dashboard_connected(self, sid):
         if self.sio_server is None:
@@ -721,12 +726,13 @@ def main() -> None:
 
     random.seed()
 
-    setup_logging("bot.log", color=True, debug=True, http_debug=False)
-    logging.getLogger("asyncio").setLevel(logging.DEBUG)
+    setup_logging("bot.log", color=True, debug=False, http_debug=False)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
 
     sio_server = socketio.AsyncServer(
         async_mode="asgi",
-        # logger=True, engineio_logger=True,
+        logger=False,
+        engineio_logger=False,
         cors_allowed_origins=["https://fr.iarazumov.com", "http://overlay.home"],
     )
     app = socketio.ASGIApp(sio_server, socketio_path="/ws")
@@ -819,6 +825,7 @@ def main() -> None:
             "SLCog",
             "elfcog",
             "duelcog",
+            "pointcog",
         ):  # 'raidcog', 'vmodcog', 'musiccog'
             # noinspection PyUnboundLocalVariable
             logger.info(f"Loading module {extension}")
@@ -872,41 +879,42 @@ async def emit(
     await asyncio.wait(tasks)
 
 
-async def do_wizlight_disco():
-    states = []
-    logger.info("Starting disco...")
-    for _ in wiz_config:
-        b = wizlight(**_)
-        state = await b.updateState()
-        if not state.get_state():
-            logger.error(f"!!! Lightbulb {_['ip']} is off !!!")
-            states.append(None)
-            continue
-
-        states.append(
-            {
-                "speed": state.get_speed(),
-                "scene": state.get_scene_id(),
-                "brightness": state.get_brightness(),
-            }
-        )
-
-        await b.turn_on(PilotBuilder(speed=200, scene=4, brightness=255))
-        await b.async_close()
-        del b
-
-    logger.info("Sleeping...")
-    await asyncio.sleep(180)
-    logger.info("Restoring...")
-
-    for i, _ in enumerate(wiz_config):
-        if states[i] is not None:
-            b = wizlight(**_)
-            await b.turn_on(PilotBuilder(**states[i]))
-            await b.async_close()
-            del b
-
-    await asyncio.sleep(1)
+#
+# async def do_wizlight_disco():
+#     states = []
+#     logger.info("Starting disco...")
+#     for _ in wiz_config:
+#         b = wizlight(**_)
+#         state = await b.updateState()
+#         if not state.get_state():
+#             logger.error(f"!!! Lightbulb {_['ip']} is off !!!")
+#             states.append(None)
+#             continue
+#
+#         states.append(
+#             {
+#                 "speed": state.get_speed(),
+#                 "scene": state.get_scene_id(),
+#                 "brightness": state.get_brightness(),
+#             }
+#         )
+#
+#         await b.turn_on(PilotBuilder(speed=200, scene=4, brightness=255))
+#         await b.async_close()
+#         del b
+#
+#     logger.info("Sleeping...")
+#     await asyncio.sleep(180)
+#     logger.info("Restoring...")
+#
+#     for i, _ in enumerate(wiz_config):
+#         if states[i] is not None:
+#             b = wizlight(**_)
+#             await b.turn_on(PilotBuilder(**states[i]))
+#             await b.async_close()
+#             del b
+#
+#     await asyncio.sleep(1)
 
 
 def patch_socketio():
@@ -915,5 +923,131 @@ def patch_socketio():
 
 if __name__ == "__main__":
     load_dotenv()
-    patch_socketio()
+    # patch_socketio()
     main()
+
+'''
+import asyncio
+import uuid
+from typing import AsyncIterable, Optional, Union, Callable, Awaitable, BinaryIO
+
+class SoundManager:
+    def __init__(self, ws_client, *, ack_timeout: float = 15.0):
+        self.ws = ws_client  # должен уметь send_json / send_bytes
+        self.ack_timeout = ack_timeout
+        self._lock = asyncio.Lock()
+        self._pending_acks: dict[str, asyncio.Event] = {}
+        # на случай reconnect — можно держать флаг готовности
+        self._overlay_ready = asyncio.Event()
+
+    # вызывать при установке WS-соединения оверлеем
+    def on_overlay_ready(self):
+        self._overlay_ready.set()
+
+    # вызывать из WS-ридера при сообщении типа {"type":"sound_done","id": "..."}
+    def on_overlay_ack(self, sound_id: str):
+        ev = self._pending_acks.get(sound_id)
+        if ev:
+            ev.set()
+
+    async def play_sound(
+        self,
+        source: Union[str, bytes, AsyncIterable[bytes], Callable[[], AsyncIterable[bytes]]],
+        *,
+        mime: str = "audio/mpeg",
+        meta: Optional[dict] = None,
+        require_ready: bool = True,
+        sound_id: Optional[str] = None,
+    ):
+        """
+        source:
+          - str: путь к файлу
+          - bytes: весь буфер (не рекомендуется для больших)
+          - AsyncIterable[bytes]: поток чанков (например, TTS)
+          - Callable -> AsyncIterable[bytes]: лениво создаём стрим (удобно для TTS)
+        """
+        if require_ready:
+            await self._overlay_ready.wait()
+
+        sid = sound_id or uuid.uuid4().hex
+        ack_event = asyncio.Event()
+        self._pending_acks[sid] = ack_event
+
+        await self._lock.acquire()
+        try:
+            # 1) сообщаем о старте
+            await self.ws.send_json({
+                "type": "sound_start",
+                "id": sid,
+                "mime": mime,
+                "meta": meta or {},
+            })
+
+            # 2) шлём чанки
+            async for chunk in self._iter_chunks(source):
+                # протокол: бинарные фреймы, или json с base64 — зависит от твоего оверлея
+                await self.ws.send_bytes(chunk)
+
+            # 3) сигнал конца
+            await self.ws.send_json({
+                "type": "sound_end",
+                "id": sid,
+            })
+
+            # 4) ждём ACK от оверлея
+            try:
+                await asyncio.wait_for(ack_event.wait(), timeout=self.ack_timeout)
+            except asyncio.TimeoutError:
+                # важно залогировать и продолжить — чтобы лок не завис
+                # при желании можно шлёпнуть команду стопа на оверлей
+                # await self.ws.send_json({"type":"sound_abort","id":sid})
+                raise
+
+        finally:
+            # аккуратно чистим состояние и точно отпускаем лок
+            self._pending_acks.pop(sid, None)
+            if self._lock.locked():
+                self._lock.release()
+
+    # ---------- helpers ----------
+
+    async def _iter_chunks(self, source) -> AsyncIterable[bytes]:
+        # путь к файлу
+        if isinstance(source, str):
+            # читаем порциями (без mmap, но можно и его)
+            async def file_iter(path: str):
+                loop = asyncio.get_running_loop()
+                # открытие файла в потоковом треде, чтобы не блокировать
+                def _read_all():
+                    with open(path, "rb") as f:
+                        while True:
+                            b = f.read(64 * 1024)
+                            if not b:
+                                break
+                            yield b
+                # оборачиваем синхронного генератора в асинхронный
+                for chunk in await loop.run_in_executor(None, lambda: list(_read_all())):
+                    yield chunk
+            async for c in file_iter(source):
+                yield c
+            return
+
+        # готовый буфер
+        if isinstance(source, (bytes, bytearray)):
+            yield bytes(source)
+            return
+
+        # асинхронный итерируемый поток
+        if hasattr(source, "__aiter__"):
+            async for c in source:
+                yield c
+            return
+
+        # фабрика стрима
+        if callable(source):
+            async for c in source():
+                yield c
+            return
+
+        raise TypeError("Unsupported sound source")
+'''

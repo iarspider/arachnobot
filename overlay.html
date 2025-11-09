@@ -20,12 +20,52 @@
 
         #death-counter,
         #plush-counter,
-        #chat-box {
+        #chat-box,
+        #pulse-block {
             position: absolute;
             color: white;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
         }
 
+        /* === Новый блок пульса === */
+        #pulse-block {
+            bottom: 60px;
+            /* ставим над Deaths */
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #pulse-heart {
+            display: inline-block;
+            transition: transform 0.2s ease;
+        }
+
+        /* Анимация "сердцебиение" при новом апдейте */
+        @keyframes pulse-beat {
+            0% {
+                transform: scale(1);
+            }
+
+            30% {
+                transform: scale(1.5);
+            }
+
+            60% {
+                transform: scale(1);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .heart-beat {
+            animation: pulse-beat 0.6s ease;
+        }
+
+        /* === конец нового === */
         #death-counter {
             bottom: 0px;
             right: 20px;
@@ -34,7 +74,7 @@
         }
 
         #plush-counter {
-            top: 20px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             transition: transform 0.3s ease;
@@ -169,6 +209,13 @@
     <!-- Проигрыватель звуков -->
     <audio id="sound-player" hidden></audio>
 
+    <!-- === Новый блок пульса (будет скрываться при ошибке) === -->
+    <div id="pulse-block" class="hidden">
+        <span id="pulse-heart">❤️</span>
+        <span id="pulse-value">--</span>
+    </div>
+    <!-- === конец нового блока === -->
+
     <!-- Счётчик смертей -->
     <div id="death-counter">Deaths: 0</div>
 
@@ -179,15 +226,112 @@
     <!-- div id="chat-box"></div -->
 
     <script src="./Yandex SpeechKit for all (YSKFA).js"></script>
-    <script src="./jquery-3.6.0.min.js"></script>
+    <!-- script src="./jquery-3.6.0.min.js"></script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"
+        integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
     <!-- Подключение к Socket.IO -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js"></script>
+    <!-- script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js"></script-->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"
+        integrity="sha512-8ExARjWWkIllMlNzVg7JKq9RKWPlJABQUNq6YvAjE/HobctjH/NA+bSiDMDvouBVjp4Wwnf1VP1OEv7Zgjtuxw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script>
         const socket = io('http://overlay.home', { transports: ['websocket'], path: '/ws/' });
         const debug = false;
         let audioContext = new (window.AudioContext || window.webkitAudioContext)();
         let audioBuffer = [];
+
+        /* =========================
+           ЛОГИКА ПУЛЬСА
+        ========================== */
+
+        const pulseBlock = document.getElementById('pulse-block');
+        const pulseHeart = document.getElementById('pulse-heart');
+        const pulseValueEl = document.getElementById('pulse-value');
+
+        let lastPulseUpdate = null;   // timestamp (ms) из поля update
+        let lastPulseValue = null;    // число из поля value
+        let lastSeenUpdate = null;    // чтобы понять "новые данные или те же"
+
+        // функция обновления отображения
+        function renderPulse() {
+            if (lastPulseUpdate === null) {
+                // нет данных — показывали блок раньше? показываем "--"
+                pulseValueEl.textContent = "--";
+                return;
+            }
+
+            const now = Date.now();
+            const diffMs = now - lastPulseUpdate;
+
+            // 10 секунд
+            if (diffMs > 10000) {
+                pulseValueEl.textContent = "--";
+            } else {
+                // нормальное значение
+                pulseValueEl.textContent = String(lastPulseValue);
+            }
+        }
+
+        // функция дернуть /pulse
+        async function fetchPulse() {
+            try {
+                const resp = await fetch('http://127.0.0.1:8082/pulse', {
+                    method: 'GET',
+                    cache: 'no-cache',
+                });
+
+                if (!resp.ok) {
+                    // ошибка HTTP статуса -> скрываем блок
+                    pulseBlock.classList.add('hidden');
+                    return;
+                }
+
+                const data = await resp.json();
+                // ожидаем { "update": 1762013390142.147, "value": 79 }
+
+                // нормализуем update в миллисекунды как число
+                const updRaw = data.update;
+                const updTs = typeof updRaw === 'number'
+                    ? updRaw
+                    : parseFloat(updRaw);
+
+                lastPulseUpdate = updTs;
+                lastPulseValue = data.value;
+
+                // показать блок, если он был скрыт
+                pulseBlock.classList.remove('hidden');
+
+                // если получили НОВЫЕ данные (update изменился), сердца "бум-бум"
+                if (lastSeenUpdate === null || updTs !== lastSeenUpdate) {
+                    lastSeenUpdate = updTs;
+
+                    // запустить анимацию: добавить класс, потом убрать
+                    pulseHeart.classList.add('heart-beat');
+                    // убираем класс после окончания анимации,
+                    // чтобы следующее обновление снова могло её запустить
+                    setTimeout(() => {
+                        pulseHeart.classList.remove('heart-beat');
+                    }, 600);
+                }
+
+                // обновить текст
+                renderPulse();
+
+            } catch (err) {
+                // любая ошибка сети/парсинга -> скрыть блок
+                pulseBlock.classList.add('hidden');
+            }
+        }
+
+        // первый запуск сразу
+        fetchPulse();
+        // затем каждые 60 сек
+        setInterval(fetchPulse, 1 * 1000);
+
+        // на всякий случай периодически перерисовываем (чтобы сработало правило "5 минут назад")
+        setInterval(renderPulse, 10 * 1000);
 
         if (!debug) {
             // Обновление счётчика смертей

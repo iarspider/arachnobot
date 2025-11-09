@@ -6,7 +6,7 @@ import time
 from tempfile import NamedTemporaryFile
 
 import requests
-import socketio.asyncio_client
+import socketio
 from bs4 import BeautifulSoup
 from loguru import logger
 from requests.structures import CaseInsensitiveDict
@@ -21,7 +21,7 @@ from twitch_commands import twitch_command_aliased, check_sender
 # sys.path.append("..")
 
 
-class SLClient(socketio.asyncio_client.AsyncClient):
+class SLClient(socketio.AsyncClient):
     def __init__(self, **kwargs):
         self.bot = kwargs.pop("bot")
         super().__init__(**kwargs)
@@ -87,7 +87,6 @@ class SLClient(socketio.asyncio_client.AsyncClient):
 class SLCog(Component):
     def __init__(self, bot):
         self.bot = bot
-        logger = logging.getLogger("arachnobot.sl")
         self.sl_client: SLClient = SLClient(logger=logger, bot=bot)
         self.streamlabs_oauth = api.get_streamlabs_session(
             os.getenv("STREAMLABS_CLIENT_ID"),

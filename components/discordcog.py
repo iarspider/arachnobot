@@ -25,7 +25,7 @@ class DiscordCog(Component):
     @is_broadcaster()
     @twitch_command_aliased(name="announce")
     async def cmd_announce(self, ctx: commands.Context):
-        await self.announce(await self.bot.get_announce_text(True))
+        await self.announce(await self.bot.get_announce_text(True)[0])
 
     # noinspection PyMethodMayBeStatic
     async def announce(self, text):
