@@ -162,9 +162,14 @@ def main():
     # pprint(res.json()["data"])
     # print(f"=== {my_id} ===")
     def get_game(name):
-        res = oauth.get("https://api.twitch.tv/helix/games", params={"name": name}, headers={"Client-ID": os.getenv('TWITCH_CLIENT_ID')})
+        res = oauth.get(
+            "https://api.twitch.tv/helix/games",
+            params={"name": name},
+            headers={"Client-ID": os.getenv("TWITCH_CLIENT_ID")},
+        )
         res.raise_for_status()
         return res.json()
+
     res = get_game("LEGO Batman 2")
     pprint(res)
 
