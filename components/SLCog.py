@@ -202,7 +202,10 @@ class SLCog(Component):
 
         await ctx.send(f"@{user} Набрано багов: {res}")
 
-    @twitch_command_aliased(name="post", aliases=("почта",))
+    @twitch_command_aliased(
+        name="post",
+        aliases=("почта", "голос"),
+    )
     async def post(self, ctx: commands.Context):
         try:
             post_message = ctx.message.text.split(None, 1)[1]
