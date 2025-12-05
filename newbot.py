@@ -27,6 +27,7 @@ from twitchio.ext import commands
 import nightbot_api
 from aio_timer import Periodic
 from config import *
+from ripkey import keyboard_listener
 
 CLIENT_ID: str = "..."  # The CLIENT ID from the Twitch Dev Console
 CLIENT_SECRET: str = "..."  # The CLIENT SECRET from the Twitch Dev Console
@@ -651,6 +652,10 @@ class Bot(commands.Bot):
         logger.info(f"Got stream {stream[0]}")
         return stream[0]
 
+    async def send_message(self, msg):
+        user = self.create_partialuser(user_id=self.owner_id)
+        await user.send_message(sender=self.user, message=msg)
+
     # region Boilerplate
 
     ####################
@@ -836,6 +841,7 @@ def main() -> None:
         async with asyncio.TaskGroup() as tg:
             _ = tg.create_task(twitch_bot.start())
             __ = tg.create_task(server.serve())
+            ___ = tg.create_task(keyboard_listener(twitch_bot))
 
         await twitch_bot.close()
 
