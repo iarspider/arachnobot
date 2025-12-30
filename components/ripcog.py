@@ -73,8 +73,8 @@ class RIPCog(Component):
         with open(self.bot.game.watchfile) as f:
             tmp = int(f.readline().strip())
 
-        new_deaths = tmp - self.deaths[1]
-        self.deaths[0] += new_deaths
+        new_deaths = tmp - self.deaths["total"]
+        self.deaths["today"] += new_deaths
         self.write_rip()
 
     async def display_rip(self, n=0):
