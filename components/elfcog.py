@@ -51,11 +51,9 @@ class ElvenCog(Component):
             asyncio.ensure_future(ctx.send(f"{author} ещё ничего не посылал!"))
             return
 
-        if len(self.bot.last_messages[author]) < count:
-            count = len(self.bot.last_messages[author])
+        count = min(count, len(self.bot.last_messages[author]))
 
-        messages = list(self.bot.last_messages[author])
-        messages.reverse()
+        messages = list(reversed(self.bot.last_messages[author]))
         if count > 0:
             messages = messages[:count]
         else:

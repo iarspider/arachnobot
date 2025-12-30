@@ -276,7 +276,6 @@ class MiscCog(commands.Component):
     @is_broadcaster()
     @twitch_command_aliased(name="join")
     async def test_join(self, ctx: commands.Context):
-
         display_name = "".join(
             random.choices(string.ascii_uppercase + string.digits, k=5)
         )
@@ -317,7 +316,7 @@ class MiscCog(commands.Component):
 
     @is_broadcaster()
     @twitch_command_aliased(name="togglemt")
-    async def toggmelt(self, ctx: commands.Context):
+    async def togglemt(self, ctx: commands.Context):
         self.bot.game.mt = not self.bot.game.mt
         self.bot.game.save()
 
@@ -335,6 +334,7 @@ class MiscCog(commands.Component):
                 await ctx.send("Недостаточно прав для выполнения этой команды")
                 return
             pearl = arg[1:].strip()
+            pearl = f"{pearl} ({self.bot.game.game})"
             self.bot.pearls.append(pearl)
             self.bot.write_pearls()
             await ctx.send(f"ПаукоПёрл №{len(self.bot.pearls)} сохранён")
@@ -365,6 +365,7 @@ class MiscCog(commands.Component):
 
         self.game.tags = ";".join(channel_info[0].tags)
         self.game.save()
+        await ctx.send("Тэги сохранены")
 
 
 # This is our entry point for the module.

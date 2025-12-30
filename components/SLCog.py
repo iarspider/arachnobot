@@ -347,6 +347,7 @@ class SLCog(Component):
             return
 
         api.add_points(self.streamlabs_oauth, user, int(points))
+        await ctx.send(f"Запас багов пользователя {user} пополнен на {points} единиц")
 
     @twitch_command_aliased(name="жадный")
     async def greedy(self, ctx: commands.Context):
