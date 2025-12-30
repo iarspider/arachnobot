@@ -11,9 +11,11 @@ import time
 import traceback
 import typing
 
+import pulsectl
 import requests
 from Xlib import X, display
 from Xlib.error import XError
+from Xlib.xobject.drawable import Window
 from loguru import logger
 from obswebsocket import obsws
 from obswebsocket import requests as obsws_requests
@@ -141,13 +143,25 @@ class OBSCog(Component):
         exit(1)
 
     @staticmethod
-    def find_window_by_title_and_class(target_title, target_class, inexact=False):
+    def move_pid_to_sink(pid, sink_name):
+        pulse = pulsectl.Pulse("router")
+        sink = pulse.get_sink_by_name(sink_name)
+
+        for si in pulse.sink_input_list():
+            if si.proplist.get("application.process.id") == str(pid):
+                pulse.sink_input_move(si.index, sink.index)
+                print(f"Moved PID {pid} to {sink_name}")
+
+    @staticmethod
+    def find_window_by_title_and_class(
+        target_title, target_class, inexact=False
+    ) -> tuple[Window, int | None] | None:
         # Connect to the X server
         disp = display.Display()
         root = disp.screen().root
 
         # Get all child windows recursively
-        def get_all_windows(window_):
+        def get_all_windows(window_) -> list[Window]:
             children = window_.query_tree().children
             all_windows_ = []
             for child in children:
@@ -190,7 +204,17 @@ class OBSCog(Component):
                     logger.debug(
                         f"Found window with title '{title}' and class '{window_class}'"
                     )
-                    return window
+                    pid_atom = disp.intern_atom("_NET_WM_PID")
+                    pid_prop = window.get_property(pid_atom, X.AnyPropertyType, 0, 1024)
+
+                    if pid_prop:
+                        pid = int(pid_prop.value[0])
+                        print("PID:", pid)
+                    else:
+                        pid = None
+                        print("No PID for this window")
+
+                    return window, pid
             except (XError, UnicodeDecodeError, AttributeError) as e:
                 logger.debug(f"Ignored window due to exception: {e}")
                 continue  # Ignore inaccessible windows or decoding errors
@@ -516,15 +540,16 @@ class OBSCog(Component):
                 while len(parts) < 3:
                     parts.append("")
 
-                win = OBSCog.find_window_by_title_and_class(
+                _ = OBSCog.find_window_by_title_and_class(
                     parts[1], parts[2], self.bot.game.window_inexact
                 )
-                if win is None:
+                if _ is None:
                     logger.error(
                         f"Can't find window title={parts[1]}, class={parts[2]}!"
                     )
                     await ctx.send("Окно игры не найдено")
                 else:
+                    win, pid = _
                     settings["capture_window"] = f"{win.id}"
                     self.ws.call(
                         obsws_requests.SetInputSettings(
@@ -534,6 +559,12 @@ class OBSCog(Component):
                         )
                     )
                     await ctx.send("Захват окна настроен")
+
+                    if pid:
+                        OBSCog.move_pid_to_sink(pid, "GameSink")
+                        await ctx.send("Захват звука настроен")
+                    else:
+                        logger.error(f"Missing window for window {win} {win.id} pid!")
                     logger.debug(f"Set capture window to {settings['capture_window']}")
         else:
             self.show_hide_scene_item("Game", "Game Capture", False)
@@ -626,14 +657,12 @@ class OBSCog(Component):
                 asyncio.ensure_future(ctx.send(msg))
 
             # self.bot.get_game_v5()
-            return msg
         except (KeyError, TypeError) as exc:
             print(traceback.format_exc())
             msg = "Перепись населения не удалась :("
             if ctx:
                 asyncio.ensure_future(ctx.send(msg))
             logger.error(str(exc))
-            return msg
 
     @is_broadcaster()
     @twitch_command_aliased(name="resume")
