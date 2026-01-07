@@ -23,6 +23,7 @@ with my_db.atomic():
     )
 
 """
+# TODO: remove deprecated aliases after 5.8.0
 class GameConfig(peewee.Model):
     game = peewee.CharField(primary_key=True)
 
@@ -78,32 +79,76 @@ class GameConfig(peewee.Model):
         database = database
 
     # ─── Derived / helper properties ──────────────────────
+    @property
+    @depreated("5.6.0, "Windows legacy, do not use")
+    def use_game_capture(self):
+        return True
 
     @property
-    def has_external_rip_source(self) -> bool:
-        return bool(self.rip_watchfile)
-
-    @property
-    @deprecated(version="5.6.0", reason="Use obs_window instead")
+    @deprecated("5.6.0", "Use obs_window instead")
     def window(self):
-        return bool(self.obs_window)
+        return self.obs_window
     
     @window.setter
-    @deprecated(version="5.6.0", reason="Use obs_window instead")
+    @deprecated("5.6.0", "Use obs_window instead")
     def window(self, value):
         self.obs_window = value
-
+    
     @property
-    @deprecated(version="5.6.0", reason="Use obs_window_title_glob instead")
+    @deprecated("5.6.0", "Use obs_window_title_glob instead")
     def window_inexact(self):
-        return bool(self.obs_window_title_glob)
+        return self.obs_window_title_glob
     
     @window_inexact.setter
-    @deprecated(version="5.6.0", reason="Use obs_window_title_glob instead")
+    @deprecated("5.6.0", "Use obs_window_title_glob instead")
     def window_inexact(self, value):
         self.obs_window_title_glob = value
-        
+    @property
+    @deprecated("5.6.0", "Use mt_enabled instead")
+    def mt(self):
+        return self.mt_enabled
     
+    @mt.setter
+    @deprecated("5.6.0", "Use mt_enabled instead")
+    def mt(self, value):
+        self.mt_enabled = value
+    @property
+    @deprecated("5.6.0", "Use mt_source instead")
+    def mt_str(self):
+        return self.mt_source
+    
+    @mt_str.setter
+    @deprecated("5.6.0", "Use mt_source instead")
+    def mt_str(self, value):
+        self.mt_source = value
+    @property
+    @deprecated("5.6.0", "Use rip_watchfile instead")
+    def watchfile(self):
+        return self.rip_watchfile
+    
+    @watchfile.setter
+    @deprecated("5.6.0", "Use rip_watchfile instead")
+    def watchfile(self, value):
+        self.rip_watchfile = value
+    @property
+    @deprecated("5.6.0", "Use rip_is_inexact instead")
+    def inexact(self):
+        return self.rip_is_inexact
+    
+    @inexact.setter
+    @deprecated("5.6.0", "Use rip_is_inexact instead")
+    def inexact(self, value):
+        self.rip_is_inexact = value
+    @property
+    @deprecated("5.6.0", "Use rip_is_infinite instead")
+    def infinite(self):
+        return self.rip_is_infinite
+    
+    @infinite.setter
+    @deprecated("5.6.0", "Use rip_is_infinite instead")
+    def infinite(self, value):
+        self.rip_is_infinite = value
+   
     
     def __str__(self) -> str:
         return self.game
