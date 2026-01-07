@@ -1,3 +1,4 @@
+#!python3
 import asyncio
 import datetime
 import http.client as http_client
@@ -22,12 +23,15 @@ from pytils import numeral
 from requests.structures import CaseInsensitiveDict
 from twitchio import eventsub, Client, Chatter, Stream, HTTPException
 from twitchio.ext import commands
+from twitchio.ext.commands import CommandErrorPayload, CommandOnCooldown
 
 # noinspection PyUnresolvedReferences
 import nightbot_api
 from aio_timer import Periodic
 from config import *
 from ripkey import keyboard_listener
+
+from radio import VLCTrackListener, RadioTrackListener
 
 CLIENT_ID: str = "..."  # The CLIENT ID from the Twitch Dev Console
 CLIENT_SECRET: str = "..."  # The CLIENT SECRET from the Twitch Dev Console
@@ -179,9 +183,11 @@ class SourceConfig(peewee.Model):
 
 
 class Bot(commands.Bot):
-    def __init__(self, *, token_filename: str, sio_server_) -> None:
+    def __init__(
+        self, *, token_filename: str, sio_server_: socketio.AsyncServer
+    ) -> None:
         self.token_filename = token_filename
-        self.sio_server = sio_server_
+        self.sio_server: socketio.AsyncServer = sio_server_
         super().__init__(
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
@@ -238,6 +244,7 @@ class Bot(commands.Bot):
         # self.duels: Optional[DuelStats] = None
         self.pubsub_events: List[Dict] = []
         self.title = ""
+        self.game_name = ""
 
         self.load_pearls()
 
@@ -246,18 +253,13 @@ class Bot(commands.Bot):
 
         self.bot_ready = False
 
-    #
-    # @game.setter
-    # async def game(self, value):
-    #     self.game_ = value
+        self.radio_station = ""
+        self.radio_now_playing: dict[str, str] = {}
+        self.radio_now_playing_cover: dict[str, str] = {}
 
     async def get_announce_text(self, now_=False):
-        stream: Stream
-        stream = await self.my_get_stream()
+        await self.get_game_v5()
 
-        game = await self.fetch_game(id=stream.game_id)
-        #        game = {"name": "Just Chatting"}
-        #        stream = {"title": "Проверка оповещений"}
         delta = self.countdown_to - datetime.datetime.now()
         delta_m = delta.seconds // 60
         if delta_m > 0 and not now_:
@@ -271,13 +273,13 @@ class Bot(commands.Bot):
 
         announcement = [
             (
-                f'Паучок запустил стрим "{stream.title}" '
-                f'по игре "{game.name}"! У вас есть {delta_text} чтобы'
+                f'Паучок запустил стрим "{self.title}" '
+                f'по игре "{self.game_name}"! У вас есть {delta_text} чтобы'
                 " открыть стрим - https://twitch.tv/iarspider !"
             ),
             (
-                f'Паучок запустил стрим "{stream.title}" '
-                f'по игре "{game.name}"! У вас есть {delta_text} чтобы'
+                f'Паучок запустил стрим "{self.title}" '
+                f'по игре "{self.game_name}"! У вас есть {delta_text} чтобы'
             ),
         ]
 
@@ -303,17 +305,21 @@ class Bot(commands.Bot):
             )
             await self.bot_play_sound(soundfile)
         else:
-            logger.info("Playing sound", sound, "using dashboard")
+            logger.info(f"Playing sound {sound} using dashboard")
             with open(sound, "rb") as mp3_file:
                 chunk_size = 4096  # Size of each chunk
                 while True:
                     chunk = mp3_file.read(chunk_size)
                     if not chunk:
                         break
+                    logger.debug("Sending chunk...")
                     await self.sio_server.emit("mp3_chunk", chunk)
+                    logger.debug("Chunk sent")
+                logger.debug("Sending mp3_end...")
                 await self.sio_server.emit(
                     "mp3_end",
                 )
+                logger.debug("Sending mp3_end - done")
 
     # TODO: Temporary solution until implemented upstream
     async def bot_play_sound(self, filename: str):
@@ -393,13 +399,21 @@ class Bot(commands.Bot):
 
     async def get_game_v5(self):
         channel_info = await self.fetch_channels([OWNER_ID])
-        game_name = channel_info[0].game_name
-        self.title = channel_info[0].title
-        logger.info(f"get_game_v5: game is {game_name}, title is {self.title}")
+        game_changed = False
 
-        self.game = GameConfig.get_or_none(game=game_name)
+        if (
+            self.game_name != channel_info[0].game_name
+            or self.title != channel_info[0].title
+        ):
+            game_changed = True
+
+        self.game_name = channel_info[0].game_name
+        self.title = channel_info[0].title
+        logger.info(f"get_game_v5: game is {self.game_name}, title is {self.title}")
+
+        self.game = GameConfig.get_or_none(game=self.game_name)
         if self.game is None:
-            self.game = GameConfig.create(game=game_name)
+            self.game = GameConfig.create(game=self.game_name)
             self.game.save()
 
         # nightbot_api.enable_disable_timer(self.nightbot, "Мультитвич", self.game.mt)
@@ -421,7 +435,8 @@ class Bot(commands.Bot):
         # else:
         # nightbot_api.put_command(self.nightbot, cmd_id, {"message": msg})
 
-        self.call_components("update")
+        if game_changed:
+            self.call_components("update")
 
     def add_user(self, user: Chatter):
         name = user.name.lower()
@@ -528,95 +543,6 @@ class Bot(commands.Bot):
     #
     #     await self.process_commands(chat_message)
     #
-    # async def event_custom_redemption_add(
-    #     self, payload: twitchio.ChannelPointsRedemptionAdd
-    # ) -> None:
-    #     logger.debug(
-    #         f"{payload.user!r} has redeemed {payload.reward!r} ({payload.reward.id} at {payload.timestamp}"
-    #     )
-    #     await self.do_reward(
-    #         payload.user,
-    #         payload.reward.title,
-    #         payload.reward.prompt,
-    #         payload.broadcaster,
-    #     )
-    #
-    # # noinspection PyUnusedLocal
-    # async def do_reward(
-    #     self, user: PartialUser, title: str, prompt: str, broadcaster: PartialUser
-    # ):
-    #     item = None
-    #     requestor = user.display_name or user.name
-    #     match title:
-    #         case "Обнять стримера":
-    #             logger.debug(f"Queued redepmtion: hugs, {requestor}")
-    #             item = {"action": "event", "value": {"type": "hugs", "from": requestor}}
-    #
-    #             await broadcaster.send_message(
-    #                 sender=BOT_ID,
-    #                 message=f"{requestor} обнял стримера! Спасибо, {requestor}!",
-    #             )
-    #         case "Обнять чатик":
-    #             logger.debug(f"Queued redepmtion: hugs, {requestor}")
-    #             item = {"action": "event", "value": {"type": "hugs", "from": requestor}}
-    #
-    #             await broadcaster.send_message(
-    #                 sender=BOT_ID, message=f"{requestor} обнял чатик!"
-    #             )
-    #
-    #         case "Ничего":
-    #             logger.debug(f"Queued redepmtion: nothing, {requestor}")
-    #             await self.play_sound("my_sound//nothing0.mp3")
-    #             item = {
-    #                 "action": "event",
-    #                 "value": {"type": "nothing", "from": requestor},
-    #             }
-    #         case "Дизайнерское Ничего":
-    #             logger.debug(f"Queued redepmtion: designer nothing, {requestor}")
-    #             await self.play_sound("my_sound//designer_nothing0.mp3")
-    #             item = {
-    #                 "action": "event",
-    #                 "value": {"type": "nihil", "from": requestor},
-    #             }
-    #         case "Эксклюзивное Ничего, pro edition":
-    #             logger.debug(f"Queued redepmtion: pro nothing, {requestor}")
-    #             await self.play_sound("my_sound//exclusive_nothing_pro.mp3")
-    #             item = {
-    #                 "action": "event",
-    #                 "value": {"type": "nihil", "from": requestor},
-    #             }
-    #         case "Стримлер! Не горбись!":
-    #             logger.debug(f"Queued redepmtion: sit, {requestor}")
-    #             await self.play_sound("my_sound//StraightenUp.mp3")
-    #             item = {"action": "event", "value": {"type": "sit", "from": requestor}}
-    #         case "Распылить упорин":
-    #             logger.debug(f"Queued redepmtion: fun, {requestor}")
-    #             item = {"action": "event", "value": {"type": "fun", "from": requestor}}
-    #             s = random.choice(
-    #                 ["Nice01", "Nice02", "ThatWasFun01", "ThatWasFun02", "ThatWasFun03"]
-    #             )
-    #             await self.play_sound(f"sound//Minion General Speech@ignore@{s}.mp3")
-    #             asyncio.ensure_future(do_wizlight_disco())
-    #         case "Гори!":
-    #             snd = random.choice(
-    #                 ["Goblin_Burn_1", "Minion_BurnBurn", "Minion_FireNoHurt"]
-    #             )
-    #             await self.play_sound(f"sound//Minion General Speech@ignore@{snd}.mp3")
-    #         case "Ты всё испортил!":
-    #             await self.play_sound("my_sound//fail.mp3")
-    #         case "Я не жадный":
-    #             await self.play_sound("my_sound//Я не жадный.mp3")
-    #         case "Жадность":
-    #             await self.play_sound("my_sound//Жадность это плохо.mp3")
-    #         case "Маловато будет":
-    #             await self.play_sound("my_sound//МАЛОВАТО БУДЕТ.mp3")
-    #         case "СТОП-игра!":
-    #             await self.play_sound("my_sound//NO GOD, PLEASE NO.mp3")
-    #
-    #     if item and (self.sio_server is not None):
-    #         self.pubsub_events.append(item)
-    #         await self.sio_server.emit(item["action"], item["value"])
-
     async def on_dashboard_connected(self, sid):
         if self.sio_server is None:
             return
@@ -720,6 +646,33 @@ class Bot(commands.Bot):
 
     # endregion
 
+    async def event_command_error(self, payload: CommandErrorPayload):
+        if isinstance(payload.exception, CommandOnCooldown):
+            await payload.context.reply(
+                f"Подожди {payload.exception.remaining:.1f} сек. перед повторным использованием команды"
+            )
+        else:
+            await super().event_command_error(payload)
+
+    async def update_track_text(self):
+        if not self.sio_server:
+            logger.warning("sio_server is none!")
+            return
+        if twitch_bot.radio_station:
+            await self.sio_server.emit("track_show")
+            await self.sio_server.emit(
+                "track_update",
+                {
+                    "text": twitch_bot.radio_now_playing.get(self.radio_station, ""),
+                    "cover": twitch_bot.radio_now_playing_cover.get(
+                        self.radio_station, ""
+                    ),
+                },
+            )
+
+        else:
+            await self.sio_server.emit("track_hide")
+
 
 def main() -> None:
     global CLIENT_ID, CLIENT_SECRET, BOT_ID, OWNER_ID, twitch_bot
@@ -759,6 +712,7 @@ def main() -> None:
         await ripcog.display_rip()
         plushchcog = twitch_bot.get_component("PluschCog")
         plushchcog.write_plusch(init=True)
+        await twitch_bot.update_track_text()
 
     @sio_server.on("disconnect")
     async def on_ws_disconnected(sid):
@@ -816,6 +770,30 @@ def main() -> None:
         logger.warning("sio_server is none!")
 
     twitch_bot = Bot(token_filename="twitch_token.json", sio_server_=sio_server)
+    listener = VLCTrackListener()
+    radio_listener = RadioTrackListener()
+
+    async def vlc_consumer(listener_: VLCTrackListener, twitch_bot_: Bot):
+        while True:
+            event = await listener_.queue.get()
+            logger.info(f"📼 Now playing: {event['artist']} — {event['title']}")
+            twitch_bot_.radio_now_playing["vlc"] = (
+                f"{event['artist']} — {event['title']}"
+            )
+            twitch_bot_.radio_now_playing_cover["vlc"] = event["cover"]
+            await twitch_bot_.update_track_text()
+
+    async def radio_consumer(listener_: RadioTrackListener, twitch_bot_: Bot):
+        while True:
+            event = await listener_.queue.get()
+            twitch_bot_.radio_now_playing[event["station"]] = (
+                f"{event['artist']} — {event['title']}"
+            )
+            twitch_bot_.radio_now_playing_cover[event["station"]] = event["cover"]
+            logger.info(
+                f"📻️ Now playing on {event['station']} : {event['artist']} — {event['title']}"
+            )
+            await twitch_bot_.update_track_text()
 
     async def runner() -> None:
         await twitch_bot.load_module("components.misccog")
@@ -839,15 +817,21 @@ def main() -> None:
         twitch_bot.call_components("setup")
 
         async with asyncio.TaskGroup() as tg:
-            _ = tg.create_task(twitch_bot.start())
-            __ = tg.create_task(server.serve())
-            ___ = tg.create_task(keyboard_listener(twitch_bot))
+            tg.create_task(twitch_bot.start())
+            tg.create_task(server.serve())
+            tg.create_task(keyboard_listener(twitch_bot))
+            tg.create_task(listener.run())
+            tg.create_task(vlc_consumer(listener, twitch_bot))
+            tg.create_task(radio_listener.run())
+            tg.create_task(radio_consumer(radio_listener, twitch_bot))
 
         await twitch_bot.close()
 
     try:
         asyncio.run(runner())
     except KeyboardInterrupt:
+        with open("shutdown", "w") as f:
+            print("1", file=f)
         logger.warning("Shutting down due to KeyboardInterrupt...")
 
 
@@ -929,7 +913,7 @@ def patch_socketio():
 
 if __name__ == "__main__":
     load_dotenv()
-    # patch_socketio()
+    patch_socketio()
     main()
 
 '''

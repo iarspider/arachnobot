@@ -1,490 +1,719 @@
 <!DOCTYPE html>
 <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Stream Overlay</title>
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stream Overlay</title>
-    <style>
-        body,
-        html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background: transparent;
-            overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            font-size: 48px;
-        }
-
-        #death-counter,
-        #plush-counter,
-        #chat-box,
-        #pulse-block {
-            position: absolute;
-            color: white;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-        }
-
-        /* === Новый блок пульса === */
-        #pulse-block {
-            bottom: 60px;
-            /* ставим над Deaths */
-            right: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        #pulse-heart {
-            display: inline-block;
-            transition: transform 0.2s ease;
-        }
-
-        /* Анимация "сердцебиение" при новом апдейте */
-        @keyframes pulse-beat {
-            0% {
-                transform: scale(1);
+        <style>
+            body,
+            html {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                background: transparent;
+                overflow: hidden;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                    Roboto, "Helvetica Neue", Arial, sans-serif;
+                font-size: 48px;
             }
 
-            30% {
-                transform: scale(1.5);
+            #death-counter,
+            #plush-counter,
+            #chat-box,
+            #pulse-block {
+                position: absolute;
+                color: white;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
             }
 
-            60% {
-                transform: scale(1);
+            /* === Блок пульса === */
+            #pulse-block {
+                bottom: 60px;
+                /* ставим над Deaths */
+                right: 20px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                background: rgba(50, 50, 50, 0.75);
+                padding: 6px 10px; /* небольшой внутренний отступ */
+                border-radius: 8px; /* лёгкое закругление углов */
             }
 
-            100% {
-                transform: scale(1);
+            #pulse-heart {
+                display: inline-block;
+                transition: transform 0.2s ease;
             }
-        }
 
-        .heart-beat {
-            animation: pulse-beat 0.6s ease;
-        }
+            /* Анимация "сердцебиение" при новом апдейте */
+            @keyframes pulse-beat {
+                0% {
+                    transform: scale(1);
+                }
 
-        /* === конец нового === */
-        #death-counter {
-            bottom: 0px;
-            right: 20px;
-            transition: color 0.5s;
-            /* Плавный переход цвета */
-        }
+                30% {
+                    transform: scale(1.5);
+                }
 
-        #plush-counter {
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            transition: transform 0.3s ease;
-            height: 40px;
-            /* Задайте фиксированную высоту для предотвращения смещения */
-            display: flex;
-            align-items: center;
-            /* Выравнивание по центру по вертикали */
-            padding: 10px;
-            /* Добавьте внутренние отступы для эстетики */
-            box-sizing: border-box;
-            /* Убедитесь, что padding включён в размеры элемента */
-        }
+                60% {
+                    transform: scale(1);
+                }
 
-        #chat-box {
-            bottom: 90px;
-            right: 20px;
-            width: 300px;
-            height: auto;
-            max-height: 250px;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-        }
+                100% {
+                    transform: scale(1);
+                }
+            }
 
-        .chat-message {
-            position: relative;
-            display: flex;
-            flex-direction: row;
-            align-items: flex-start;
-            margin-bottom: 5px;
-            opacity: 0;
-            /* Сначала скрыто, для анимации */
-            animation: slide-in 1s forwards;
-            word-wrap: break-word;
-            /* Автоматический перенос длинных слов */
-            white-space: normal;
-            /* Перенос текста на новые строки */
-        }
+            .heart-beat {
+                animation: pulse-beat 0.6s ease;
+            }
+            /* === Конец блок пульса === */
 
-        .chat-message.badge-mod::before {
-            content: '🗡️';
-            /* Эмодзи для модератора */
-            margin-right: 5px;
-        }
+            #death-counter {
+                bottom: 0px;
+                right: 20px;
+                transition: color 0.5s;
+                /* Плавный переход цвета */
+            }
 
-        .chat-message.badge-vip::before {
-            content: '💎';
-            /* Эмодзи для VIP */
-            margin-right: 5px;
-        }
+            #plush-counter {
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                transition: transform 0.3s ease;
+                height: 40px;
+                /* Задайте фиксированную высоту для предотвращения смещения */
+                display: flex;
+                align-items: center;
+                /* Выравнивание по центру по вертикали */
+                padding: 10px;
+                /* Добавьте внутренние отступы для эстетики */
+                box-sizing: border-box;
+                /* Убедитесь, что padding включён в размеры элемента */
+            }
 
-        .chat-username {
-            font-weight: bold;
-            margin-right: 8px;
-        }
-
-        /* Анимация для сообщений справа налево */
-        @keyframes slide-in {
-            0% {
-                transform: translateX(100%);
+            .chat-message {
+                position: relative;
+                display: flex;
+                flex-direction: row;
+                align-items: flex-start;
+                margin-bottom: 5px;
                 opacity: 0;
+                /* Сначала скрыто, для анимации */
+                animation: slide-in 1s forwards;
+                word-wrap: break-word;
+                /* Автоматический перенос длинных слов */
+                white-space: normal;
+                /* Перенос текста на новые строки */
             }
 
-            80% {
-                transform: translateX(-5%);
+            .chat-message.badge-mod::before {
+                content: "🗡️";
+                /* Эмодзи для модератора */
+                margin-right: 5px;
+            }
+
+            .chat-message.badge-vip::before {
+                content: "💎";
+                /* Эмодзи для VIP */
+                margin-right: 5px;
+            }
+
+            .chat-username {
+                font-weight: bold;
+                margin-right: 8px;
+            }
+
+            /* Анимация для сообщений справа налево */
+            @keyframes slide-in {
+                0% {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+
+                80% {
+                    transform: translateX(-5%);
+                    opacity: 1;
+                }
+
+                100% {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+
+            /* Анимация для счётчика плюшей, без изменения размеров */
+            @keyframes plush-squish {
+                0% {
+                    transform: translateX(-50%) scale(1, 1);
+                }
+
+                50% {
+                    transform: translateX(-50%) scale(1.5, 0.5);
+                    /* Растягивание по горизонтали, сжатие по вертикали */
+                }
+
+                100% {
+                    transform: translateX(-50%) scale(1, 1);
+                }
+            }
+
+            /* Цветовые анимации для счётчика смертей */
+            @keyframes death-increase {
+                0% {
+                    color: white;
+                }
+
+                50% {
+                    color: red;
+                }
+
+                100% {
+                    color: white;
+                }
+            }
+
+            @keyframes death-decrease {
+                0% {
+                    color: white;
+                }
+
+                50% {
+                    color: gold;
+                }
+
+                100% {
+                    color: white;
+                }
+            }
+
+            .hidden {
+                display: none;
+            }
+
+            #banner {
+                position: absolute;
+                top: 10px;
+                left: 50%;
+                transform: translateX(-50%);
+                /* max-width: 90vw; */
+                /* max-height: 40vh; */
+                pointer-events: none;
+                /* hidden by default via .hidden */
+            }
+            /* TRACK */
+
+            #track-container {
+                position: absolute;
+                top: 20px;
+                left: 50%;
+                width: 75%;
+                transform: translateX(-50%);
+                overflow: hidden;
+
+                background: rgba(0, 0, 0, 0.55);
+                padding: 10px 20px;
+                border-radius: 10px;
+                color: white;
+                text-align: center;
+            }
+
+            #track-marquee {
+                width: 100%;
+                overflow: hidden;
+                white-space: nowrap;
+            }
+
+            #track-text {
+                display: inline-block;
+                padding-left: 0;
+            }
+
+            @keyframes marquee {
+                from {
+                    transform: translateX(0);
+                }
+                to {
+                    transform: translateX(-100%);
+                }
+            }
+
+            .track-scroll {
+                padding-left: 100%;
+                animation-name: marquee;
+                animation-timing-function: linear;
+                animation-iteration-count: infinite;
+            }
+
+            #track-cover {
+                position: absolute;
+                top: 0px;
+                left: 0px;
+                width: 150px;
+                height: 150px;
                 opacity: 1;
+                top: 20px;
+                left: 20px;
             }
 
-            100% {
-                transform: translateX(0);
-                opacity: 1;
+            #track-cover:not([src]),
+            #track-cover[src=""] {
+                opacity: 0;
+                pointer-events: none;
             }
-        }
+            /* COUNTERS & CHAT */
 
-        /* Анимация для счётчика плюшей, без изменения размеров */
-        @keyframes plush-squish {
-            0% {
-                transform: translateX(-50%) scale(1, 1);
-            }
-
-            50% {
-                transform: translateX(-50%) scale(1.5, 0.5);
-                /* Растягивание по горизонтали, сжатие по вертикали */
+            #death-counter {
+                bottom: 0;
+                right: 20px;
             }
 
-            100% {
-                transform: translateX(-50%) scale(1, 1);
-            }
-        }
-
-        /* Цветовые анимации для счётчика смертей */
-        @keyframes death-increase {
-            0% {
-                color: white;
+            #plush-counter {
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
             }
 
-            50% {
-                color: red;
+            #chat-box {
+                bottom: 90px;
+                right: 20px;
+                width: 300px;
+                max-height: 250px;
+                background: rgba(0, 0, 0, 0.5);
+                padding: 10px;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-end;
             }
 
-            100% {
-                color: white;
-            }
-        }
-
-        @keyframes death-decrease {
-            0% {
-                color: white;
+            .chat-message {
+                display: flex;
+                gap: 6px;
+                word-wrap: break-word;
             }
 
-            50% {
-                color: gold;
+            .chat-username {
+                font-weight: bold;
             }
+        </style>
+    </head>
 
-            100% {
-                color: white;
-            }
-        }
+    <body>
+        <audio id="sound-player" hidden></audio>
 
-        .hidden {
-            display: none;
-        }
-    </style>
-</head>
+        <!-- TRACK -->
+        <img id="track-cover" class="hidden" />
+        <div id="track-container" class="hidden">
+            <div id="track-marquee">
+                <span id="track-text"></span>
+            </div>
+        </div>
 
-<body>
+        <!-- COUNTERS -->
+        <div id="death-counter">Deaths: 0</div>
+        <div id="plush-counter">Пока что никого не плющило</div>
 
-    <!-- Проигрыватель звуков -->
-    <audio id="sound-player" hidden></audio>
+        <!-- CHAT -->
+        <!-- div id="chat-box" class="hidden"></div -->
 
-    <!-- === Новый блок пульса (будет скрываться при ошибке) === -->
-    <div id="pulse-block" class="hidden">
-        <span id="pulse-heart">❤️</span>
-        <span id="pulse-value">--</span>
-    </div>
-    <!-- === конец нового блока === -->
+        <script src="Yandex SpeechKit for all (YSKFA).js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js"></script>
 
-    <!-- Счётчик смертей -->
-    <div id="death-counter">Deaths: 0</div>
+        <script>
+            const socket = io("http://overlay.home", {
+                transports: ["websocket"],
+                path: "/ws/",
+            });
+            const debug = false;
+            let audioContext = new (window.AudioContext ||
+                window.webkitAudioContext)();
+            let audioBuffer = [];
 
-    <!-- Счётчик "плющей" -->
-    <div id="plush-counter">Пока что никого не плющило</div>
+            /* TRACK LOGIC */
+            const $trackContainer = $("#track-container");
+            const $trackCover = $("#track-cover");
+            const $trackText = $("#track-text");
 
-    <!-- Чат -->
-    <!-- div id="chat-box"></div -->
+            function setTrackText(text) {
+                console.log("Track text", text);
 
-    <script src="./Yandex SpeechKit for all (YSKFA).js"></script>
-    <!-- script src="./jquery-3.6.0.min.js"></script -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"
-        integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+                $trackText.text(text);
 
-    <!-- Подключение к Socket.IO -->
-    <!-- script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js"></script-->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js"
-        integrity="sha512-8ExARjWWkIllMlNzVg7JKq9RKWPlJABQUNq6YvAjE/HobctjH/NA+bSiDMDvouBVjp4Wwnf1VP1OEv7Zgjtuxw=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script>
-        const socket = io('http://overlay.home', { transports: ['websocket'], path: '/ws/' });
-        const debug = false;
-        let audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        let audioBuffer = [];
+                // reset to non-scrolling state before measuring
+                $trackText
+                    .removeClass("track-scroll")
+                    .css("animation-duration", "");
 
-        /* =========================
-           ЛОГИКА ПУЛЬСА
-        ========================== */
+                requestAnimationFrame(() => {
+                    const cw = $trackContainer[0].clientWidth;
+                    const tw = $trackText[0].scrollWidth;
 
-        const pulseBlock = document.getElementById('pulse-block');
-        const pulseHeart = document.getElementById('pulse-heart');
-        const pulseValueEl = document.getElementById('pulse-value');
+                    console.log("cw =", cw, ", tw =", tw);
 
-        let lastPulseUpdate = null;   // timestamp (ms) из поля update
-        let lastPulseValue = null;    // число из поля value
-        let lastSeenUpdate = null;    // чтобы понять "новые данные или те же"
-
-        // функция обновления отображения
-        function renderPulse() {
-            if (lastPulseUpdate === null) {
-                // нет данных — показывали блок раньше? показываем "--"
-                pulseValueEl.textContent = "--";
-                return;
-            }
-
-            const now = Date.now();
-            const diffMs = now - lastPulseUpdate;
-
-            // 10 секунд
-            if (diffMs > 10000) {
-                pulseValueEl.textContent = "--";
-            } else {
-                // нормальное значение
-                pulseValueEl.textContent = String(lastPulseValue);
-            }
-        }
-
-        // функция дернуть /pulse
-        async function fetchPulse() {
-            try {
-                const resp = await fetch('http://127.0.0.1:8082/pulse', {
-                    method: 'GET',
-                    cache: 'no-cache',
+                    if (tw > cw) {
+                        console.log("Track text is long, enable scroll");
+                        const duration = tw / 60; // px/sec
+                        $trackText
+                            .css("animation-duration", duration + "s")
+                            .addClass("track-scroll");
+                    }
                 });
+            }
 
-                if (!resp.ok) {
-                    // ошибка HTTP статуса -> скрываем блок
-                    pulseBlock.classList.add('hidden');
+            // Socket handlers
+            socket.on("track_show", () => {
+                $trackContainer.removeClass("hidden");
+                $trackCover.removeClass("hidden");
+            });
+
+            socket.on("track_hide", () => {
+                $trackContainer.addClass("hidden");
+                $trackCover.addClass("hidden");
+            });
+
+            socket.on("track_update", (data) => {
+                setTrackText(data.text);
+                $trackCover.attr("src", data.cover);
+            });
+
+            /* POSITIONING */
+
+            function setPosition(el, v, h, dx = 0, dy = 0) {
+                el.style.top = "";
+                el.style.bottom = "";
+                el.style.left = "";
+                el.style.right = "";
+                el.style.transform = "";
+
+                if (v === "N") el.style.top = "0";
+                if (v === "S") el.style.bottom = "0";
+                if (v === "mid") {
+                    el.style.top = "50%";
+                    el.style.transform += " translateY(-50%)";
+                }
+
+                if (h === "W") el.style.left = "0";
+                if (h === "E") el.style.right = "0";
+                if (h === "mid") {
+                    el.style.left = "50%";
+                    el.style.transform += " translateX(-50%)";
+                }
+
+                el.style.marginLeft = dx + "px";
+                el.style.marginTop = dy + "px";
+            }
+
+            socket.on("move_component", (data) => {
+                const el = document.getElementById(data.id);
+                if (!el) return;
+
+                setPosition(el, data.v, data.h, data.dx, data.dy);
+            });
+
+            /* COUNTERS & CHAT */
+
+            socket.on("update_death_count", (data) => {
+                document.getElementById("death-counter").textContent =
+                    data.text;
+            });
+
+            socket.on("update_plush_count", (data) => {
+                document.getElementById("plush-counter").textContent =
+                    data.text;
+            });
+
+            socket.on("new_chat_message", (data) => {
+                const chatBox = document.getElementById("chat-box");
+                const msg = document.createElement("div");
+                msg.className = "chat-message";
+
+                const user = document.createElement("span");
+                user.className = "chat-username";
+                user.style.color = data.color;
+                user.textContent = data.username;
+
+                const text = document.createElement("span");
+                text.textContent = data.message;
+
+                msg.appendChild(user);
+                msg.appendChild(text);
+                chatBox.appendChild(msg);
+
+                while (chatBox.children.length > 10) {
+                    chatBox.removeChild(chatBox.firstChild);
+                }
+            });
+
+            /* PULSE */
+
+            const pulseBlock = document.getElementById("pulse-block");
+            const pulseHeart = document.getElementById("pulse-heart");
+            const pulseValueEl = document.getElementById("pulse-value");
+
+            let lastPulseUpdate = null; // timestamp (ms) из поля update
+            let lastPulseValue = null; // число из поля value
+            let lastSeenUpdate = null; // чтобы понять "новые данные или те же"
+
+            // функция обновления отображения
+            function renderPulse() {
+                if (lastPulseUpdate === null) {
+                    // нет данных — показывали блок раньше? показываем "--"
+                    pulseValueEl.textContent = "--";
                     return;
                 }
 
-                const data = await resp.json();
-                // ожидаем { "update": 1762013390142.147, "value": 79 }
+                const now = Date.now();
+                const diffMs = now - lastPulseUpdate;
 
-                // нормализуем update в миллисекунды как число
-                const updRaw = data.update;
-                const updTs = typeof updRaw === 'number'
-                    ? updRaw
-                    : parseFloat(updRaw);
-
-                lastPulseUpdate = updTs;
-                lastPulseValue = data.value;
-
-                // показать блок, если он был скрыт
-                pulseBlock.classList.remove('hidden');
-
-                // если получили НОВЫЕ данные (update изменился), сердца "бум-бум"
-                if (lastSeenUpdate === null || updTs !== lastSeenUpdate) {
-                    lastSeenUpdate = updTs;
-
-                    // запустить анимацию: добавить класс, потом убрать
-                    pulseHeart.classList.add('heart-beat');
-                    // убираем класс после окончания анимации,
-                    // чтобы следующее обновление снова могло её запустить
-                    setTimeout(() => {
-                        pulseHeart.classList.remove('heart-beat');
-                    }, 600);
+                // 10 секунд
+                if (diffMs > 10000) {
+                    pulseValueEl.textContent = "--";
+                } else {
+                    // нормальное значение
+                    pulseValueEl.textContent = String(lastPulseValue);
                 }
-
-                // обновить текст
-                renderPulse();
-
-            } catch (err) {
-                // любая ошибка сети/парсинга -> скрыть блок
-                pulseBlock.classList.add('hidden');
             }
-        }
 
-        // первый запуск сразу
-        fetchPulse();
-        // затем каждые 60 сек
-        setInterval(fetchPulse, 1 * 1000);
+            // функция дернуть /pulse
+            async function fetchPulse() {
+                try {
+                    const resp = await fetch("http://127.0.0.1:8082/pulse", {
+                        method: "GET",
+                        cache: "no-cache",
+                    });
 
-        // на всякий случай периодически перерисовываем (чтобы сработало правило "5 минут назад")
-        setInterval(renderPulse, 10 * 1000);
+                    if (!resp.ok) {
+                        // ошибка HTTP статуса -> скрываем блок
+                        pulseBlock.classList.add("hidden");
+                        return;
+                    }
 
-        if (!debug) {
-            // Обновление счётчика смертей
-            socket.on('update_death_count', (data) => {
-                const { text, animation } = data;  // Получаем текст и тип анимации
-                const deathCounter = document.getElementById('death-counter');
+                    const data = await resp.json();
+                    // ожидаем { "update": 1762013390142.147, "value": 79 }
 
-                // Обновляем текст счётчика смертей
-                deathCounter.textContent = text;
+                    // нормализуем update в миллисекунды как число
+                    const updRaw = data.update;
+                    const updTs =
+                        typeof updRaw === "number"
+                            ? updRaw
+                            : parseFloat(updRaw);
 
-                // Применяем анимацию, если требуется
-                if (animation === 1) {
-                    deathCounter.style.animation = 'death-increase 1s';
-                } else if (animation === -1) {
-                    deathCounter.style.animation = 'death-decrease 1s';
+                    lastPulseUpdate = updTs;
+                    lastPulseValue = data.value;
+
+                    // показать блок, если он был скрыт
+                    pulseBlock.classList.remove("hidden");
+
+                    // если получили НОВЫЕ данные (update изменился), сердца "бум-бум"
+                    if (lastSeenUpdate === null || updTs !== lastSeenUpdate) {
+                        lastSeenUpdate = updTs;
+
+                        // запустить анимацию: добавить класс, потом убрать
+                        pulseHeart.classList.add("heart-beat");
+                        // убираем класс после окончания анимации,
+                        // чтобы следующее обновление снова могло её запустить
+                        setTimeout(() => {
+                            pulseHeart.classList.remove("heart-beat");
+                        }, 600);
+                    }
+
+                    // обновить текст
+                    renderPulse();
+                } catch (err) {
+                    // любая ошибка сети/парсинга -> скрыть блок
+                    pulseBlock.classList.add("hidden");
                 }
+            }
 
-                // Убираем анимацию после её завершения
-                setTimeout(() => {
-                    deathCounter.style.animation = '';
-                }, 1000);
-            });
+            // первый запуск сразу
+            // fetchPulse();
+            // затем каждые 60 сек
+            // setInterval(fetchPulse, 1 * 1000);
 
-            // Обновление счётчика плюшей
-            socket.on('update_plush_count', (data) => {
-                const { text, animate } = data;
-                const plushCounter = document.getElementById('plush-counter');
-                plushCounter.textContent = text;
+            // на всякий случай периодически перерисовываем (чтобы сработало правило "5 минут назад")
+            // setInterval(renderPulse, 10 * 1000);
 
-                if (animate) {
-                    // Анимация сжатия и растяжения при обновлении плюшей
-                    plushCounter.style.animation = 'plush-squish 1s 3';
+            if (!debug) {
+                // Обновление счётчика смертей
+                socket.on("update_death_count", (data) => {
+                    const { text, animation } = data; // Получаем текст и тип анимации
+                    const deathCounter =
+                        document.getElementById("death-counter");
+
+                    // Обновляем текст счётчика смертей
+                    deathCounter.textContent = text;
+
+                    // Применяем анимацию, если требуется
+                    if (animation === 1) {
+                        deathCounter.style.animation = "death-increase 1s";
+                    } else if (animation === -1) {
+                        deathCounter.style.animation = "death-decrease 1s";
+                    }
 
                     // Убираем анимацию после её завершения
                     setTimeout(() => {
-                        plushCounter.style.animation = '';
-                    }, 3000);
+                        deathCounter.style.animation = "";
+                    }, 1000);
+                });
+
+                // Обновление счётчика плюшей
+                socket.on("update_plush_count", (data) => {
+                    const { text, animate } = data;
+                    const plushCounter =
+                        document.getElementById("plush-counter");
+                    plushCounter.textContent = text;
+
+                    if (animate) {
+                        // Анимация сжатия и растяжения при обновлении плюшей
+                        plushCounter.style.animation = "plush-squish 1s 3";
+
+                        // Убираем анимацию после её завершения
+                        setTimeout(() => {
+                            plushCounter.style.animation = "";
+                        }, 3000);
+                    }
+                });
+
+                // Добавление сообщений чата с поддержкой цвета и бейджей
+                socket.on("new_chat_message", (data) => {
+                    const chatBox = document.getElementById("chat-box");
+
+                    // Создание нового элемента для сообщения
+                    const messageDiv = document.createElement("div");
+                    messageDiv.classList.add("chat-message");
+
+                    // Добавление бейджа, если есть
+                    if (data.badge === "mod") {
+                        messageDiv.classList.add("badge-mod");
+                    } else if (data.badge === "vip") {
+                        messageDiv.classList.add("badge-vip");
+                    }
+
+                    // Добавление никнейма с цветом
+                    const usernameSpan = document.createElement("span");
+                    usernameSpan.classList.add("chat-username");
+                    usernameSpan.style.color = data.color; // Установка цвета ника
+                    usernameSpan.textContent = data.username;
+
+                    // Добавление сообщения
+                    const messageSpan = document.createElement("span");
+                    messageSpan.textContent = data.message;
+
+                    messageDiv.appendChild(usernameSpan);
+                    messageDiv.appendChild(messageSpan);
+                    chatBox.appendChild(messageDiv);
+
+                    // Скроллим, чтобы показывать только последние 10 сообщений
+                    const chatMessages =
+                        chatBox.querySelectorAll(".chat-message");
+                    if (chatMessages.length > 10) {
+                        chatMessages[0].remove(); // Удаляем самое старое сообщение
+                    }
+
+                    // Скроллим к последнему сообщению
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                });
+
+                // Скрытие/отображение счётчика смертей через SocketIO
+                socket.on("toggle_death_counter", (val) => {
+                    const deathCounter =
+                        document.getElementById("death-counter");
+                    if (val === 1) {
+                        deathCounter.classList.remove("hidden");
+                    } else {
+                        deathCounter.classList.add("hidden");
+                    }
+                });
+            } else {
+                let plushCount = 0;
+                const plushCounter = document.getElementById("plush-counter");
+
+                function updatePlushCounter(newCount) {
+                    plushCount = newCount;
+
+                    // Добавляем класс для анимации
+                    plushCounter.textContent = `Plushies: ${plushCount}`;
+
+                    plushCounter.style.animation = "plush-squish 0.5s";
+                    // Убираем класс анимации через 400мс, когда она завершится
+                    setTimeout(() => {
+                        plushCounter.style.animation = "";
+                    }, 500);
                 }
-            });
 
-            // Добавление сообщений чата с поддержкой цвета и бейджей
-            socket.on('new_chat_message', (data) => {
-                const chatBox = document.getElementById('chat-box');
-
-                // Создание нового элемента для сообщения
-                const messageDiv = document.createElement('div');
-                messageDiv.classList.add('chat-message');
-
-                // Добавление бейджа, если есть
-                if (data.badge === 'mod') {
-                    messageDiv.classList.add('badge-mod');
-                } else if (data.badge === 'vip') {
-                    messageDiv.classList.add('badge-vip');
-                }
-
-                // Добавление никнейма с цветом
-                const usernameSpan = document.createElement('span');
-                usernameSpan.classList.add('chat-username');
-                usernameSpan.style.color = data.color; // Установка цвета ника
-                usernameSpan.textContent = data.username;
-
-                // Добавление сообщения
-                const messageSpan = document.createElement('span');
-                messageSpan.textContent = data.message;
-
-                messageDiv.appendChild(usernameSpan);
-                messageDiv.appendChild(messageSpan);
-                chatBox.appendChild(messageDiv);
-
-                // Скроллим, чтобы показывать только последние 10 сообщений
-                const chatMessages = chatBox.querySelectorAll('.chat-message');
-                if (chatMessages.length > 10) {
-                    chatMessages[0].remove(); // Удаляем самое старое сообщение
-                }
-
-                // Скроллим к последнему сообщению
-                chatBox.scrollTop = chatBox.scrollHeight;
-            });
-
-            // Скрытие/отображение счётчика смертей через SocketIO
-            socket.on('toggle_death_counter', (val) => {
-                const deathCounter = document.getElementById('death-counter');
-                if (val === 1) {
-                    deathCounter.classList.remove('hidden');
-                } else {
-                    deathCounter.classList.add('hidden');
-                }
-            });
-
-            // Проигрывание звука через SocketIO
-            socket.on('play_sound', (soundUrl) => {
-                const soundPlayer = document.getElementById('sound-player');
-                soundPlayer.src = soundUrl;
-                soundPlayer.play();
-            });
-
-        } else {
-            let plushCount = 0;
-            const plushCounter = document.getElementById('plush-counter');
-
-            function updatePlushCounter(newCount) {
-                plushCount = newCount;
-
-                // Добавляем класс для анимации
-                plushCounter.textContent = `Plushies: ${plushCount}`;
-
-                plushCounter.style.animation = 'plush-squish 0.5s';
-                // Убираем класс анимации через 400мс, когда она завершится
-                setTimeout(() => {
-                    plushCounter.style.animation = '';
-                }, 500);
+                // Тестовая симуляция обновления счётчика
+                setInterval(() => {
+                    updatePlushCounter(plushCount + 1);
+                }, 2000); // Обновляем счётчик каждые 2 секунды
             }
 
-            // Тестовая симуляция обновления счётчика
-            setInterval(() => {
-                updatePlushCounter(plushCount + 1);
-            }, 2000); // Обновляем счётчик каждые 2 секунды
-        }
-        socket.on('mp3_chunk', (chunk) => {
-            // Convert the received chunk (Base64 or binary) into a buffer
-            let arrayBuffer = new Uint8Array(chunk).buffer;
-            audioBuffer.push(arrayBuffer);
-        });
+            if (!navigator.userAgent.includes("firefox")) {
+                socket.on("mp3_chunk", (chunk) => {
+                    // Convert the received chunk (Base64 or binary) into a buffer
+                    let arrayBuffer = new Uint8Array(chunk).buffer;
+                    audioBuffer.push(arrayBuffer);
+                });
 
-        socket.on('mp3_end', () => {
-            // Concatenate all chunks
-            let fullBuffer = audioBuffer.reduce((acc, buffer) => {
-                let tmp = new Uint8Array(acc.byteLength + buffer.byteLength);
-                tmp.set(new Uint8Array(acc), 0);
-                tmp.set(new Uint8Array(buffer), acc.byteLength);
-                return tmp.buffer;
-            }, new ArrayBuffer(0));
+                socket.on("mp3_end", () => {
+                    // Concatenate all chunks
+                    let fullBuffer = audioBuffer.reduce((acc, buffer) => {
+                        let tmp = new Uint8Array(
+                            acc.byteLength + buffer.byteLength
+                        );
+                        tmp.set(new Uint8Array(acc), 0);
+                        tmp.set(new Uint8Array(buffer), acc.byteLength);
+                        return tmp.buffer;
+                    }, new ArrayBuffer(0));
 
-            // Decode and play the audio
-            audioContext.decodeAudioData(fullBuffer, (decodedData) => {
-                const source = audioContext.createBufferSource();
-                source.buffer = decodedData;
-                source.connect(audioContext.destination);
-                source.onended = () => {
-                    socket.emit('audioFinished');  // Replace 'audioFinished' with your event name
-                };
-                source.start(0);
-            });
+                    // Decode and play the audio
+                    audioContext.decodeAudioData(fullBuffer, (decodedData) => {
+                        const source = audioContext.createBufferSource();
+                        source.buffer = decodedData;
+                        source.connect(audioContext.destination);
+                        source.onended = () => {
+                            socket.emit("audioFinished"); // Replace 'audioFinished' with your event name
+                        };
+                        source.start(0);
+                    });
 
-            // Clear the buffer
-            audioBuffer = [];
-        });
+                    // Clear the buffer
+                    audioBuffer = [];
+                });
 
-        socket.on('tts', (text) => {
-            textSender(text);
-        });
+                socket.on("tts", (text) => {
+                    textSender(text);
+                });
+            }
+            /* BANNER */
+            const bannerEl = document.getElementById("banner");
+            const BANNER_SHOW_MS = 4130; // how long the banner stays visible
+            const BANNER_INTERVAL_MS = 45 * 60 * 1000; // 45 minutes
 
-    </script>
-</body>
+            function showBanner() {
+                if (!bannerEl) return;
 
+                // trick to restart GIF animation each time:
+                const src = bannerEl.getAttribute("src");
+                bannerEl.setAttribute("src", src);
+
+                bannerEl.classList.remove("hidden");
+
+                // auto-hide after N seconds
+                setTimeout(hideBanner, BANNER_SHOW_MS);
+            }
+
+            function hideBanner() {
+                if (!bannerEl) return;
+                bannerEl.classList.add("hidden");
+            }
+
+            // periodic show (every 45 minutes)
+            setInterval(showBanner, BANNER_INTERVAL_MS);
+
+            // optional: show once at startup (comment out if you don't want that)
+            showBanner();
+        </script>
+    </body>
 </html>

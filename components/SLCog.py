@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import os
 import time
 from tempfile import NamedTemporaryFile
@@ -8,18 +7,15 @@ import requests
 import socketio
 from bs4 import BeautifulSoup
 from loguru import logger
-from requests.structures import CaseInsensitiveDict
 from twitchio.ext import commands
-from twitchio.ext.commands import is_broadcaster, Component
+from twitchio.ext.commands import is_broadcaster, Component, cooldown
 
 import streamlabs_api as api
 from config import rippers, streamlabs_redirect_uri
 from twitch_commands import twitch_command_aliased, check_sender
 
 
-# sys.path.append("..")
-
-
+# noinspection PyMethodMayBeStatic
 class SLClient(socketio.AsyncClient):
     def __init__(self, **kwargs):
         self.bot = kwargs.pop("bot")
@@ -83,6 +79,9 @@ class SLClient(socketio.AsyncClient):
         await self.bot.sio_server.emit(message["action"], message["value"])
 
 
+post_price = {"regular": 50, "vip": 25, "mod": 25}
+
+
 class SLCog(Component):
     def __init__(self, bot):
         self.bot = bot
@@ -97,15 +96,12 @@ class SLCog(Component):
         asyncio.ensure_future(
             self.sl_client.connect(f"https://sockets.streamlabs.com?token={token}")
         )
-        self.last_post = CaseInsensitiveDict()
-        self.post_timeout = 1 * 60
-        self.post_price = {"regular": 50, "vip": 25, "mod": 25}
 
         self.session = requests.Session()
         try:
             res = self.session.get("https://voxworker.com/ru")
             res.raise_for_status()
-            soup = BeautifulSoup(res.text, "html.parser")
+            soup = BeautifulSoup(res.text, "lxml")
 
             textId = soup.select("input[name=textId]")
             sessionId = soup.select("input[name=sessionId]")
@@ -124,11 +120,42 @@ class SLCog(Component):
             )
             logger.debug("Session ready")
         except requests.HTTPError as e:
-            logger.exception(msg="Failed to initialize voxworker session", exc_info=e)
+            logger.opt(exception=e).exception("Failed to initialize voxworker session")
             self.voxdata = None
         except (IndexError, KeyError) as e:
-            logger.exception("Failed to parse voxworker page")
+            logger.opt(exception=e).exception("Failed to parse voxworker page")
             self.voxdata = None
+
+    # noinspection PyMethodParameters
+    async def bypass_streamer(ctx: commands.Context):
+        if ctx.broadcaster:
+            return None
+
+        return commands.BucketType.chatter(ctx)
+
+    async def check_and_sub_points(
+        self, ctx: commands.Context, price: dict[str, int] | int
+    ):
+        points = api.get_points(self.streamlabs_oauth, ctx.author.name)
+        if ctx.broadcaster:
+            required = 0
+        else:
+            if isinstance(price, dict):
+                if ctx.author.moderator:
+                    required = price["mod"]
+                elif ctx.author.vip:
+                    required = price["vip"]
+                else:
+                    required = price["regular"]
+            else:
+                required = price
+
+        if points < required:
+            await ctx.send(f"Недостаточно багов: баланс {points}, цена {required}")
+            return False
+
+        api.sub_points(self.streamlabs_oauth, ctx.author.name, required)
+        return True
 
     async def say(self, text):
         if not self.voxdata:
@@ -184,6 +211,7 @@ class SLCog(Component):
             return True
 
     @twitch_command_aliased(name="bugs", aliases=("баги",))
+    @cooldown(rate=1, per=60, key=bypass_streamer)
     async def bugs(self, ctx: commands.Context):
         """
         Показывает текущее число "багов" (очков лояльности)
@@ -205,63 +233,25 @@ class SLCog(Component):
         name="post",
         aliases=("почта", "голос"),
     )
+    @cooldown(rate=1, per=60, key=bypass_streamer)
     async def post(self, ctx: commands.Context):
+
         try:
             post_message = ctx.message.text.split(None, 1)[1]
         except IndexError:
             return
 
-        # await self.ctx.send("Почта на ремонте")
-        # await self.bot.play_sound("pochta.mp3")
-        # return
-        #
-        now = datetime.datetime.now()
-        if ctx.author.name != "iarspider":
-            lastpost = self.last_post.get(ctx.author.name, None)
-            if lastpost is not None:
-                delta = now - lastpost
-                if delta.seconds < self.post_timeout:
-                    asyncio.ensure_future(
-                        ctx.send("Не надо так часто отправлять почту!")
-                    )
-                    return
-
-            if ctx.author.moderator:
-                price = self.post_price["mod"]
-            elif ctx.author.vip:
-                price = self.post_price["vip"]
-            else:
-                price = self.post_price["regular"]
-
-            points = api.get_points(self.streamlabs_oauth, ctx.author.name)
-
-            if points < price:
-                asyncio.ensure_future(
-                    ctx.send(
-                        f"У вас недостаточно багов для отправки почты - вам нужно "
-                        f"минимум {price}. Проверить баги: !баги"
-                    )
-                )
-
-                return
-        else:
-            price = 0
+        if not await self.check_and_sub_points(ctx, post_price):
+            return
 
         if self.bot.sio_server:
             logger.info("Send tts event to overlay")
             await self.bot.play_sound("my_sound//ding-sound-effect_1.mp3")
             await self.bot.sio_server.emit("tts", post_message)
             logger.info("TTS sent to overlay")
-            if price > 0:
-                res = api.sub_points(self.streamlabs_oauth, ctx.author.name, price)
-                logger.debug(res)
-            self.last_post[ctx.author.name] = now
         else:
             if await self.say(post_message):
-                if price > 0:
-                    res = api.sub_points(self.streamlabs_oauth, ctx.author.name, price)
-                    logger.debug(res)
-                self.last_post[ctx.author.name] = now
+                pass
             else:
                 await self.bot.play_sound("my_sound//pochta.mp3")
 
@@ -273,46 +263,11 @@ class SLCog(Component):
         except IndexError:
             return
 
-        # await self.ctx.send("Почта на ремонте")
-        # await self.bot.play_sound("pochta.mp3")
-        # return
-        #
-        now = datetime.datetime.now()
-        if ctx.author.name != "iarspider":
-            lastpost = self.last_post.get(ctx.author.name, None)
-            if lastpost is not None:
-                delta = now - lastpost
-                if delta.seconds < self.post_timeout:
-                    asyncio.ensure_future(
-                        ctx.send("Не надо так часто отправлять почту!")
-                    )
-                    return
-
-            if ctx.author.moderator:
-                price = self.post_price["mod"]
-            elif ctx.author.vip:
-                price = self.post_price["vip"]
-            else:
-                price = self.post_price["regular"]
-
-            points = api.get_points(self.streamlabs_oauth, ctx.author.name)
-
-            if points < price:
-                asyncio.ensure_future(
-                    ctx.send(
-                        f"У вас недостаточно багов для отправки почты: цена {price}, баланс {points}. Проверить баги: !баги"
-                    )
-                )
-
-                return
-        else:
-            price = 0
+        if not await self.check_and_sub_points(ctx, post_price):
+            return
 
         if await self.say(post_message):
-            if price > 0:
-                res = api.sub_points(self.streamlabs_oauth, ctx.author.name, price)
-                logger.debug(res)
-            self.last_post[ctx.author.name] = now
+            pass
         else:
             await self.bot.play_sound("my_sound//pochta.mp3")
 
@@ -326,6 +281,7 @@ class SLCog(Component):
 
         await self.bot.play_sound("my_sound//matmatmat.mp3")
 
+    # noinspection PyUnusedLocal
     @is_broadcaster()
     @twitch_command_aliased(name="spin")
     async def spin(self, ctx: commands.Context):
@@ -349,73 +305,32 @@ class SLCog(Component):
         await ctx.send(f"Запас багов пользователя {user} пополнен на {points} единиц")
 
     @twitch_command_aliased(name="жадный")
+    @cooldown(rate=1, per=60, key=bypass_streamer)
     async def greedy(self, ctx: commands.Context):
-        now = datetime.datetime.now()
-        lastpost = self.last_post.get(ctx.author.name, None)
-        if lastpost is not None:
-            delta = now - lastpost
-            if delta.seconds < self.post_timeout:
-                asyncio.ensure_future(ctx.send("Не надо так часто отправлять почту!"))
-                return
-
-        points = api.get_points(self.streamlabs_oauth, ctx.author.name)
-        if points < 1000:
-            asyncio.ensure_future(
-                ctx.send(
-                    f"У вас недостаточно багов для выполнения этой команды: цена 1000, баланс {points}"
-                )
-            )
-        else:
-            await self.bot.play_sound("my_sound//Я не жадный.mp3")
-            res = api.sub_points(self.streamlabs_oauth, ctx.author.name, 1000)
-            logger.debug(res)
-            self.last_post[ctx.author.name] = now
+        if not await self.check_and_sub_points(ctx, 1000):
+            return
+        await self.bot.play_sound("my_sound//Я не жадный.mp3")
 
     @twitch_command_aliased(name="маловато")
+    @cooldown(rate=1, per=60, key=bypass_streamer)
     async def moar(self, ctx: commands.Context):
-        now = datetime.datetime.now()
-        lastpost = self.last_post.get(ctx.author.name, None)
-        if lastpost is not None:
-            delta = now - lastpost
-            if delta.seconds < self.post_timeout:
-                asyncio.ensure_future(ctx.send("Не надо так часто отправлять почту!"))
-                return
-
-        points = api.get_points(self.streamlabs_oauth, ctx.author.name)
-        if points < 500:
-            asyncio.ensure_future(
-                ctx.send(
-                    f"У вас недостаточно багов для выполнения этой команды: цена 500, баланс {points}"
-                )
-            )
-        else:
-            await self.bot.play_sound("my_sound//МАЛОВАТО БУДЕТ.mp3")
-            res = api.sub_points(self.streamlabs_oauth, ctx.author.name, 500)
-            logger.debug(res)
-            self.last_post[ctx.author.name] = now
+        if not await self.check_and_sub_points(ctx, 500):
+            return
+        await self.bot.play_sound("my_sound//МАЛОВАТО БУДЕТ.mp3")
 
     @twitch_command_aliased(name="жадность")
+    @cooldown(rate=1, per=60, key=bypass_streamer)
     async def greed(self, ctx: commands.Context):
-        now = datetime.datetime.now()
-        lastpost = self.last_post.get(ctx.author.name, None)
-        if lastpost is not None:
-            delta = now - lastpost
-            if delta.seconds < self.post_timeout:
-                asyncio.ensure_future(ctx.send("Не надо так часто отправлять почту!"))
-                return
+        if not await self.check_and_sub_points(ctx, 500):
+            return
+        await self.bot.play_sound("my_sound//Жадность это плохо.mp3")
 
-        points = api.get_points(self.streamlabs_oauth, ctx.author.name)
-        if points < 1000:
-            asyncio.ensure_future(
-                ctx.send(
-                    f"У вас недостаточно багов для выполнения этой команды: цена 1000, баланс {points}"
-                )
-            )
-        else:
-            await self.bot.play_sound("my_sound//Жадность это плохо.mp3")
-            res = api.sub_points(self.streamlabs_oauth, ctx.author.name, 1000)
-            logger.debug(res)
-            self.last_post[ctx.author.name] = now
+    @twitch_command_aliased(name="лужа")
+    @cooldown(rate=1, per=60, key=bypass_streamer)
+    async def puddle(self, ctx: commands.Context):
+        if not await self.check_and_sub_points(ctx, 500):
+            return
+        await self.bot.play_sound("my_sound//Лужа.mp3")
 
 
 async def setup(bot: commands.Bot):

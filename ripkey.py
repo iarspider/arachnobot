@@ -40,6 +40,7 @@ async def keyboard_listener(twitch_bot) -> None:
     logger.info("Device grabbed exclusively")
 
     try:
+        # noinspection PyUnresolvedReferences
         async for event in device.async_read_loop():
             # logger.info(f"{event.type=} =?= {ecodes.EV_KEY} , {event.value=} =?= 1")
             # Only handle key press events (value=1), not release (0) or repeat (2)

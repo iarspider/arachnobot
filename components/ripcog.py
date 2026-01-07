@@ -3,6 +3,7 @@ import os
 import sys
 from pathlib import Path
 
+import socketio
 from twitchio.ext import commands
 from twitchio.ext.commands import is_broadcaster, Component
 from watchdog.events import FileSystemEventHandler
@@ -40,7 +41,7 @@ class RIPCog(Component):
         return self.bot.game
 
     @property
-    def sio_server(self):
+    def sio_server(self) -> socketio.AsyncServer:
         return self.bot.sio_server
 
     def setup(self):
@@ -96,16 +97,16 @@ class RIPCog(Component):
         with open("rip_display.txt", "w", encoding="utf8") as f:
             f.write(text)
 
-        if self.bot.sio_server:
+        if self.sio_server:
             if self.bot.game.rip_enabled:
-                await self.bot.sio_server.emit("toggle_death_counter", 1)
+                await self.sio_server.emit("toggle_death_counter", 1)
                 data = {
                     "text": text,
                     "animation": 0 if n == 0 else n // abs(n),
                 }
                 await self.sio_server.emit("update_death_count", data)
             else:
-                await self.bot.sio_server.emit("toggle_death_counter", 0)
+                await self.sio_server.emit("toggle_death_counter", 0)
 
     async def write_rip(self, n=0):
         await self.display_rip(n)
