@@ -3,12 +3,13 @@ import os
 import time
 from tempfile import NamedTemporaryFile
 
-import requests
+import httpx
 import socketio
 from bs4 import BeautifulSoup
 from loguru import logger
 from twitchio.ext import commands
 from twitchio.ext.commands import is_broadcaster, Component, cooldown
+from fake_useragent import UserAgent
 
 import streamlabs_api as api
 from config import rippers, streamlabs_redirect_uri
@@ -97,7 +98,9 @@ class SLCog(Component):
             self.sl_client.connect(f"https://sockets.streamlabs.com?token={token}")
         )
 
-        self.session = requests.Session()
+        self.session = httpx.Client(
+            headers={"User-Agent": UserAgent.firefox}, follow_redirects=True
+        )
         try:
             res = self.session.get("https://voxworker.com/ru")
             res.raise_for_status()
@@ -119,7 +122,7 @@ class SLCog(Component):
                 "хл+опок.",
             )
             logger.debug("Session ready")
-        except requests.HTTPError as e:
+        except httpx.HTTPError as e:
             logger.opt(exception=e).exception("Failed to initialize voxworker session")
             self.voxdata = None
         except (IndexError, KeyError) as e:
@@ -165,7 +168,7 @@ class SLCog(Component):
         res = self.session.post(
             "https://voxworker.com/ru/ajax/convert", data=self.voxdata
         )
-        if not res.ok:
+        if not res.is_success:
             logger.error(f"Initial request to VoxWorker failed: {res.status_code}")
         resj = res.json()
         logger.debug("Sent request to VoxWorker")
@@ -180,7 +183,7 @@ class SLCog(Component):
             res = self.session.get(
                 f'https://voxworker.com/ru/ajax/status?id={resj["taskId"]}'
             )
-            if not res.ok:
+            if not res.is_success:
                 logger.error(f"Status request to VoxWorker failed: {res.status_code}")
                 return False
             resj = res.json()
@@ -201,7 +204,7 @@ class SLCog(Component):
             logger.debug("Downloading file from VoxWorker")
             self.voxdata["textId"] = resj.get("textId", "")
             res = self.session.get(resj["downloadUrl"])
-            if not res.ok:
+            if not res.is_success:
                 logger.error(f"Failed to download URL: {res.status_code}")
             with NamedTemporaryFile(delete=False, suffix=".mp3") as tempfile:
                 tempfile.write(res.content)
@@ -224,7 +227,7 @@ class SLCog(Component):
             res = api.get_points(self.streamlabs_oauth, user)
             # print(res)
             # res = res['points']
-        except requests.HTTPError:
+        except httpx.HTTPError:
             res = 0
 
         await ctx.send(f"@{user} Набрано багов: {res}")
@@ -287,7 +290,7 @@ class SLCog(Component):
     async def spin(self, ctx: commands.Context):
         # points = api.get_points(self.streamlabs_oauth, ctx.author.name)
         # httpclient_logging_patch()
-        requests.post(
+        httpx.post(
             "https://streamlabs.com/api/v1.0/wheel/spin",
             data={"access_token": self.streamlabs_oauth.access_token},
         )

@@ -13,6 +13,8 @@ import mimetypes
 from urllib.parse import urlparse, unquote
 from pathlib import Path
 
+from fake_useragent import UserAgent
+
 
 class VLCTrackListener:
     def __init__(self):
@@ -132,7 +134,9 @@ class RadioTrackListener:
         url = f"https://www.radiorecord.ru/api/station/history/?id={station_id}"
 
         try:
-            r = await client.get(url, timeout=10)
+            r = await client.get(
+                url, timeout=20, headers={"User-Agent": UserAgent.firefox}
+            )
             r.raise_for_status()
             data = r.json()
         except (httpx.HTTPError, json.JSONDecodeError) as e:
@@ -158,7 +162,7 @@ class RadioTrackListener:
 
         async with httpx.AsyncClient() as client:
             while True:
-                await asyncio.sleep(5)
+                await asyncio.sleep(10)
 
                 await asyncio.gather(
                     *(
