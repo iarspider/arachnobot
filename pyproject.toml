@@ -42,6 +42,7 @@ python-telegram-bot = "^22.5"
 pulsectl = "^24.12.0"
 lxml = "^6.0.2"
 fake-useragent = "^2.2.0"
+httpx-oauth = "^0.16.1"
 
 
 

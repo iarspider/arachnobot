@@ -135,7 +135,7 @@ class RadioTrackListener:
 
         try:
             r = await client.get(
-                url, timeout=20, headers={"User-Agent": UserAgent.firefox}
+                url, timeout=20, headers={"User-Agent": str(UserAgent.firefox)}
             )
             r.raise_for_status()
             data = r.json()

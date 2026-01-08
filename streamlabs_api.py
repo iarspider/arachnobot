@@ -119,12 +119,7 @@ def main():
     streamlabs_client_id = os.environ["STREAMLABS_CLIENT_ID"]
     streamlabs_client_secret = os.environ["STREAMLABS_CLIENT_SECRET"]
 
-    try:
-        import http.client as http_client
-    except ImportError:
-        # Python 2
-        # noinspection PyUnresolvedReferences
-        import httplib as http_client
+    import http.client as http_client
 
     http_client.HTTPConnection.debuglevel = 1
     logging.basicConfig()
@@ -138,14 +133,14 @@ def main():
     oauth = get_streamlabs_session(
         streamlabs_client_id, streamlabs_client_secret, streamlabs_redirect_uri
     )
-    r = add_points(oauth, "veniamin_arefev", 750, "iarspider")
-    pprint.pprint(r)
-    # r = requests.get(
-    #     "https://streamlabs.com/api/v1.0/socket/token?access_token="
-    #     + oauth.access_token
-    # )
-    # # r.raise_for_status()
-    # print(r.json())
+    # r = add_points(oauth, "veniamin_arefev", 750, "iarspider")
+    # pprint.pprint(r)
+    r = requests.get(
+        "https://streamlabs.com/api/v1.0/socket/token?access_token="
+        + oauth.access_token
+    )
+    r.raise_for_status()
+    print(r.json())
 
 
 if __name__ == "__main__":

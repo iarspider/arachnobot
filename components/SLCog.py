@@ -99,7 +99,7 @@ class SLCog(Component):
         )
 
         self.session = httpx.Client(
-            headers={"User-Agent": UserAgent.firefox}, follow_redirects=True
+            headers={"User-Agent": str(UserAgent.firefox)}, follow_redirects=True
         )
         try:
             res = self.session.get("https://voxworker.com/ru")
