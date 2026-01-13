@@ -58,11 +58,11 @@ class RIPCog(Component):
             self.observer.join()
             self.observer = None
 
-        if self.bot.game.watchfile and os.path.exists(self.bot.game.watchfile):
+        if self.bot.game.rip_watchfile and os.path.exists(self.bot.game.rip_watchfile):
             if self.observer:
                 self.observer.stop()
                 self.observer.join()
-            event_handler = CustomFileChangeHandler(self, self.bot.game.watchfile)
+            event_handler = CustomFileChangeHandler(self, self.bot.game.rip_watchfile)
             self.observer = Observer()
             self.observer.schedule(
                 event_handler,
@@ -82,12 +82,12 @@ class RIPCog(Component):
         if not self.game:
             await self.bot.get_game_v5()
 
-        if self.game.inexact:
+        if self.game.rip_is_inexact:
             text = f"{self.rip_emoji}: {{today}}+ (всего: ≈{{total}})".format(
                 **self.deaths
             )
         else:
-            if self.game.infinite:
+            if self.game.rip_is_infinite:
                 text = f"{self.rip_emoji}: ∞"
             else:
                 text = f"{self.rip_emoji}: {{today}} (всего: {{total}})".format(

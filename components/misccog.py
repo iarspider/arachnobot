@@ -377,6 +377,8 @@ class MiscCog(commands.Component):
             return
 
         obs_cog.set_music_source("vlc")
+        if self.bot.sio_server:
+            await self.bot.sio_server.emit("track_show")
 
     @is_broadcaster()
     @twitch_command_aliased("radio")
@@ -391,6 +393,8 @@ class MiscCog(commands.Component):
             logger.warning("OBS cog not found!")
 
         if self.bot.radio_station == "none":
+            if self.bot.sio_server:
+                await self.bot.sio_server.emit("track_hide")
             await ctx.send("Музыка отключена")
 
         if self.bot.radio_station not in ("rock", "symphony"):
@@ -402,6 +406,8 @@ class MiscCog(commands.Component):
 
         await self.bot.update_track_text()
         if self.bot.radio_station:
+            if self.bot.sio_server:
+                await self.bot.sio_server.emit("track_show")
             await ctx.send(
                 f"Источник музыки: радио {self.bot.radio_station.capitalize()}"
             )

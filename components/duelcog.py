@@ -191,7 +191,7 @@ class DuelCog(Component):
             await ctx.send("Модерам не нужны кубики, чтобы кого-то забанить :)")
             return
 
-        if defender.is_mod and not allow_duel_to_mod:
+        if defender.moderator and not allow_duel_to_mod:
             await ctx.send(f"А вот модеров не трожь, @{attacker}!")
             return
 

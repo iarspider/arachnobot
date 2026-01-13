@@ -139,7 +139,7 @@ class RadioTrackListener:
             )
             r.raise_for_status()
             data = r.json()
-        except (httpx.HTTPError, json.JSONDecodeError) as e:
+        except (httpx.HTTPError, httpx.ReadTimeout, json.JSONDecodeError) as e:
             logger.opt(exception=True).exception(
                 "Radio Record API returned error!",
             )

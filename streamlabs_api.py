@@ -45,6 +45,7 @@ def get_streamlabs_session(client_id, client_secret, redirect_uri):
     try:
         f = open("streamlabs_token.json", "r")
         token = simplejson.load(f)
+        f.close()
     except (OSError, simplejson.JSONDecodeError):
         print("Failed to load token!")
         token = get_token(client_id, client_secret, redirect_uri)

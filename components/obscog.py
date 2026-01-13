@@ -513,7 +513,7 @@ class OBSCog(Component):
             return
 
         self.set_music_source("")
-        self.bot.update_track_text()
+        await self.bot.update_track_text()
 
         if self.bot.game.use_game_capture:
             self.show_hide_scene_item("Game", "Game Capture", True)
