@@ -6,6 +6,7 @@ import glob
 import os
 import random
 import re
+import subprocess
 import sys
 import time
 import typing
@@ -312,6 +313,8 @@ class OBSCog(Component):
                 self.bot.title.split("|")[0], self.bot.game.game
             )
         )
+
+        subprocess.run(["./toggle_aec.sh", "on" if self.game.aec else "off"])
 
         self.event.set()
 

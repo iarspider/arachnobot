@@ -137,28 +137,6 @@ def httpclient_logging_patch(level=logging.DEBUG):
     http_client.HTTPConnection.debuglevel = 1
 
 
-#
-# class GameConfig(peewee.Model):
-#     game = peewee.CharField(primary_key=True)
-#     rip_total = peewee.IntegerField(default=0)
-#     rip_enabled = peewee.BooleanField(default=True)
-#     music_enabled = peewee.BooleanField(default=False)
-#     window = peewee.CharField(default="X")
-#     infinite = peewee.BooleanField(default=False)
-#     inexact = peewee.BooleanField(default=False)
-#     mt = peewee.BooleanField(default=False)
-#     mt_str = peewee.CharField(default="iarspider/moar__/danzio_plagius")
-#     watchfile = peewee.CharField(default="")
-#     rip_emoji = peewee.CharField(default="☠")
-#     use_game_capture = peewee.BooleanField(default=True)
-#     tags = peewee.TextField(default="")
-#     window_inexact = peewee.BooleanField(default=False)
-#
-#     def __str__(self):
-#         return self.game
-#
-#     class Meta:
-#         database = database
 # TODO: remove deprecated aliases after 5.8.0
 class GameConfig(peewee.Model):
     game = peewee.CharField(primary_key=True)
@@ -198,6 +176,9 @@ class GameConfig(peewee.Model):
     # ─── External integrations ────────────────────────────
     mt_enabled = peewee.BooleanField(default=False)
     mt_source = peewee.CharField(default="iarspider/moar__/danzio_plagius")
+
+    # ─── Acoustic Echo Cancellation ───────────────────────
+    aec = peewee.BooleanField(default=False)
 
     # ─── Twitch metadata ──────────────────────────────────
     tags = peewee.TextField(
