@@ -3,12 +3,15 @@ import os
 import sys
 from pathlib import Path
 
+import socketio
 from twitchio.ext import commands
 from twitchio.ext.commands import is_broadcaster, Component
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
+from newbot import ExtraRipCounter
 from twitch_commands import twitch_command_aliased
+import pytils
 
 sys.path.append("..")
 from config import rippers
@@ -32,15 +35,17 @@ class RIPCog(Component):
         self.deaths = {"today": 0, "total": 0}
         self.rip_emoji = ""
 
-        self.obscog = None
-        self.observer = None
+        self.obscog: "OBSCog | None" = None
+        self.observer: Observer | None = None
+
+        self.boss: str | None = None
 
     @property
     def game(self):
         return self.bot.game
 
     @property
-    def sio_server(self):
+    def sio_server(self) -> socketio.AsyncServer:
         return self.bot.sio_server
 
     def setup(self):
@@ -57,11 +62,11 @@ class RIPCog(Component):
             self.observer.join()
             self.observer = None
 
-        if self.bot.game.watchfile and os.path.exists(self.bot.game.watchfile):
+        if self.bot.game.rip_watchfile and os.path.exists(self.bot.game.rip_watchfile):
             if self.observer:
                 self.observer.stop()
                 self.observer.join()
-            event_handler = CustomFileChangeHandler(self, self.bot.game.watchfile)
+            event_handler = CustomFileChangeHandler(self, self.bot.game.rip_watchfile)
             self.observer = Observer()
             self.observer.schedule(
                 event_handler,
@@ -81,12 +86,12 @@ class RIPCog(Component):
         if not self.game:
             await self.bot.get_game_v5()
 
-        if self.game.inexact:
+        if self.game.rip_is_inexact:
             text = f"{self.rip_emoji}: {{today}}+ (всего: ≈{{total}})".format(
                 **self.deaths
             )
         else:
-            if self.game.infinite:
+            if self.game.rip_is_infinite:
                 text = f"{self.rip_emoji}: ∞"
             else:
                 text = f"{self.rip_emoji}: {{today}} (всего: {{total}})".format(
@@ -96,16 +101,32 @@ class RIPCog(Component):
         with open("rip_display.txt", "w", encoding="utf8") as f:
             f.write(text)
 
-        if self.bot.sio_server:
+        if self.game.extra_rips.exists():
+            with open("rip_boss.txt", "w", encoding="utf8") as f:
+                for xrc in self.game.extra_rips:
+                    if self.boss and xrc.name == self.boss:
+                        prefix = "▶"
+                    else:
+                        prefix = "✔"
+
+                    count_str = pytils.numeral.get_plural(
+                        xrc.cnt, ("трай", "трая", "траев"), "траев"
+                    )
+                    print(
+                        f"{prefix} {xrc.name}: {count_str}",
+                        file=f,
+                    )
+
+        if self.sio_server:
             if self.bot.game.rip_enabled:
-                await self.bot.sio_server.emit("toggle_death_counter", 1)
+                await self.sio_server.emit("toggle_death_counter", 1)
                 data = {
                     "text": text,
                     "animation": 0 if n == 0 else n // abs(n),
                 }
                 await self.sio_server.emit("update_death_count", data)
             else:
-                await self.bot.sio_server.emit("toggle_death_counter", 0)
+                await self.sio_server.emit("toggle_death_counter", 0)
 
     async def write_rip(self, n=0):
         await self.display_rip(n)
@@ -114,7 +135,16 @@ class RIPCog(Component):
 
     async def do_rip(self, n=1):
         self.deaths["today"] += n
+        self.deaths["today"] = max(0, self.deaths["today"])
         self.deaths["total"] += n
+        self.deaths["total"] = max(0, self.deaths["total"])
+
+        if self.boss:
+            boss_obj: ExtraRipCounter
+            boss_obj, _ = ExtraRipCounter.get_or_create(game=self.game, name=self.boss)
+            boss_obj.cnt += n
+            boss_obj.cnt = max(0, boss_obj.cnt)
+            boss_obj.save()
 
         await self.write_rip(n)
 
@@ -258,6 +288,32 @@ class RIPCog(Component):
         else:
             await self.obscog.enable_rip(False)
         await ctx.send("Счётчик смертей отключён")
+
+    @is_broadcaster()
+    @twitch_command_aliased("boss")
+    async def boss(self, ctx: commands.Context):
+        try:
+            arg = ctx.message.text.split()[1]
+        except (IndexError, ValueError):
+            # await ctx.send("Usage: !boss name")
+            self.boss = ""
+            await self.display_rip()
+            await ctx.reply(f"Босс больше не выбран")
+            return
+        else:
+            self.boss = arg
+            await self.display_rip()
+            await ctx.reply(f"Выбран босс {arg}")
+
+    @is_broadcaster()
+    @twitch_command_aliased("endboss", aliases=["unboss"])
+    async def endboss(self, ctx: commands.Context):
+        if self.boss:
+            self.boss = ""
+            await self.display_rip()
+            await ctx.reply(f"Босс {self.boss} повержен!")
+        else:
+            await ctx.reply("Нет активного босса ☹️")
 
     # @twitch_command_aliased(name='ripz')
     # async def ripz(self, ctx: commands.Context):

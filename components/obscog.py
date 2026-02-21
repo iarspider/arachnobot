@@ -8,7 +8,6 @@ import random
 import re
 import sys
 import time
-import traceback
 import typing
 
 import pulsectl
@@ -31,54 +30,9 @@ sys.path.append("..")
 from config import trailer_root, trailer_default
 
 
-#
-# def ws_call(self, obj):
-#     """
-#     Make a call to the OBS server through the Websocket.
-#
-#     :param obj: Request (class from obswebsocket.requests module) to send
-#         to the server.
-#     :return: Request object populated with response data.
-#     """
-#     if not isinstance(obj, base_classes.Baserequests):
-#         raise exceptions.ObjectError("Call parameter is not a request object")
-#     data = obj.data()
-#
-#     message_id = str(self.id)
-#     self.id += 1
-#     event = threading.Event()
-#     self.events[message_id] = event
-#
-#     if self.legacy:
-#         payload = {"message-id": message_id, "request-type": obj.name}
-#         payload.update(data)
-#     else:
-#         payload = {
-#             "op": 6,
-#             "d": {
-#                 "requestId": message_id,
-#                 "requestType": obj.name,
-#                 "requestData": data,
-#             },
-#         }
-#     # IARSpider: send UTF-8 encoded data
-#     payload_body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-#     LOG.debug("Sending message id {}: {}".format(message_id, payload_body))
-#     self.ws.send(payload_body)
-#     # end
-#
-#     event.wait(self.timeout)
-#     self.events.pop(message_id)
-#
-#     if message_id in self.answers:
-#         r = self.answers.pop(message_id)
-#         if self.legacy:
-#             obj.input(r, r["status"] == "ok")
-#         else:
-#             obj.input(r.get("responseData", {}), r["requestStatus"]["result"])
-#         return obj
-#     raise exceptions.MessageTimeout("No answer for message {}".format(message_id))
-#
+# noinspection PyUnusedLocal
+async def sante_custom_key(ctx: commands.Context) -> typing.Hashable | None:
+    return 1
 
 
 class OBSCog(Component):
@@ -150,12 +104,12 @@ class OBSCog(Component):
         for si in pulse.sink_input_list():
             if si.proplist.get("application.process.id") == str(pid):
                 pulse.sink_input_move(si.index, sink.index)
-                print(f"Moved PID {pid} to {sink_name}")
+                logger.info(f"Moved PID {pid} to {sink_name}")
 
     @staticmethod
     def find_window_by_title_and_class(
-        target_title, target_class, inexact=False
-    ) -> tuple[Window, int | None] | None:
+        target_title, target_class, window_title_is_glob=False
+    ) -> tuple[Window, int | None] | tuple[None, None]:
         # Connect to the X server
         disp = display.Display()
         root = disp.screen().root
@@ -180,11 +134,14 @@ class OBSCog(Component):
                 title = window.get_property(title_atom, X.AnyPropertyType, 0, 1024)
                 if title:
                     title = title.value.decode("utf-8")
-                    if title == target_title and not inexact:
+                    if title == target_title and not window_title_is_glob:
                         logger.debug(f"Found window with matching title")
                         title_match = True
                     else:
-                        if fnmatch.fnmatch(title, target_title) and inexact:
+                        if (
+                            fnmatch.fnmatch(title, target_title)
+                            and window_title_is_glob
+                        ):
                             logger.debug(
                                 f"Found window with matching title (wildcard match)"
                             )
@@ -209,20 +166,20 @@ class OBSCog(Component):
 
                     if pid_prop:
                         pid = int(pid_prop.value[0])
-                        print("PID:", pid)
+                        logger.debug(f"PID: {pid}")
                     else:
                         pid = None
-                        print("No PID for this window")
+                        logger.error("No PID for this window!")
 
                     return window, pid
             except (XError, UnicodeDecodeError, AttributeError) as e:
-                logger.debug(f"Ignored window due to exception: {e}")
+                logger.opt(exception=e).debug(f"Ignored window due to exception: {e}")
                 continue  # Ignore inaccessible windows or decoding errors
 
-        logger.debug(
+        logger.warning(
             f"Window with title '{target_title}' and class '{target_class}' not found"
         )
-        return None
+        return None, None
 
     def ws_call(self, request: obsws_requests.Baserequests):
         if self.use_teleport:
@@ -231,6 +188,14 @@ class OBSCog(Component):
             return self.ws.call(request)
 
     def show_hide_scene_item(self, scene_name, item, visible):
+        if not scene_name:
+            res = self.ws.call(obsws_requests.GetCurrentProgramScene())
+            if res.status:
+                scene_name = res.sceneName
+
+        if not scene_name:
+            logger.error("No scene requested and current scene not defined!")
+
         res = self.ws.call(
             obsws_requests.GetSceneItemId(sceneName=scene_name, sourceName=item)
         )
@@ -333,6 +298,10 @@ class OBSCog(Component):
         time.sleep(1)
         self.show_hide_scene_item("Starting", "Screensaver", True)
         tags = [x for x in self.game.tags.split(";") if x]
+        try:
+            tags.remove("ИграюНеправильно")
+        except ValueError:
+            pass
 
         if tags:
             logger.debug("Set tags", tags)
@@ -345,6 +314,31 @@ class OBSCog(Component):
         )
 
         self.event.set()
+
+    def set_input_status_volume(
+        self, input_name: str, muted: bool, input_volume: float | None = None
+    ):
+        if input_volume:
+            self.ws.call(
+                obsws_requests.SetInputVolume(
+                    inputName=input_name, inputVolumeDb=input_volume
+                )
+            )
+
+        self.ws.call(
+            obsws_requests.SetInputMute(inputName=input_name, inputMuted=muted)
+        )
+
+    def set_music_source(self, source: str):
+        sources = {"rock": "Радио", "symphony": "Рекорд Классика", "vlc": "Music"}
+        for s in sources.values():
+            self.set_input_status_volume(s, True)
+
+        if source in sources:
+            logger.info(f"Unmuting source {sources[source]}")
+            self.set_input_status_volume(sources[source], False)
+        else:
+            logger.warning(f"No source matching {source}!")
 
     @is_broadcaster()
     @twitch_command_aliased(name="countdown", aliases=("preroll", "cd", "pr"))
@@ -410,7 +404,10 @@ class OBSCog(Component):
         self.ws.call(
             obsws_requests.SetInputVolume(inputName="Радио", inputVolumeDb=-7.0)
         )
-        self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=False))
+        self.ws.call(
+            obsws_requests.SetInputMute(inputName="Game sink", inputMuted=True)
+        )
+        self.set_music_source("rock")
 
         self.show_hide_scene_item("Starting", "Ожидание", False)
         self.show_hide_scene_item("Starting", "Ожидание 2", False)
@@ -508,7 +505,16 @@ class OBSCog(Component):
             )
         )
 
-        self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=False))
+        self.ws.call(
+            obsws_requests.SetInputMute(inputName="Game sink", inputMuted=True)
+        )
+
+        # self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=False))
+        self.set_music_source("rock")
+        self.ws.call(
+            obsws_requests.SetInputVolume(inputName="Радио", inputVolumeDb=-7.0)
+        )
+        asyncio.ensure_future(self.bot.update_track_text())
         # self.get_chatters()
         if ctx:
             asyncio.ensure_future(ctx.send("Начать перепись населения!"))
@@ -526,58 +532,63 @@ class OBSCog(Component):
         if self.ws is None:
             return
 
-        self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=True))
+        self.set_music_source("")
+        await self.bot.update_track_text()
 
-        if self.bot.game.use_game_capture:
-            self.show_hide_scene_item("Game", "Game Capture", True)
-            self.show_hide_scene_item("Game", "Window Capture", False)
-            if self.bot.game.window != "X":
-                source: obsws_requests.GetInputSettings = self.ws.call(
-                    obsws_requests.GetInputSettings(inputName="Game Capture")
-                )
-                settings = source.getInputSettings()
-                parts = self.bot.game.window.split("\r\n")
-                while len(parts) < 3:
-                    parts.append("")
+        # if self.bot.game.use_game_capture:
+        self.show_hide_scene_item("Game", "Game Capture", True)
+        self.show_hide_scene_item("Game", "Window Capture", False)
+        if self.bot.game.obs_window != "X":
+            source: obsws_requests.GetInputSettings = self.ws.call(
+                obsws_requests.GetInputSettings(inputName="Game Capture")
+            )
+            settings = source.getInputSettings()
+            parts = self.bot.game.obs_window.split("\r\n")
+            while len(parts) < 3:
+                parts.append("")
 
-                _ = OBSCog.find_window_by_title_and_class(
-                    parts[1], parts[2], self.bot.game.window_inexact
-                )
-                if _ is None:
-                    logger.error(
-                        f"Can't find window title={parts[1]}, class={parts[2]}!"
+            win, pid = OBSCog.find_window_by_title_and_class(
+                parts[1], parts[2], self.bot.game.obs_window_title_glob
+            )
+            if win is None:
+                logger.error(f"Can't find window title={parts[1]}, class={parts[2]}!")
+                await ctx.send("Окно игры не найдено")
+            else:
+                settings["capture_window"] = f"{win.id}"
+                self.ws.call(
+                    obsws_requests.SetInputSettings(
+                        inputName="Game Capture",
+                        inputSettings=settings,
+                        overlay=False,
                     )
-                    await ctx.send("Окно игры не найдено")
+                )
+                await ctx.send("Захват окна настроен")
+
+                if pid:
+                    OBSCog.move_pid_to_sink(pid, "GameSink")
+                    await ctx.send("Захват звука настроен")
                 else:
-                    win, pid = _
-                    settings["capture_window"] = f"{win.id}"
-                    self.ws.call(
-                        obsws_requests.SetInputSettings(
-                            inputName="Game Capture",
-                            inputSettings=settings,
-                            overlay=False,
-                        )
-                    )
-                    await ctx.send("Захват окна настроен")
-
-                    if pid:
-                        OBSCog.move_pid_to_sink(pid, "GameSink")
-                        await ctx.send("Захват звука настроен")
-                    else:
-                        logger.error(f"Missing window for window {win} {win.id} pid!")
-                    logger.debug(f"Set capture window to {settings['capture_window']}")
-        else:
-            self.show_hide_scene_item("Game", "Game Capture", False)
-            self.show_hide_scene_item("Game", "Window Capture", True)
+                    logger.error(f"Window {win} {win.id} doesn't have a pid!")
+                    await ctx.send("Процесс игры не найден!")
+                logger.debug(f"Set capture window to {settings['capture_window']}")
+        # else:
+        #     self.show_hide_scene_item("Game", "Game Capture", False)
+        #     self.show_hide_scene_item("Game", "Window Capture", True)
 
         scene_obj: SourceConfig
-        for scene_obj in SourceConfig.select():
+        for scene_obj in SourceConfig.select(
+            SourceConfig.scene, SourceConfig.source
+        ).distinct():
             self.show_hide_scene_item(scene_obj.scene, scene_obj.source, False)
 
         for scene_obj in self.bot.game.sources:
             self.show_hide_scene_item(
                 scene_obj.scene, scene_obj.source, scene_obj.state
             )
+
+        self.ws.call(
+            obsws_requests.SetInputMute(inputName="Game sink", inputMuted=False)
+        )
 
         # if self.vr:
         #     self.switch_to("VR Game")
@@ -598,15 +609,24 @@ class OBSCog(Component):
             )
         )
 
+        self.show_hide_scene_item("Game", "boss", self.bot.game.extra_rips.exists())
+
         await asyncio.sleep(5)
 
         self.ws_call(obsws_requests.StartRecord())
 
-    async def do_resume(self, ctx: typing.Optional[commands.Context]):
+    @is_broadcaster()
+    @twitch_command_aliased(name="resume")
+    async def resume(self, ctx: commands.Context):
+        """
+        Отменяет перерыв
+
+        %%resume
+        """
         if self.ws is None:
             return
 
-        old_screne = self.ws.call(obsws_requests.GetCurrentProgramScene())
+        old_scene = self.ws.call(obsws_requests.GetCurrentProgramScene())
 
         self.show_hide_scene_item("Paused", "ужин", False)
 
@@ -616,7 +636,8 @@ class OBSCog(Component):
         #     # self.ws.call(obsws_requests.SetMute(self.aud_sources.getMic2(),
         #     # False))
         # else:
-        self.ws.call(obsws_requests.SetInputMute(inputName="Радио", inputMuted=True))
+        self.set_music_source(self.bot.radio_station)
+        await self.bot.update_track_text()
 
         self.ws.call(
             obsws_requests.SetInputMute(
@@ -630,6 +651,10 @@ class OBSCog(Component):
             )
         )
 
+        self.ws.call(
+            obsws_requests.SetInputMute(inputName="Game sink", inputMuted=False)
+        )
+
         res = self.ws.call(obsws_requests.GetRecordStatus())
         # If recording was stopped, start it again,
         # Otherwise, resume it
@@ -638,7 +663,7 @@ class OBSCog(Component):
         else:
             self.ws_call(obsws_requests.StartRecord())
 
-        if old_screne.name == "Battle":
+        if old_scene.name == "Battle":
             return
 
         self.switch_to("Game")
@@ -658,22 +683,12 @@ class OBSCog(Component):
 
             # self.bot.get_game_v5()
         except (KeyError, TypeError) as exc:
-            print(traceback.format_exc())
+            # print(traceback.format_exc())
             msg = "Перепись населения не удалась :("
             if ctx:
                 asyncio.ensure_future(ctx.send(msg))
-            logger.error(str(exc))
-
-    @is_broadcaster()
-    @twitch_command_aliased(name="resume")
-    async def resume(self, ctx: commands.Context):
-        """
-        Отменяет перерыв
-
-        %%resume
-        """
-
-        await self.do_resume(ctx)
+            # logger.error(str(exc))
+            logger.opt(exception=exc).exception("Перепись населения не удалась!")
 
     @is_broadcaster()
     @twitch_command_aliased(name="pause", aliases=("break",))
@@ -776,7 +791,7 @@ class OBSCog(Component):
 
         settings = source.getInputSettings()
 
-        self.bot.game.window = settings["capture_window"]
+        self.bot.game.obs_window = settings["capture_window"]
         self.bot.game.save()
         asyncio.ensure_future(ctx.send(f"Настройки захвата {self.game} сохранены"))
 
@@ -799,10 +814,6 @@ class OBSCog(Component):
     async def end_(self, ctx: commands.Context):
         await ctx.reply("💤")
         open("shutdown", "w").close()
-
-    # noinspection PyMethodMayBeStatic
-    async def sante_custom_key(ctx: commands.Context) -> typing.Hashable | None:
-        return 1
 
     @twitch_command_aliased(
         name="sante", aliases=("буд", "будь", "будароф", "бударофф")

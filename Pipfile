@@ -4,39 +4,8 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-requests-oauthlib = "*"
-websocket-client = "*"
-obs-websocket-py = "*"
-py-dateutil = "*"
-python-dotenv = "*"
-python-engineio = "==3.14.2"
-python-socketio = "==4.6.1"
-colorlog = "*"
-pytils = "*"
-uvicorn = "*"
-aiohttp = "*"
-chardet = "*"
-multidict = "*"
-pika = "*"
-beautifulsoup4 = "*"
-peewee = "*"
-pipwin = "*"
-eyed3 = "*"
-pyaudio = "*"
-loguru = "*"
-ujson = "*"
-ciso8601 = "*"
-faust-cchardet = "*"
-twitchio = {git = "https://github.com/PythonistaGuild/TwitchIO"}
-pywizlight = "*"
-yt-dlp = "*"
-tinytag = "*"
-watchdog = "*"
-websockets = "*"
-python-xlib = "*"
 
 [dev-packages]
-black = "*"
 
 [requires]
 python_version = "3.12"

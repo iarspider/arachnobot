@@ -5,19 +5,16 @@ import random
 import string
 from collections import deque
 
+import telegram
 import twitchio
 from loguru import logger
-from pytils import numeral
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-from twitchio import Stream
 from twitchio.ext import commands
 from twitchio.ext.commands import is_broadcaster
 
 import config
 from config import twitch_extra_bite, twitch_no_bite, rippers
-from twitch_commands import twitch_command_aliased, check_sender
-
-import telegram
+from twitch_commands import twitch_command_aliased
 
 
 class MiscCog(commands.Component):
@@ -366,6 +363,54 @@ class MiscCog(commands.Component):
         self.game.tags = ";".join(channel_info[0].tags)
         self.game.save()
         await ctx.send("Тэги сохранены")
+
+    @is_broadcaster()
+    @twitch_command_aliased("vlc")
+    async def vlc(self, ctx: commands.Context):
+        self.bot.radio_station = "vlc"
+        await self.bot.update_track_text()
+        await ctx.send("Источник музыки: VLC")
+
+        obs_cog = self.bot.get_component("OBSCog")
+        if not obs_cog:
+            logger.warning("OBS cog not found!")
+            return
+
+        obs_cog.set_music_source("vlc")
+        if self.bot.sio_server:
+            await self.bot.sio_server.emit("track_show")
+
+    @is_broadcaster()
+    @twitch_command_aliased("radio")
+    async def radio(self, ctx: commands.Context):
+        try:
+            self.bot.radio_station = ctx.message.text.split(None, 1)[1]
+        except IndexError:
+            self.bot.radio_station = "rock"
+
+        obs_cog = self.bot.get_component("OBSCog")
+        if not obs_cog:
+            logger.warning("OBS cog not found!")
+
+        if self.bot.radio_station == "none":
+            if self.bot.sio_server:
+                await self.bot.sio_server.emit("track_hide")
+            await ctx.send("Музыка отключена")
+
+        if self.bot.radio_station not in ("rock", "symphony"):
+            self.bot.radio_station = ""
+            logger.warning(f"Unknown radio station: {self.bot.radio_station}!")
+
+        if obs_cog:
+            obs_cog.set_music_source(self.bot.radio_station)
+
+        await self.bot.update_track_text()
+        if self.bot.radio_station:
+            if self.bot.sio_server:
+                await self.bot.sio_server.emit("track_show")
+            await ctx.send(
+                f"Источник музыки: радио {self.bot.radio_station.capitalize()}"
+            )
 
 
 # This is our entry point for the module.
