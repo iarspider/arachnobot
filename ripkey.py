@@ -55,7 +55,9 @@ async def keyboard_listener(twitch_bot) -> None:
                         msg = await ripcog.do_rip(n=1)
                         await twitch_bot.send_message(msg)
                     except Exception as e:
-                        logger.error(f"Error executing RIP command: {e}")
+                        logger.opt(exception=e).error(
+                            f"Error executing RIP command: {e}"
+                        )
                 else:
                     pass
                     # logger.debug("Wrong code")

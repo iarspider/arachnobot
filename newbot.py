@@ -310,6 +310,16 @@ class SourceConfig(peewee.Model):
         database = database
 
 
+class ExtraRipCounter(peewee.Model):
+    game = peewee.ForeignKeyField(model=GameConfig, backref="extra_rips")
+    name = peewee.CharField()
+    cnt = peewee.IntegerField(default=1)
+
+    class Meta:
+        table_name = "xripcount"
+        database = database
+
+
 class Bot(commands.Bot):
     def __init__(
         self, *, token_filename: str, sio_server_: socketio.AsyncServer
@@ -403,7 +413,7 @@ class Bot(commands.Bot):
             (
                 f'Паучок запустил стрим "{self.title}" '
                 f'по игре "{self.game_name}"! У вас есть {delta_text} чтобы'
-                " открыть стрим - https://twitch.tv/iarspider !"
+                " открыть стрим - <https://twitch.tv/iarspider>!"
             ),
             (
                 f'Паучок запустил стрим "{self.title}" '
@@ -777,7 +787,7 @@ class Bot(commands.Bot):
     async def event_command_error(self, payload: CommandErrorPayload):
         if isinstance(payload.exception, CommandOnCooldown):
             await payload.context.reply(
-                f"Подожди {payload.exception.remaining:.1f} сек. перед повторным использованием команды"
+                f"Подожди {payload.exception.remaining:.0f} сек. перед повторным использованием команды"
             )
         else:
             await super().event_command_error(payload)
@@ -822,7 +832,9 @@ def main() -> None:
         cors_allowed_origins=["https://fr.iarazumov.com", "http://overlay.home"],
     )
     app = socketio.ASGIApp(sio_server, socketio_path="/ws")
-    config = uvicorn.Config(app, host="0.0.0.0", port=8081, ws="websockets-sansio")
+    config = uvicorn.Config(
+        app, host="0.0.0.0", port=8081, ws="websockets-sansio", lifespan="on"
+    )
     # noinspection PyUnusedLocal
     server = uvicorn.Server(config)
 

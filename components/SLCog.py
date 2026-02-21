@@ -335,6 +335,27 @@ class SLCog(Component):
             return
         await self.bot.play_sound("my_sound//Лужа.mp3")
 
+    @twitch_command_aliased(name="страшно")
+    @cooldown(rate=1, per=60, key=bypass_streamer)
+    async def scary(self, ctx: commands.Context):
+        if not await self.check_and_sub_points(ctx, 500):
+            return
+        await self.bot.play_sound("my_sound//scary.ogg")
+
+    @twitch_command_aliased(name="дурак")
+    @cooldown(rate=1, per=60, key=bypass_streamer)
+    async def fool(self, ctx: commands.Context):
+        if not await self.check_and_sub_points(ctx, 1000):
+            return
+        await self.bot.play_sound("my_sound//Дурак.ogg")
+
+    @twitch_command_aliased(name="сказочный")
+    @cooldown(rate=1, per=60, key=bypass_streamer)
+    async def skazochnij(self, ctx: commands.Context):
+        if not await self.check_and_sub_points(ctx, 2000):
+            return
+        await self.bot.play_sound("my_sound//Сказочный.mp3")
+
 
 async def setup(bot: commands.Bot):
     await bot.add_component(SLCog(bot))

@@ -157,6 +157,8 @@ class RadioTrackListener:
             )
 
     async def run(self):
+        return
+
         for station_id, station in self.stations.items():
             self.last_line[station_id] = ""
 
