@@ -8,7 +8,8 @@ from loguru import logger
 from twitchio.ext import commands
 from twitchio.ext.commands import Component, is_broadcaster
 
-from newbot import Bot, DuelStats
+from newbot import Bot
+from models import DuelStats
 from twitch_commands import twitch_command_aliased
 
 sys.path.append("..")
@@ -92,7 +93,7 @@ class DuelCog(Component):
         attacker_s = args[0].strip("@")
         attacker = attacker_s.lower()
 
-        if not attacker in self.attacks[defender]:
+        if attacker not in self.attacks[defender]:
             await ctx.send(f"{attacker_s} не вызывал на дуэль {defender_s}!")
             logger.info(self.attacks)
             return
@@ -117,7 +118,7 @@ class DuelCog(Component):
         attacker_name = args[0].strip("@")
         attacker_lower = attacker_name.lower()
 
-        if not attacker_lower in self.attacks[defender_lower]:
+        if attacker_lower not in self.attacks[defender_lower]:
             await ctx.send(f"{attacker_name} не вызывал на дуэль {defender_name}!")
             logger.info(self.attacks)
             return

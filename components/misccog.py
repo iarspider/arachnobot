@@ -5,6 +5,7 @@ import random
 import string
 from collections import deque
 
+import dbus
 import telegram
 import twitchio
 from loguru import logger
@@ -265,8 +266,8 @@ class MiscCog(commands.Component):
         # {ctx.author.display_name}!"))
         asyncio.ensure_future(
             ctx.reply(
-                f"Справка по командам ботика: "
-                f"https://iarspider.github.io/arachnobot/help"
+                "Справка по командам ботика: "
+                "https://iarspider.github.io/arachnobot/help"
             )
         )
 
@@ -327,7 +328,7 @@ class MiscCog(commands.Component):
             arg = ""
 
         if arg.startswith("+"):
-            if not ctx.author.name.lower() in rippers:
+            if ctx.author.name.lower() not in rippers:
                 await ctx.send("Недостаточно прав для выполнения этой команды")
                 return
             pearl = arg[1:].strip()
@@ -411,6 +412,25 @@ class MiscCog(commands.Component):
             await ctx.send(
                 f"Источник музыки: радио {self.bot.radio_station.capitalize()}"
             )
+
+    @is_broadcaster()
+    @twitch_command_aliased("next")
+    async def player_next(self, ctx: commands.Context):
+        if self.bot.radio_station != "vlc":
+            return
+
+        dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+        bus = dbus.SessionBus()
+
+        proxy = bus.get_object(
+            "org.mpris.MediaPlayer2.vlc",
+            "/org/mpris/MediaPlayer2",
+        )
+
+        props_iface = dbus.Interface(proxy, "org.mpris.MediaPlayer2.Player")
+        props_iface.Next()
+
+        await ctx.reply("Готово")
 
 
 # This is our entry point for the module.

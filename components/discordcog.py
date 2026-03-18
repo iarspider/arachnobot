@@ -1,9 +1,6 @@
-import asyncio
 import os
 import sys
 
-from loguru import logger
-from twitchio import Stream
 from twitchio.ext.commands import Component, is_broadcaster
 
 sys.path.append("..")
@@ -13,8 +10,7 @@ import datetime
 import json
 
 import pika
-from pytils import numeral
-from twitch_commands import twitch_command_aliased, check_sender
+from twitch_commands import twitch_command_aliased
 from twitchio.ext import commands
 
 

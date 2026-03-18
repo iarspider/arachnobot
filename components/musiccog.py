@@ -128,7 +128,7 @@ class MusicCog(Component):
             f"refesh_token post() done, response code is {response.status_code}"
         )
         if response.status_code == 200:
-            logger.debug(f"refresh_token: writing new token")
+            logger.debug("refresh_token: writing new token")
             data = response.json()
             self.token["access_token_expires"] = data["access_token_expires"]
             self.token["access_token"] = data["access_token"]
@@ -270,9 +270,9 @@ class MusicCog(Component):
                     )
                 else:
                     asyncio.ensure_future(
-                        channel.send(f"Спасибо кому-то за заказ музыки!")
+                        channel.send("Спасибо кому-то за заказ музыки!")
                     )
-                    logger.info(f"Спасибо кому-то за заказ музыки!")
+                    logger.info("Спасибо кому-то за заказ музыки!")
 
                 if self.bot.sio_server is not None:
                     # print(">> sio_server.emit start <<")

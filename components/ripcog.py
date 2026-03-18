@@ -4,12 +4,13 @@ import sys
 from pathlib import Path
 
 import socketio
+from black.trans import defaultdict
 from twitchio.ext import commands
 from twitchio.ext.commands import is_broadcaster, Component
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from newbot import ExtraRipCounter
+from models import ExtraRipCounter, BossStateEnum
 from twitch_commands import twitch_command_aliased
 import pytils
 
@@ -38,7 +39,15 @@ class RIPCog(Component):
         self.obscog: "OBSCog | None" = None
         self.observer: Observer | None = None
 
-        self.boss: str | None = None
+        # self.boss: str | None = None
+        self.boss_obj: ExtraRipCounter | None = None
+
+        self.prefix_char: defaultdict[BossStateEnum, str] = defaultdict(lambda: "?")
+
+        self.prefix_char[BossStateEnum.CURRENT] = "▶"
+        self.prefix_char[BossStateEnum.PAUSED] = "⏸"
+        self.prefix_char[BossStateEnum.DROPPED] = "❌"
+        self.prefix_char[BossStateEnum.DEFEATED] = "✔"
 
     @property
     def game(self):
@@ -103,11 +112,9 @@ class RIPCog(Component):
 
         if self.game.extra_rips.exists():
             with open("rip_boss.txt", "w", encoding="utf8") as f:
+
                 for xrc in self.game.extra_rips:
-                    if self.boss and xrc.name == self.boss:
-                        prefix = "▶"
-                    else:
-                        prefix = "✔"
+                    prefix = self.prefix_char[xrc.state]
 
                     count_str = pytils.numeral.get_plural(
                         xrc.cnt, ("трай", "трая", "траев"), "траев"
@@ -139,12 +146,12 @@ class RIPCog(Component):
         self.deaths["total"] += n
         self.deaths["total"] = max(0, self.deaths["total"])
 
-        if self.boss:
-            boss_obj: ExtraRipCounter
-            boss_obj, _ = ExtraRipCounter.get_or_create(game=self.game, name=self.boss)
-            boss_obj.cnt += n
-            boss_obj.cnt = max(0, boss_obj.cnt)
-            boss_obj.save()
+        if self.boss_obj:
+            #            boss_obj: ExtraRipCounter
+            #            boss_obj, _ = ExtraRipCounter.get_or_create(game=self.game, name=self.boss)
+            self.boss_obj.cnt += n
+            self.boss_obj.cnt = max(0, self.boss_obj.cnt)
+            self.boss_obj.save()
 
         await self.write_rip(n)
 
@@ -296,22 +303,33 @@ class RIPCog(Component):
             arg = ctx.message.text.split()[1]
         except (IndexError, ValueError):
             # await ctx.send("Usage: !boss name")
-            self.boss = ""
+            # self.boss = ""
+            if self.boss_obj:
+                self.boss_obj.state = BossStateEnum.PAUSED
+                self.boss_obj.save()
+
             await self.display_rip()
-            await ctx.reply(f"Босс больше не выбран")
+            await ctx.reply("Босс больше не выбран")
             return
         else:
-            self.boss = arg
+            if self.boss_obj:
+                self.boss_obj.state = BossStateEnum.PAUSED
+                self.boss_obj.save()
+
+            self.boss_obj, _ = ExtraRipCounter.get_or_create(game=self.game, name=arg)
+            self.boss_obj.state = BossStateEnum.CURRENT
+            self.boss_obj.save()
+
             await self.display_rip()
             await ctx.reply(f"Выбран босс {arg}")
 
     @is_broadcaster()
     @twitch_command_aliased("endboss", aliases=["unboss"])
     async def endboss(self, ctx: commands.Context):
-        if self.boss:
-            self.boss = ""
+        if self.boss_obj:
+            self.boss_obj.state = BossStateEnum.DEFEATED
             await self.display_rip()
-            await ctx.reply(f"Босс {self.boss} повержен!")
+            await ctx.reply(f"Босс {self.boss_obj.name} повержен!")
         else:
             await ctx.reply("Нет активного босса ☹️")
 

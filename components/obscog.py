@@ -24,7 +24,7 @@ from twitchio.ext import commands
 from twitchio.ext.commands import Component
 from twitchio.ext.commands import is_broadcaster
 
-from newbot import SourceConfig
+from models import SourceConfig
 from twitch_commands import twitch_command_aliased
 
 sys.path.append("..")
@@ -136,7 +136,7 @@ class OBSCog(Component):
                 if title:
                     title = title.value.decode("utf-8")
                     if title == target_title and not window_title_is_glob:
-                        logger.debug(f"Found window with matching title")
+                        logger.debug("Found window with matching title")
                         title_match = True
                     else:
                         if (
@@ -144,7 +144,7 @@ class OBSCog(Component):
                             and window_title_is_glob
                         ):
                             logger.debug(
-                                f"Found window with matching title (wildcard match)"
+                                "Found window with matching title (wildcard match)"
                             )
                             title_match = True
 
@@ -282,7 +282,7 @@ class OBSCog(Component):
             os.path.join(trailer_root, game_trailer_glob), recursive=False
         )
         if not files:
-            logger.info(f"No trailer found, will use screensaver")
+            logger.info("No trailer found, will use screensaver")
             files = [trailer_default]
         else:
             logger.info(f"Trailer will use the following file: {files[0]}")
@@ -824,6 +824,23 @@ class OBSCog(Component):
     @commands.cooldown(rate=1, per=30, key=sante_custom_key)
     async def sante(self, ctx: commands.Context):
         await self.bot.play_sound("my_sound//Sante.mp3")
+
+    @is_broadcaster()
+    @twitch_command_aliased(name="демо", aliases=["demo"])
+    async def demo(self, ctx: commands.Context):
+        try:
+            arg = ctx.message.text.split(maxsplit=1)[1]
+        except IndexError:
+            return
+
+        self.ws.call(
+            obsws_requests.SetInputSettings(
+                inputName="Game title",
+                inputSettings={
+                    "text": arg,
+                },
+            )
+        )
 
     @twitch_command_aliased(name="эксперименты")
     @commands.cooldown(rate=1, per=60, key=sante_custom_key)
