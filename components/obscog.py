@@ -295,9 +295,14 @@ class OBSCog(Component):
             )
         )
 
+        logger.info("Trailer loaded")
+
         self.show_hide_scene_item("Starting", "Screensaver", False)
         time.sleep(1)
         self.show_hide_scene_item("Starting", "Screensaver", True)
+
+        logger.info("Trailer reloaded")
+
         tags = [x for x in self.game.tags.split(";") if x]
         try:
             tags.remove("ИграюНеправильно")
@@ -308,13 +313,17 @@ class OBSCog(Component):
             logger.debug("Set tags", tags)
             await ctx.broadcaster.modify_channel(tags=tags)
 
+        logger.info("Tags loaded")
+
+        subprocess.run(["./toggle_aec.sh", "on" if self.game.aec else "off"])
+
+        logger.info("AEC configured")
+
         await ctx.reply(
             "К стриму готов! | {0}... | {1}".format(
                 self.bot.title.split("|")[0], self.bot.game.game
             )
         )
-
-        subprocess.run(["./toggle_aec.sh", "on" if self.game.aec else "off"])
 
         self.event.set()
 
