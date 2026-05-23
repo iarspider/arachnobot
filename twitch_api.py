@@ -176,3 +176,111 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+"""
+import asyncio
+import logging
+import os
+import webbrowser
+
+import simplejson
+from authlib.integrations.httpx_client import AsyncOAuth2Client
+
+SCOPE = [
+    "channel:edit:commercial",
+    "channel:moderate",
+    "channel:read:redemptions",
+    "chat:edit",
+    "chat:read",
+    "moderator:manage:banned_users",
+]
+
+TOKEN_FILE = "twitch_api_token.json"
+
+AUTHORIZE_URL = "https://id.twitch.tv/oauth2/authorize"
+TOKEN_URL = "https://id.twitch.tv/oauth2/token"
+VALIDATE_URL = "https://id.twitch.tv/oauth2/validate"
+
+
+def token_saver(token):
+    with open(TOKEN_FILE, "w") as f:
+        simplejson.dump(token, f)
+
+
+async def get_token(client_id: str, client_secret: str, redirect_uri: str) -> dict:
+    async with AsyncOAuth2Client(
+        client_id=client_id,
+        redirect_uri=redirect_uri,
+        scope=" ".join(SCOPE),
+    ) as oauth:
+        authorization_url, state = oauth.create_authorization_url(AUTHORIZE_URL)
+        webbrowser.open_new(authorization_url)
+
+        authorization_response = input("Enter the full callback URL: ").strip()
+
+        token = await oauth.fetch_token(
+            TOKEN_URL,
+            authorization_response=authorization_response,
+            client_secret=client_secret,
+            include_client_id=True,
+            force_querystring=True,
+        )
+
+    token_saver(token)
+    return token
+
+
+async def validate(oauth: AsyncOAuth2Client, can_refresh: bool = True) -> None:
+    try:
+        response = await oauth.get(
+            VALIDATE_URL,
+            headers={"Authorization": f'OAuth {oauth.token["access_token"]}'},
+        )
+        response.raise_for_status()
+    except Exception as e:
+        if can_refresh:
+            client_id = os.getenv("TWITCH_CLIENT_ID")
+            client_secret = os.getenv("TWITCH_CLIENT_SECRET")
+            redirect_uri = "https://iarazumov.com/oauth/twitch"
+
+            token = await oauth.refresh_token(
+                TOKEN_URL,
+                client_id=client_id,
+                client_secret=client_secret,
+            )
+            token_saver(token)
+
+            new_oauth = await get_session(client_id, client_secret, redirect_uri)
+            await validate(new_oauth, can_refresh=False)
+        else:
+            logging.fatal("Validation failed: " + str(e))
+            raise RuntimeError("Validation failed")
+
+
+async def get_session(
+    client_id: str, client_secret: str, redirect_uri: str
+) -> AsyncOAuth2Client:
+    try:
+        with open(TOKEN_FILE, "r") as f:
+            token = simplejson.load(f)
+    except (OSError, simplejson.JSONDecodeError, FileNotFoundError):
+        print("Failed to load token!")
+        token = await get_token(client_id, client_secret, redirect_uri)
+
+    oauth = AsyncOAuth2Client(
+        client_id=client_id,
+        client_secret=client_secret,
+        token=token,
+        redirect_uri=redirect_uri,
+        scope=" ".join(SCOPE),
+        token_endpoint=TOKEN_URL,
+        update_token=token_saver,
+    )
+
+    await validate(oauth)
+    return oauth
+"""
+
+# force_querystring. Этого параметра нет в authlib. Если Twitch требует передавать код в query string,
+# а не в теле — скорее всего, это уже делается по умолчанию через authorization_response. Если возникнут проблемы,
+# можно разобрать URL вручную и передать code явно.

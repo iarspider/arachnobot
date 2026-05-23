@@ -13,6 +13,7 @@ from collections import defaultdict
 from multiprocessing import Process
 from typing import Optional, List, Dict
 
+import requests
 import socketio
 import twitchio
 import uvicorn
@@ -22,7 +23,7 @@ from pytils import numeral
 from requests.structures import CaseInsensitiveDict
 from twitchio import eventsub, Client, Chatter, Stream, HTTPException
 from twitchio.ext import commands
-from twitchio.ext.commands import CommandErrorPayload, CommandOnCooldown
+from twitchio.ext.commands import CommandErrorPayload, CommandOnCooldown, GuardFailure
 
 # import nightbot_api
 from aio_timer import Periodic
@@ -211,7 +212,10 @@ class Bot(commands.Bot):
     async def get_announce_text(self, now_=False):
         await self.get_game_v5()
 
-        delta = self.countdown_to - datetime.datetime.now()
+        delta = self.countdown_to - datetime.datetime.now().astimezone()
+        if delta.total_seconds() < 0:
+            return ""
+
         delta_m = delta.seconds // 60
         if delta_m > 0 and not now_:
             delta_text = "примерно " + numeral.get_plural(
@@ -406,6 +410,18 @@ class Bot(commands.Bot):
         ):
             self.greeted.add(name)
             self.greeted.add(display_name)
+            fancy_name = user.display_name or user.name
+            resp = requests.post(
+                f"https://stars.iarazumov.com/viewer/{fancy_name}/mark",
+                headers={"Authorization": os.getenv("STARS_TOKEN")},
+            )
+            try:
+                resp.raise_for_status()
+            except Exception as e:
+                logger.opt(exception=e).exception(
+                    f"Failed to add star for user {fancy_name}!"
+                )
+
             if user.subscriber or user.founder:
                 logger.info("Start custom greeter")
                 if os.path.exists(f"greetings//{name.lower()}.mp3"):
@@ -561,6 +577,13 @@ class Bot(commands.Bot):
             payload=subscription, as_bot=False, token_for=OWNER_ID
         )
 
+        subscription = eventsub.ChannelRaidSubscription(
+            from_broadcaster_user_id=OWNER_ID
+        )
+        await self.subscribe_websocket(
+            payload=subscription, as_bot=False, token_for=OWNER_ID
+        )
+
     async def add_token(
         self, token: str, refresh: str
     ) -> twitchio.authentication.ValidateTokenPayload:
@@ -602,6 +625,8 @@ class Bot(commands.Bot):
             await payload.context.reply(
                 f"Подожди {payload.exception.remaining:.0f} сек. перед повторным использованием команды"
             )
+        elif isinstance(payload.exception, GuardFailure):
+            await payload.context.reply(f"Эта кнопочка не для тебя!")
         else:
             await super().event_command_error(payload)
 

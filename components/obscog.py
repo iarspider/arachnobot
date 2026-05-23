@@ -21,7 +21,7 @@ from obswebsocket import obsws
 from obswebsocket import requests as obsws_requests
 from pytils import numeral
 from twitchio.ext import commands
-from twitchio.ext.commands import Component
+from twitchio.ext.commands import Component, Context
 from twitchio.ext.commands import is_broadcaster
 
 from models import SourceConfig
@@ -361,11 +361,13 @@ class OBSCog(Component):
             if len(parts) == 2:
                 m, s = parts
                 # noinspection PyShadowingNames
-                end_time = datetime.timedelta(minutes=m, seconds=s)
-                end_time = datetime.datetime.now() + end_time
+                delta = datetime.timedelta(minutes=m, seconds=s)
+                end_time = datetime.datetime.now().astimezone() + delta
             elif len(parts) == 3:
                 h, m, s = parts
-                end_time = datetime.datetime.now().replace(hour=h, minute=m, second=s)
+                today = datetime.date.today()
+                time_ = datetime.time(hour=h, minute=m, second=s)
+                end_time = datetime.datetime.combine(today, time_).astimezone()
             else:
                 self.bot.logger.error("Invalid call to countdown: {0}".format(args[0]))
                 return
@@ -433,10 +435,23 @@ class OBSCog(Component):
 
         asyncio.ensure_future(self.bot.my_run_commercial(self.bot.owner_id))
 
-        now = datetime.datetime.now()
+        now = datetime.datetime.now().astimezone()
         dt = self.bot.countdown_to - now
 
         asyncio.ensure_future(self.hide_zeroes(dt.seconds))
+
+        today = now.date()
+        resp = requests.post(
+            f"https://stars.iarazumov.com/stream/{today.strftime("%Y-%m-%d")}/start",
+            json={"name": self.bot.title},
+            headers={"Authorization": os.getenv("STARS_TOKEN")},
+        )
+
+        try:
+            resp.raise_for_status()
+        except Exception as e:
+            logger.opt(exception=e).exception("Failed to register stream!")
+
         # @routines.routine(seconds=s, minutes=m, hours=h, wait_first=True,
         # iterations=1)
 
@@ -547,45 +562,12 @@ class OBSCog(Component):
         self.set_music_source("")
         await self.bot.update_track_text()
 
+        await self.bot.get_game_v5()
+
         # if self.bot.game.use_game_capture:
         self.show_hide_scene_item("Game", "Game Capture", True)
         self.show_hide_scene_item("Game", "Window Capture", False)
-        if self.bot.game.obs_window != "X":
-            source: obsws_requests.GetInputSettings = self.ws.call(
-                obsws_requests.GetInputSettings(inputName="Game Capture")
-            )
-            settings = source.getInputSettings()
-            parts = self.bot.game.obs_window.split("\r\n")
-            while len(parts) < 3:
-                parts.append("")
-
-            win, pid = OBSCog.find_window_by_title_and_class(
-                parts[1], parts[2], self.bot.game.obs_window_title_glob
-            )
-            if win is None:
-                logger.error(f"Can't find window title={parts[1]}, class={parts[2]}!")
-                await ctx.send("Окно игры не найдено")
-            else:
-                settings["capture_window"] = f"{win.id}"
-                self.ws.call(
-                    obsws_requests.SetInputSettings(
-                        inputName="Game Capture",
-                        inputSettings=settings,
-                        overlay=False,
-                    )
-                )
-                await ctx.send("Захват окна настроен")
-
-                if pid:
-                    OBSCog.move_pid_to_sink(pid, "GameSink")
-                    await ctx.send("Захват звука настроен")
-                else:
-                    logger.error(f"Window {win} {win.id} doesn't have a pid!")
-                    await ctx.send("Процесс игры не найден!")
-                logger.debug(f"Set capture window to {settings['capture_window']}")
-        # else:
-        #     self.show_hide_scene_item("Game", "Game Capture", False)
-        #     self.show_hide_scene_item("Game", "Window Capture", True)
+        await self.set_capture_window(ctx)
 
         scene_obj: SourceConfig
         for scene_obj in SourceConfig.select(
@@ -626,6 +608,44 @@ class OBSCog(Component):
         await asyncio.sleep(5)
 
         self.ws_call(obsws_requests.StartRecord())
+
+    async def set_capture_window(self, ctx: Context):
+        if self.bot.game.obs_window != "X":
+            source: obsws_requests.GetInputSettings = self.ws.call(
+                obsws_requests.GetInputSettings(inputName="Game Capture")
+            )
+            settings = source.getInputSettings()
+            parts = self.bot.game.obs_window.split("\r\n")
+            while len(parts) < 3:
+                parts.append("")
+
+            win, pid = OBSCog.find_window_by_title_and_class(
+                parts[1], parts[2], self.bot.game.obs_window_title_glob
+            )
+            if win is None:
+                logger.error(f"Can't find window title={parts[1]}, class={parts[2]}!")
+                await ctx.send("Окно игры не найдено")
+            else:
+                settings["capture_window"] = f"{win.id}"
+                self.ws.call(
+                    obsws_requests.SetInputSettings(
+                        inputName="Game Capture",
+                        inputSettings=settings,
+                        overlay=False,
+                    )
+                )
+                await ctx.send("Захват окна настроен")
+
+                if pid:
+                    OBSCog.move_pid_to_sink(pid, "GameSink")
+                    await ctx.send("Захват звука настроен")
+                else:
+                    logger.error(f"Window {win} {win.id} doesn't have a pid!")
+                    await ctx.send("Процесс игры не найден!")
+                logger.debug(f"Set capture window to {settings['capture_window']}")
+        # else:
+        #     self.show_hide_scene_item("Game", "Game Capture", False)
+        #     self.show_hide_scene_item("Game", "Window Capture", True)
 
     @is_broadcaster()
     @twitch_command_aliased(name="resume")
@@ -679,6 +699,9 @@ class OBSCog(Component):
             return
 
         self.switch_to("Game")
+        # self.show_hide_scene_item("Game", "Game Capture", True)
+        # self.show_hide_scene_item("Game", "Window Capture", False)
+        await self.set_capture_window(ctx)
 
         try:
             res = await self.bot.my_get_stream()
@@ -796,8 +819,7 @@ class OBSCog(Component):
     @is_broadcaster()
     @twitch_command_aliased(name="save")
     async def save_window(self, ctx: commands.Context):
-        if self.bot.game is None:
-            self.bot.get_game_v5()
+        await self.bot.get_game_v5()
 
         source = self.ws.call(obsws_requests.GetInputSettings(inputName="Game Capture"))
 
