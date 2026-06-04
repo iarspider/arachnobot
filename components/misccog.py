@@ -9,6 +9,7 @@ import dbus
 import telegram
 import twitchio
 from loguru import logger
+import requests
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from twitchio.ext import commands
 from twitchio.ext.commands import is_broadcaster
@@ -77,6 +78,21 @@ class MiscCog(commands.Component):
     async def cmd_ping(self, ctx: commands.Context):
         await ctx.send("Yeth, Mathter?")
 
+    @commands.Component.listener()
+    async def event_raid(self, _: twitchio.ChannelRaid):
+        if self.bot.game.stars:
+            today = datetime.date.today()
+            resp = requests.post(
+                f"https://stars.iarazumov.com/stream/{today.strftime("%Y-%m-%d")}/end",
+                json={"name": self.bot.title},
+                headers={"Authorization": os.getenv("STARS_TOKEN")},
+            )
+
+            try:
+                resp.raise_for_status()
+            except Exception as e:
+                logger.opt(exception=e).exception("Failed to register stream!")
+
     # noinspection PyUnusedLocal
     @commands.Component.listener()
     async def event_stream_online(self, payload: twitchio.StreamOnline) -> None:
@@ -90,6 +106,9 @@ class MiscCog(commands.Component):
         )
 
         ann_texts = await self.bot.get_announce_text()
+        if not ann_texts:
+            logger.info("get_announce_text returned empty string - skipping announce")
+            return
 
         logger.info("Getting Discord cog...")
         discord_cog = self.bot.get_component("DiscordCog")

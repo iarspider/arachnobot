@@ -44,6 +44,8 @@ lxml = "^6.0.2"
 fake-useragent = "^2.2.0"
 httpx-oauth = "^0.16.1"
 peewee-enum-field = "^0.2.0"
+pydantic = "^2.13.3"
+pydantic-settings = "^2.14.0"
 
 
 
