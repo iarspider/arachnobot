@@ -440,17 +440,18 @@ class OBSCog(Component):
 
         asyncio.ensure_future(self.hide_zeroes(dt.seconds))
 
-        today = now.date()
-        resp = requests.post(
-            f"https://stars.iarazumov.com/stream/{today.strftime("%Y-%m-%d")}/start",
-            json={"name": self.bot.title},
-            headers={"Authorization": os.getenv("STARS_TOKEN")},
-        )
+        if self.bot.game.stars:
+            today = now.date()
+            resp = requests.post(
+                f"https://stars.iarazumov.com/stream/{today.strftime("%Y-%m-%d")}/start",
+                json={"name": self.bot.title},
+                headers={"Authorization": os.getenv("STARS_TOKEN")},
+            )
 
-        try:
-            resp.raise_for_status()
-        except Exception as e:
-            logger.opt(exception=e).exception("Failed to register stream!")
+            try:
+                resp.raise_for_status()
+            except Exception as e:
+                logger.opt(exception=e).exception("Failed to register stream!")
 
         # @routines.routine(seconds=s, minutes=m, hours=h, wait_first=True,
         # iterations=1)

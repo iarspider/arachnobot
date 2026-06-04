@@ -79,18 +79,19 @@ class MiscCog(commands.Component):
         await ctx.send("Yeth, Mathter?")
 
     @commands.Component.listener()
-    async def event_raid(self, payload: twitchio.ChannelRaid):
-        today = datetime.date.today()
-        resp = requests.post(
-            f"https://stars.iarazumov.com/stream/{today.strftime("%Y-%m-%d")}/end",
-            json={"name": self.bot.title},
-            headers={"Authorization": os.getenv("STARS_TOKEN")},
-        )
+    async def event_raid(self, _: twitchio.ChannelRaid):
+        if self.bot.game.stars:
+            today = datetime.date.today()
+            resp = requests.post(
+                f"https://stars.iarazumov.com/stream/{today.strftime("%Y-%m-%d")}/end",
+                json={"name": self.bot.title},
+                headers={"Authorization": os.getenv("STARS_TOKEN")},
+            )
 
-        try:
-            resp.raise_for_status()
-        except Exception as e:
-            logger.opt(exception=e).exception("Failed to register stream!")
+            try:
+                resp.raise_for_status()
+            except Exception as e:
+                logger.opt(exception=e).exception("Failed to register stream!")
 
     # noinspection PyUnusedLocal
     @commands.Component.listener()
