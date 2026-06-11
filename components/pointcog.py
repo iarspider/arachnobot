@@ -61,14 +61,16 @@ class PointCog(Component):
     async def emit(self, item):
         if self.bot.sio_server is not None:
             self.bot.pubsub_events.append(item)
-            await self.bot.sio_server.emit(item["action"], item["value"])
+            await self.bot.sio_server.emit(
+                item["action"], item["value"], namespace="/dashboard"
+            )
 
     @commands.Component.listener()
     async def event_custom_redemption_add(
         self, payload: twitchio.ChannelPointsRedemptionAdd
     ) -> None:
         logger.info(
-            f"{payload.user!r} has redeemed {payload.reward.title} ({payload.reward.id}) at {payload.timestamp}"
+            f"{payload.user.name} has redeemed {payload.reward.title} ({payload.reward.id}) at {payload.timestamp}"
         )
 
     @commands.reward_command(

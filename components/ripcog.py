@@ -126,14 +126,20 @@ class RIPCog(Component):
 
         if self.sio_server:
             if self.bot.game.rip_enabled:
-                await self.sio_server.emit("toggle_death_counter", 1)
+                await self.sio_server.emit(
+                    "toggle_death_counter", 1, namespace="/overlay"
+                )
                 data = {
                     "text": text,
                     "animation": 0 if n == 0 else n // abs(n),
                 }
-                await self.sio_server.emit("update_death_count", data)
+                await self.sio_server.emit(
+                    "update_death_count", data, namespace="/overlay"
+                )
             else:
-                await self.sio_server.emit("toggle_death_counter", 0)
+                await self.sio_server.emit(
+                    "toggle_death_counter", 0, namespace="/overlay"
+                )
 
     async def write_rip(self, n=0):
         await self.display_rip(n)
@@ -273,8 +279,8 @@ class RIPCog(Component):
         self.bot.game.rip_enabled = True
         self.bot.game.save()
 
-        if self.bot.sio_server:
-            await self.bot.sio_server.emit("toggle_death_counter", 1)
+        if self.sio_server:
+            await self.sio_server.emit("toggle_death_counter", 1, namespace="/overlay")
         else:
             await self.obscog.enable_rip(True)
 
@@ -290,8 +296,8 @@ class RIPCog(Component):
         self.bot.game.rip_enabled = False
         self.bot.game.save()
 
-        if self.bot.sio_server:
-            await self.bot.sio_server.emit("toggle_death_counter", 0)
+        if self.sio_server:
+            await self.sio_server.emit("toggle_death_counter", 0, namespace="/overlay")
         else:
             await self.obscog.enable_rip(False)
         await ctx.send("Счётчик смертей отключён")

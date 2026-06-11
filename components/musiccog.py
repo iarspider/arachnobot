@@ -277,7 +277,9 @@ class MusicCog(Component):
                 if self.bot.sio_server is not None:
                     # print(">> sio_server.emit start <<")
                     asyncio.ensure_future(
-                        self.bot.sio_server.emit(item["action"], item["value"])
+                        self.bot.sio_server.emit(
+                            item["action"], item["value"], namespace="/dashboard"
+                        )
                     )
                     # print(">> sio_server.emit end <<")
                 else:

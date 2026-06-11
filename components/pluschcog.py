@@ -28,7 +28,9 @@ class PluschCog(Component):
         if self.bot.sio_server:
             asyncio.ensure_future(
                 self.bot.sio_server.emit(
-                    "update_plush_count", {"text": text, "animate": not init}
+                    "update_plush_count",
+                    {"text": text, "animate": not init},
+                    namespace="/overlay",
                 )
             )
 

@@ -234,7 +234,7 @@ class SLCog(Component):
 
     @twitch_command_aliased(
         name="post",
-        aliases=("почта", "голос"),
+        aliases=("почта", "голос", "Почта", "почка", "Почка"),
     )
     @cooldown(rate=1, per=60, key=bypass_streamer)
     async def post(self, ctx: commands.Context):
@@ -247,10 +247,10 @@ class SLCog(Component):
         if not await self.check_and_sub_points(ctx, post_price):
             return
 
-        if self.bot.sio_server:
+        if self.bot.overlay is not None:
             logger.info("Send tts event to overlay")
             await self.bot.play_sound("my_sound//ding-sound-effect_1.mp3")
-            await self.bot.sio_server.emit("tts", post_message)
+            await self.bot.sio_server.emit("tts", post_message, namespace="/overlay")
             logger.info("TTS sent to overlay")
         else:
             if await self.say(post_message):
@@ -342,6 +342,13 @@ class SLCog(Component):
             return
         await self.bot.play_sound("my_sound//scary.ogg")
 
+    @twitch_command_aliased(name="nope")
+    @cooldown(rate=1, per=60, key=bypass_streamer)
+    async def nope(self, ctx: commands.Context):
+        if not await self.check_and_sub_points(ctx, 500):
+            return
+        await self.bot.play_sound("my_sound//nope.mp3")
+
     @twitch_command_aliased(name="дурак")
     @cooldown(rate=1, per=60, key=bypass_streamer)
     async def fool(self, ctx: commands.Context):
@@ -355,6 +362,13 @@ class SLCog(Component):
         if not await self.check_and_sub_points(ctx, 2000):
             return
         await self.bot.play_sound("my_sound//Сказочный.mp3")
+
+    @twitch_command_aliased(name="неприятности", aliases=["гав"])
+    @cooldown(rate=1, per=60, key=bypass_streamer)
+    async def troubles(self, ctx: commands.Context):
+        if not await self.check_and_sub_points(ctx, 500):
+            return
+        await self.bot.play_sound("my_sound//неприятности.mp3")
 
 
 async def setup(bot: commands.Bot):

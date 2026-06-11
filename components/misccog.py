@@ -309,7 +309,9 @@ class MiscCog(commands.Component):
             },
         }
         if self.bot.sio_server is not None:
-            await self.bot.sio_server.emit(item["action"], item["value"])
+            await self.bot.sio_server.emit(
+                item["action"], item["value"], namespace="/dashboard"
+            )
         else:
             logger.warning("send_viewer_joined: sio_server is none!")
 
@@ -319,7 +321,9 @@ class MiscCog(commands.Component):
         arg = ctx.message.text.split()[1]
         item = {"action": "remove", "value": arg}
         if self.bot.sio_server is not None:
-            await self.bot.sio_server.emit(item["action"], item["value"])
+            await self.bot.sio_server.emit(
+                item["action"], item["value"], namespace="/dashboard"
+            )
         else:
             logger.warning("send_viewer_joined: sio_server is none!")
 
@@ -398,7 +402,7 @@ class MiscCog(commands.Component):
 
         obs_cog.set_music_source("vlc")
         if self.bot.sio_server:
-            await self.bot.sio_server.emit("track_show")
+            await self.bot.sio_server.emit("track_show", namespace="/overlay")
 
     @is_broadcaster()
     @twitch_command_aliased("radio")
@@ -414,7 +418,7 @@ class MiscCog(commands.Component):
 
         if self.bot.radio_station == "none":
             if self.bot.sio_server:
-                await self.bot.sio_server.emit("track_hide")
+                await self.bot.sio_server.emit("track_hide", namespace="/overlay")
             await ctx.send("Музыка отключена")
 
         if self.bot.radio_station not in ("rock", "symphony"):
@@ -427,7 +431,7 @@ class MiscCog(commands.Component):
         await self.bot.update_track_text()
         if self.bot.radio_station:
             if self.bot.sio_server:
-                await self.bot.sio_server.emit("track_show")
+                await self.bot.sio_server.emit("track_show", namespace="/overlay")
             await ctx.send(
                 f"Источник музыки: радио {self.bot.radio_station.capitalize()}"
             )

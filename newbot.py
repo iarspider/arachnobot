@@ -187,6 +187,7 @@ class Bot(commands.Bot):
         self.last_messages = CaseInsensitiveDict()  # ! keep this here !
 
         self.dashboard: List[int] = []
+        self.overlay: int | None = None
 
         # self.player = sounds.AudioPlayer(callback=self.player_done)
         self.started = False
@@ -203,7 +204,7 @@ class Bot(commands.Bot):
         self.play_sound_lock = asyncio.Lock()
         self.current_sound = ""
 
-        self.bot_ready = False
+        self.bot_ready = asyncio.Event()
 
         self.radio_station = ""
         self.radio_now_playing: dict[str, str] = {}
@@ -242,10 +243,32 @@ class Bot(commands.Bot):
 
     async def play_sound(self, sound: str | bytes, is_temporary: bool = False):
         logger.info("play_sound - waiting for lock")
-        await self.play_sound_lock.acquire()
+        # await self.play_sound_lock.acquire()
+        try:
+            await asyncio.wait_for(self.play_sound_lock.acquire(), 10)
+        except TimeoutError:
+            logger.warning(
+                "Timed out waiting for play_sound_lock, force-releasing the lock"
+            )
+            self.play_sound_lock.release()
+
         logger.info("play_sound - lock acquired")
 
-        if not self.sio_server:
+        if self.overlay is not None:
+            logger.info(f"Playing sound {sound} using dashboard")
+            with open(sound, "rb") as mp3_file:
+                chunk_size = 4096  # Size of each chunk
+                while True:
+                    chunk = mp3_file.read(chunk_size)
+                    if not chunk:
+                        break
+                    logger.debug("Sending chunk...")
+                    await self.sio_server.emit("mp3_chunk", chunk, namespace="/overlay")
+                    logger.debug("Chunk sent")
+                logger.debug("Sending mp3_end...")
+                await self.sio_server.emit("mp3_end", namespace="/overlay")
+                logger.debug("Sending mp3_end - done")
+        else:
             logger.info("Playing sound", sound, "using mplayer")
             self.current_sound = ""
 
@@ -259,22 +282,6 @@ class Bot(commands.Bot):
                 f"play sound from{' temporary' if is_temporary else ''} {soundfile}"
             )
             await self.bot_play_sound(soundfile)
-        else:
-            logger.info(f"Playing sound {sound} using dashboard")
-            with open(sound, "rb") as mp3_file:
-                chunk_size = 4096  # Size of each chunk
-                while True:
-                    chunk = mp3_file.read(chunk_size)
-                    if not chunk:
-                        break
-                    logger.debug("Sending chunk...")
-                    await self.sio_server.emit("mp3_chunk", chunk)
-                    logger.debug("Chunk sent")
-                logger.debug("Sending mp3_end...")
-                await self.sio_server.emit(
-                    "mp3_end",
-                )
-                logger.debug("Sending mp3_end - done")
 
     # TODO: Temporary solution until implemented upstream
     async def bot_play_sound(self, filename: str):
@@ -410,17 +417,19 @@ class Bot(commands.Bot):
         ):
             self.greeted.add(name)
             self.greeted.add(display_name)
-            fancy_name = user.display_name or user.name
-            resp = requests.post(
-                f"https://stars.iarazumov.com/viewer/{fancy_name}/mark",
-                headers={"Authorization": os.getenv("STARS_TOKEN")},
-            )
-            try:
-                resp.raise_for_status()
-            except Exception as e:
-                logger.opt(exception=e).exception(
-                    f"Failed to add star for user {fancy_name}!"
+
+            if self.game.stars:
+                fancy_name = user.display_name or user.name
+                resp = requests.post(
+                    f"https://stars.iarazumov.com/viewer/{fancy_name}/mark",
+                    headers={"Authorization": os.getenv("STARS_TOKEN")},
                 )
+                try:
+                    resp.raise_for_status()
+                except Exception as e:
+                    logger.opt(exception=e).exception(
+                        f"Failed to add star for user {fancy_name}!"
+                    )
 
             if user.subscriber or user.founder:
                 logger.info("Start custom greeter")
@@ -497,7 +506,9 @@ class Bot(commands.Bot):
             },
         }
         if self.sio_server is not None:
-            await self.sio_server.emit(item["action"], item["value"], to=sid)
+            await self.sio_server.emit(
+                item["action"], item["value"], namespace="/dashboard"
+            )
         else:
             logger.warning("send_viewer_joined: sio_server is none!")
 
@@ -527,7 +538,11 @@ class Bot(commands.Bot):
 
         for item in self.pubsub_events:
             tasks.append(
-                asyncio.create_task(self.sio_server.emit(item["action"], item["value"]))
+                asyncio.create_task(
+                    self.sio_server.emit(
+                        item["action"], item["value"], namespace="/dashboard"
+                    )
+                )
             )
 
         # noinspection PySimplifyBooleanCheck
@@ -615,7 +630,7 @@ class Bot(commands.Bot):
 
     async def event_ready(self) -> None:
         logger.info(f"Ready | {self.bot_id}")
-        self.bot_ready = True
+        self.bot_ready.set()
         await self.get_game_v5()
 
     # endregion
@@ -635,7 +650,7 @@ class Bot(commands.Bot):
             logger.warning("sio_server is none!")
             return
         if twitch_bot.radio_station:
-            await self.sio_server.emit("track_show")
+            await self.sio_server.emit("track_show", namespace="/overlay")
             await self.sio_server.emit(
                 "track_update",
                 {
@@ -644,10 +659,11 @@ class Bot(commands.Bot):
                         self.radio_station, ""
                     ),
                 },
+                namespace="/overlay",
             )
 
         else:
-            await self.sio_server.emit("track_hide")
+            await self.sio_server.emit("track_hide", namespace="/overlay")
 
 
 def main() -> None:
@@ -677,30 +693,43 @@ def main() -> None:
     server = uvicorn.Server(config)
 
     # noinspection PyUnresolvedReferences,PyUnusedLocal
-    @sio_server.on("connect")
-    async def on_ws_connected(sid, _):
+    @sio_server.on("connect", namespace="/overlay")
+    async def on_overlay_connected(sid, _):
         global twitch_bot
-        while not twitch_bot.bot_ready:
-            await asyncio.sleep(0.1)
+        await twitch_bot.bot_ready.wait()
+        twitch_bot.overlay = sid
 
-        twitch_bot.dashboard.append(sid)
-        asyncio.ensure_future(twitch_bot.on_dashboard_connected(sid))
-        logger.info(f"Dashboard connected with id {sid}")
+        logger.info(f"Overlay connected with id {sid}")
         ripcog: "RIPCog" = twitch_bot.get_component("RIPCog")
         await ripcog.display_rip()
         plushchcog = twitch_bot.get_component("PluschCog")
         plushchcog.write_plusch(init=True)
         await twitch_bot.update_track_text()
 
-    @sio_server.on("disconnect")
-    async def on_ws_disconnected(sid):
+    @sio_server.on("connect", namespace="/dashboard")
+    async def on_dashboard_connected(sid, _):
+        global twitch_bot
+        # while not twitch_bot.bot_ready:
+        #     await asyncio.sleep(0.1)
+        await twitch_bot.bot_ready.wait()
+
+        twitch_bot.dashboard.append(sid)
+        asyncio.ensure_future(twitch_bot.on_dashboard_connected(sid))
+        logger.info(f"Dashboard connected with id {sid}")
+
+    @sio_server.on("disconnect", namespace="/dashboard")
+    async def on_dashboard_disconnected(sid):
         global twitch_bot
         if sid in twitch_bot.dashboard:
             logger.warning(f"Dashboard {sid} disconnected!")
             twitch_bot.dashboard.remove(sid)
 
+    @sio_server.on("disconnect", namespace="/overlay")
+    async def on_overlay_disconnected(_):
+        twitch_bot.overlay = None
+
     # noinspection PyUnresolvedReferences,PyUnusedLocal
-    @sio_server.on("rip")
+    @sio_server.on("rip", namespace="/dashboard")
     async def on_ws_rip(sid):
         logger.info("Received message: rip")
         ripcog: "RIPCog" = twitch_bot.get_component("RIPCog")
@@ -708,7 +737,7 @@ def main() -> None:
         await twitch_bot.send_message(msg)
 
     # noinspection PyUnresolvedReferences,PyUnusedLocal
-    @sio_server.on("unrip")
+    @sio_server.on("unrip", namespace="/dashboard")
     async def on_ws_unrip(sid):
         logger.info("Received message: unrip")
         ripcog: "RIPCog" = twitch_bot.get_component("RIPCog")
@@ -716,7 +745,7 @@ def main() -> None:
         await twitch_bot.send_message(msg)
 
     # noinspection PyUnresolvedReferences,PyUnusedLocal
-    @sio_server.on("break")
+    @sio_server.on("break", namespace="/dashboard")
     async def on_ws_break(sid):
         logger.info("Received message: break")
         cog: "OBSCog" = twitch_bot.get_component("OBSCog")
@@ -724,17 +753,16 @@ def main() -> None:
         await twitch_bot.send_message("Начать перепись населения!")
 
     # noinspection PyUnresolvedReferences,PyUnusedLocal
-    @sio_server.on("resume")
+    @sio_server.on("resume", namespace="/dashboard")
     async def on_ws_resume(sid):
         logger.info("Received message: resume")
         cog: "OBSCog" = twitch_bot.get_component("OBSCog")
         msg = await cog.do_resume(None)
         await twitch_bot.send_message(msg)
 
-    @sio_server.on("audioFinished")
-    async def on_ws_audio_finished(sid):
-        _ = sid
-        logger.info("Received message: audioFinished")
+    @sio_server.on("audioFinished", namespace="/overlay")
+    async def on_ws_audio_finished(sid, *_):
+        logger.info(f"Received message: audioFinished from {sid}")
         twitch_bot.play_sound_lock.release()
 
     # noinspection PyUnresolvedReferences,PyUnusedLocal
@@ -748,7 +776,7 @@ def main() -> None:
         logger.warning("sio_server is none!")
 
     twitch_bot = Bot(token_filename="twitch_token.json", sio_server_=sio_server)
-    listener = VLCTrackListener()
+    vlc_listener = VLCTrackListener()
     radio_listener = RadioTrackListener()
 
     async def vlc_consumer(listener_: VLCTrackListener, twitch_bot_: Bot):
@@ -798,8 +826,8 @@ def main() -> None:
             tg.create_task(twitch_bot.start())
             tg.create_task(server.serve())
             tg.create_task(keyboard_listener(twitch_bot))
-            tg.create_task(listener.run())
-            tg.create_task(vlc_consumer(listener, twitch_bot))
+            tg.create_task(vlc_listener.run())
+            tg.create_task(vlc_consumer(vlc_listener, twitch_bot))
             tg.create_task(radio_listener.run())
             tg.create_task(radio_consumer(radio_listener, twitch_bot))
 
@@ -893,129 +921,3 @@ if __name__ == "__main__":
     load_dotenv()
     patch_socketio()
     main()
-
-'''
-import asyncio
-import uuid
-from typing import AsyncIterable, Optional, Union, Callable, Awaitable, BinaryIO
-
-class SoundManager:
-    def __init__(self, ws_client, *, ack_timeout: float = 15.0):
-        self.ws = ws_client  # должен уметь send_json / send_bytes
-        self.ack_timeout = ack_timeout
-        self._lock = asyncio.Lock()
-        self._pending_acks: dict[str, asyncio.Event] = {}
-        # на случай reconnect — можно держать флаг готовности
-        self._overlay_ready = asyncio.Event()
-
-    # вызывать при установке WS-соединения оверлеем
-    def on_overlay_ready(self):
-        self._overlay_ready.set()
-
-    # вызывать из WS-ридера при сообщении типа {"type":"sound_done","id": "..."}
-    def on_overlay_ack(self, sound_id: str):
-        ev = self._pending_acks.get(sound_id)
-        if ev:
-            ev.set()
-
-    async def play_sound(
-        self,
-        source: Union[str, bytes, AsyncIterable[bytes], Callable[[], AsyncIterable[bytes]]],
-        *,
-        mime: str = "audio/mpeg",
-        meta: Optional[dict] = None,
-        require_ready: bool = True,
-        sound_id: Optional[str] = None,
-    ):
-        """
-        source:
-          - str: путь к файлу
-          - bytes: весь буфер (не рекомендуется для больших)
-          - AsyncIterable[bytes]: поток чанков (например, TTS)
-          - Callable -> AsyncIterable[bytes]: лениво создаём стрим (удобно для TTS)
-        """
-        if require_ready:
-            await self._overlay_ready.wait()
-
-        sid = sound_id or uuid.uuid4().hex
-        ack_event = asyncio.Event()
-        self._pending_acks[sid] = ack_event
-
-        await self._lock.acquire()
-        try:
-            # 1) сообщаем о старте
-            await self.ws.send_json({
-                "type": "sound_start",
-                "id": sid,
-                "mime": mime,
-                "meta": meta or {},
-            })
-
-            # 2) шлём чанки
-            async for chunk in self._iter_chunks(source):
-                # протокол: бинарные фреймы, или json с base64 — зависит от твоего оверлея
-                await self.ws.send_bytes(chunk)
-
-            # 3) сигнал конца
-            await self.ws.send_json({
-                "type": "sound_end",
-                "id": sid,
-            })
-
-            # 4) ждём ACK от оверлея
-            try:
-                await asyncio.wait_for(ack_event.wait(), timeout=self.ack_timeout)
-            except asyncio.TimeoutError:
-                # важно залогировать и продолжить — чтобы лок не завис
-                # при желании можно шлёпнуть команду стопа на оверлей
-                # await self.ws.send_json({"type":"sound_abort","id":sid})
-                raise
-
-        finally:
-            # аккуратно чистим состояние и точно отпускаем лок
-            self._pending_acks.pop(sid, None)
-            if self._lock.locked():
-                self._lock.release()
-
-    # ---------- helpers ----------
-
-    async def _iter_chunks(self, source) -> AsyncIterable[bytes]:
-        # путь к файлу
-        if isinstance(source, str):
-            # читаем порциями (без mmap, но можно и его)
-            async def file_iter(path: str):
-                loop = asyncio.get_running_loop()
-                # открытие файла в потоковом треде, чтобы не блокировать
-                def _read_all():
-                    with open(path, "rb") as f:
-                        while True:
-                            b = f.read(64 * 1024)
-                            if not b:
-                                break
-                            yield b
-                # оборачиваем синхронного генератора в асинхронный
-                for chunk in await loop.run_in_executor(None, lambda: list(_read_all())):
-                    yield chunk
-            async for c in file_iter(source):
-                yield c
-            return
-
-        # готовый буфер
-        if isinstance(source, (bytes, bytearray)):
-            yield bytes(source)
-            return
-
-        # асинхронный итерируемый поток
-        if hasattr(source, "__aiter__"):
-            async for c in source:
-                yield c
-            return
-
-        # фабрика стрима
-        if callable(source):
-            async for c in source():
-                yield c
-            return
-
-        raise TypeError("Unsupported sound source")
-'''

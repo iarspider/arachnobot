@@ -322,7 +322,7 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.1/socket.io.js"></script>
 
         <script>
-            const socket = io("http://overlay.home", {
+            const socket = io("http://overlay.home/overlay", {
                 transports: ["websocket"],
                 path: "/ws/",
             });
@@ -330,6 +330,7 @@
             let audioContext = new (window.AudioContext ||
                 window.webkitAudioContext)();
             let audioBuffer = [];
+            let sound_id = "";
 
             /* TRACK LOGIC */
             const $trackContainer = $("#track-container");
@@ -650,33 +651,36 @@
             }
 
             if (!navigator.userAgent.includes("firefox")) {
+                socket.on("mp3_start", (id) => {sound_id = id;});
+
                 socket.on("mp3_chunk", (chunk) => {
                     // Convert the received chunk (Base64 or binary) into a buffer
                     let arrayBuffer = new Uint8Array(chunk).buffer;
                     audioBuffer.push(arrayBuffer);
                 });
 
-                socket.on("mp3_end", () => {
-                    // Concatenate all chunks
-                    let fullBuffer = audioBuffer.reduce((acc, buffer) => {
-                        let tmp = new Uint8Array(
-                            acc.byteLength + buffer.byteLength
-                        );
-                        tmp.set(new Uint8Array(acc), 0);
-                        tmp.set(new Uint8Array(buffer), acc.byteLength);
-                        return tmp.buffer;
-                    }, new ArrayBuffer(0));
+                socket.on("mp3_end", (id) => {
+                        // Concatenate all chunks
+                        let fullBuffer = audioBuffer.reduce((acc, buffer) => {
+                            let tmp = new Uint8Array(
+                                acc.byteLength + buffer.byteLength
+                            );
+                            tmp.set(new Uint8Array(acc), 0);
+                            tmp.set(new Uint8Array(buffer), acc.byteLength);
+                            return tmp.buffer;
+                        }, new ArrayBuffer(0));
 
-                    // Decode and play the audio
-                    audioContext.decodeAudioData(fullBuffer, (decodedData) => {
-                        const source = audioContext.createBufferSource();
-                        source.buffer = decodedData;
-                        source.connect(audioContext.destination);
-                        source.onended = () => {
-                            socket.emit("audioFinished"); // Replace 'audioFinished' with your event name
-                        };
-                        source.start(0);
-                    });
+                        // Decode and play the audio
+                        audioContext.decodeAudioData(fullBuffer, (decodedData) => {
+                            const source = audioContext.createBufferSource();
+                            source.buffer = decodedData;
+                            source.connect(audioContext.destination);
+                            source.onended = () => {
+                                socket.emit("audioFinished", sound_id); // Replace 'audioFinished' with your event name
+                            };
+                            source.start(0);
+                        });
+
 
                     // Clear the buffer
                     audioBuffer = [];

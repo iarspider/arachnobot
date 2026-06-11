@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "twitch-bot-v5"
-version = "5.5.5"
+version = "5.7.0"
 description = ""
 authors = ["Ivan Razumov <iarspider@gmail.com>"]
 readme = "README.md"
